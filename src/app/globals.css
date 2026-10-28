@@ -123,3 +123,24 @@ main.esbatido[data-baixo="1"] { --fb: 18px; }
 @media (prefers-reduced-motion: reduce) {
   .esq { animation: none; }
 }
+
+/* Barras de scroll finas, como as da Cloudflare: polegar discreto (a cor de linha do tema), sem fundo e sem setas. Em @layer base para que os componentes que escondem a barra (.sem-barra, abas, barra lateral) a possam sobrepor. */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-kumo-line) transparent;
+  }
+}
+
+/* Elevação dos popups: janelas, menus, listas e a pesquisa têm todos a sombra do menu do Kumo; no tema escuro é mais escura, porque a sombra clara não se vê sobre fundo escuro. */
+:root {
+  --elevacao-popup: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+[data-mode="dark"] {
+  --elevacao-popup: 0 16px 32px -4px rgb(0 0 0 / 0.7), 0 6px 12px -4px rgb(0 0 0 / 0.55);
+}
+[role="dialog"],
+[role="menu"],
+[role="listbox"] {
+  --tw-shadow: var(--elevacao-popup);
+}

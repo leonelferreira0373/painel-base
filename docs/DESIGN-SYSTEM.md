@@ -54,6 +54,7 @@ O desenho segue o painel da Cloudflare e usa a biblioteca [`@cloudflare/kumo`](h
 
 - `Shell` (`src/components/Shell.tsx`) desenha a barra lateral, o cabeçalho, a pesquisa (Ctrl+K), o rodapé e a porta de entrada. **Não se mexe nele para acrescentar páginas**: o menu sai de `src/dados/estrutura.ts`.
 - A barra lateral é uma coluna de ícones que se expande ao passar o rato; há um botão «sempre aberta». No telemóvel abre como gaveta e mostra sempre os nomes.
+- **O botão da barra** (`AlternarBarra`) é o `Sidebar.Trigger` do Kumo com o ícone animado do próprio Kumo: a barra vertical **desliza** de um lado para o outro (`translate-x-px` aberta, `translate-x-[10.5px]` fechada). Não se muda o ícone nem se pinta o botão de escuro quando está ativo. No telemóvel o ícone segue o estado da gaveta.
 - O perfil fica no canto superior esquerdo da barra (avatar, trocar de conta, definições da conta, tema, terminar sessão).
 - As páginas de entrada (`/entrar/`, `/registar/`, …) não têm o `Shell`: usam as molduras de `src/components/auth/Moldura.tsx`.
 
@@ -106,6 +107,19 @@ Usa-se sempre o componente do Kumo; **nunca** um `<button>`, `<input>` ou `<sele
 | Estado vazio de página | `Empty` (Kumo) | Ícone, título, descrição e, no máximo, um botão. |
 | Avisos passageiros | `toasts.add({ title })` ou `avisar()` | `avisar` está em `useApp()`. |
 | Pesquisa rápida | `CommandPalette` | Já está no `Shell`. |
+
+## 5a. Popups, janelas e sombras
+
+- **Uma só elevação.** Janelas (`Dialog`, `Confirmar`), menus (`DropdownMenu`), listas (`Select`), popovers e a pesquisa rápida têm a mesma sombra: o tamanho `shadow-lg` do Kumo mais o anel fino do tema. Vem de `--elevacao-popup` em `globals.css` (aplicada a `role="dialog"`, `menu` e `listbox`); **no tema escuro é mais escura**, porque uma sombra clara não se vê sobre fundo escuro. Nunca ponha sombras à mão num popup.
+- Popups de contas e menus têm 288 px de largura (`w-[288px]`, no máximo `100vw - 16px`) e cantos `rounded-lg`. As linhas dos popups usam a constante `LINHA_POPUP` do `Shell` (altura 36 px, `rounded-md`, realce `bg-kumo-tint`).
+- A pesquisa rápida e as janelas ficam **centradas na horizontal**; a pesquisa fica a 10 % do topo. No telemóvel, a pesquisa ocupa o ecrã inteiro.
+- **Seletor de contas** (`PerfilLateral`, no canto superior esquerdo da barra), igual ao da Cloudflare: campo «Pesquisar contas…» com a lupa de 14 px e linha por baixo; lista de contas com avatar, nome, função e e-mail e um visto na atual; separador; «Criar conta»; depois as definições da conta, o tema (três botões de ícone) e «Terminar sessão». Abre por baixo do seletor, alinhado à esquerda.
+
+## 5b. Barras de scroll
+
+- Todas as barras de scroll são **finas**, sem fundo nem setas, com o polegar na cor de linha do tema (`scrollbar-width: thin; scrollbar-color: var(--color-kumo-line) transparent`, em `@layer base` de `globals.css`). Não se estilizam barras à mão.
+- A barra lateral usa a barra do próprio Kumo (`ScrollArea`): 6 px, polegar `bg-kumo-line` que só aparece ao passar o rato ou ao rolar, com desvanecimento em cima e em baixo.
+- Para esconder a barra mantendo o scroll (a página principal, filas deslizantes), use `sem-barra`.
 
 ## 6. Gráficos
 
@@ -169,7 +183,7 @@ Sempre que uma área rola e há mais conteúdo para lá da borda, a ponta **desv
 ## 12. Avatar e perfil
 
 - O avatar sem fotografia é um círculo com o mesmo CSS do botão principal e as **iniciais em branco** (`Avatar`, `iniciaisDe`). Com fotografia, mostra a imagem.
-- O menu do perfil (`PerfilLateral` no `Shell`) tem: cabeçalho com nome e e-mail, definições da conta, tema (claro, escuro, sistema), trocar de conta e terminar sessão.
+- O popup do perfil (`PerfilLateral` no `Shell`) é o seletor de contas da secção 5a: trocar de conta, criar conta, definições da conta, tema (claro, escuro, sistema) e terminar sessão.
 
 ## 13. Formulários
 

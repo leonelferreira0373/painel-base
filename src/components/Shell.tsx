@@ -1,7 +1,7 @@
 // Estrutura do painel, igual à do painel da Cloudflare: coluna de ícones que se expande, cabeçalho de 58 px com o caminho da página, conteúdo centrado e rodapé com ligações. No telemóvel, a barra lateral abre como gaveta.
 "use client";
 
-import { Breadcrumbs, Button, CommandPalette, DropdownMenu, Sidebar, Toasty, Tooltip, TooltipProvider, useSidebar } from "@cloudflare/kumo";
+import { Breadcrumbs, Button, CommandPalette, Popover, Sidebar, Toasty, Tooltip, TooltipProvider, useSidebar } from "@cloudflare/kumo";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -20,6 +20,7 @@ import { Avatar } from "./Avatar";
 import { CorpoDica, Dica } from "./Dica";
 import { EsbatidoGlobal } from "./Estados";
 import { Ic, ICONES } from "./Icones";
+import { BotaoIcone } from "./ui";
 
 export function localizar(pathname: string): { areaId: string; moduloId: string } {
   const partes = pathname.split("/").filter(Boolean);
@@ -27,13 +28,23 @@ export function localizar(pathname: string): { areaId: string; moduloId: string 
   return { areaId: partes[0], moduloId: partes[1] ?? "" };
 }
 
+/** O ícone do painel que o Kumo desenha no botão da barra (a barra vertical desliza de um lado para o outro). Copiado porque o do Kumo só segue a barra do computador e no telemóvel a barra é uma gaveta. */
+function IconeBarra({ aberto }: { aberto: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="shrink-0">
+      <path d="M21.25 6.72v10.56a2.97 2.97 0 0 1-2.97 2.97H5.72a2.97 2.97 0 0 1-2.97-2.97V6.72a2.97 2.97 0 0 1 2.97-2.97h12.56a2.97 2.97 0 0 1 2.97 2.97" />
+      <path d="M6.25 7.25v9.5" className={`transition-transform duration-(--sidebar-animation-duration) ease-(--sidebar-easing) ${aberto ? "translate-x-px" : "translate-x-[10.5px]"}`} />
+    </svg>
+  );
+}
+
 function AlternarBarra() {
   const { open, openMobile, isMobile } = useSidebar();
   const aberto = isMobile ? openMobile : open;
   return (
     <Dica conteudo={aberto ? "Recolher o menu" : "Fixar o menu aberto. Também abre ao passar o rato pelos ícones."} lado="right">
-      <Sidebar.Trigger aria-label={aberto ? "Fechar menu" : "Abrir menu"} aria-pressed={aberto} className={aberto ? "bg-(--sidebar-active-bg) text-kumo-default" : ""}>
-        <Ic nome="barra" tamanho={18} peso={aberto ? "fill" : "regular"} />
+      <Sidebar.Trigger aria-label={aberto ? "Fechar menu" : "Abrir menu"} className="cursor-default">
+        <IconeBarra aberto={aberto} />
       </Sidebar.Trigger>
     </Dica>
   );
@@ -45,23 +56,38 @@ const TEMAS: { id: Tema; rotulo: string; icone: "sol" | "lua" | "monitor" }[] = 
   { id: "sistema", rotulo: "Igual ao sistema", icone: "monitor" },
 ];
 
+/** Linha de um menu em popup: a mesma altura, cantos e realce em todos os popups do painel. */
+const LINHA_POPUP = "flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-kumo-default transition-colors hover:bg-kumo-tint focus-visible:bg-kumo-tint focus-visible:outline-none";
+
+/** O popup do perfil, como o seletor de contas da Cloudflare: pesquisa, lista de contas com visto na atual e «Criar conta»; por baixo, as definições da conta, o tema e terminar sessão. */
 function PerfilLateral() {
   const { funcao } = useApp();
   const { conta, terminarSessao, trocarConta } = useConta();
   const { tema, definir } = useTema();
-  const { open, isMobile, isPeeking } = useSidebar();
+  const { open, isMobile, isPeeking, setOpenMobile } = useSidebar();
+  const [aberto, setAberto] = useState(false);
+  const [q, setQ] = useState("");
   const expandido = open || isMobile || isPeeking;
-  const iconeTema = TEMAS.find((t) => t.id === tema)?.icone ?? "sol";
+  useEffect(() => {
+    if (!aberto) setQ("");
+  }, [aberto]);
+  const termo = q.trim().toLowerCase();
+  const contas = FUNCOES.filter((f) => termo === "" || `${f.pessoa} ${f.rotulo} ${emailDe(f)}`.toLowerCase().includes(termo));
+  const fechar = () => {
+    setAberto(false);
+    if (isMobile) setOpenMobile(false);
+  };
   const ligacao = (secao: string, rotulo: string, icone: "pessoa" | "escudo" | "campainha" | "lembrete") => (
-    <DropdownMenu.LinkItem href={caminhoConta(secao)} icon={<Ic nome={icone} />} render={<Link href={caminhoConta(secao)} />}>
+    <Link key={secao} href={caminhoConta(secao)} onClick={fechar} className={LINHA_POPUP}>
+      <Ic nome={icone} tamanho={16} className="shrink-0 text-kumo-subtle" />
       {rotulo}
-    </DropdownMenu.LinkItem>
+    </Link>
   );
   return (
     <div className="flex h-[58px] min-w-0 flex-1 items-center">
-      <DropdownMenu>
-        <Dica bloco lado="right" conteudo={<CorpoDica titulo={conta.nome} texto={`${funcao.rotulo}. Abra o menu para as definições da conta, o tema e para trocar de conta.`} />}>
-          <DropdownMenu.Trigger
+      <Popover.Root open={aberto} onOpenChange={setAberto}>
+        <Dica bloco lado="right" conteudo={<CorpoDica titulo={conta.nome} texto={`${funcao.rotulo}. Abra o menu para trocar de conta, para as definições da conta e para o tema.`} />}>
+          <Popover.Trigger
             render={
               <button aria-label={T.topo.mudarFuncao} title="" className={`flex h-10 items-center rounded-lg text-left transition-colors hover:bg-kumo-tint ${expandido ? "-ml-2 w-[calc(100%+8px)] gap-2.5 px-2" : "w-8 justify-center"}`}>
                 <Avatar foto={conta.foto} nome={conta.nome} tamanho={32} />
@@ -75,53 +101,76 @@ function PerfilLateral() {
             }
           />
         </Dica>
-        <DropdownMenu.Content className="w-[288px]">
-          <div className="flex items-center gap-3 px-2.5 py-2">
-            <Avatar foto={conta.foto} nome={conta.nome} tamanho={40} />
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-kumo-default">{conta.nome}</div>
-              <div className="truncate text-xs text-kumo-subtle">{conta.email}</div>
-              <div className="truncate text-xs text-kumo-subtle">{funcao.rotulo}</div>
-            </div>
-          </div>
-          <DropdownMenu.Separator />
-          {ligacao("perfil", "Definições da conta", "pessoa")}
-          {ligacao("seguranca", "Segurança", "escudo")}
-          {ligacao("notificacoes", "Notificações", "campainha")}
-          {ligacao("lembretes", "Lembretes", "lembrete")}
-          <DropdownMenu.Separator />
-          <DropdownMenu.Sub>
-            <DropdownMenu.SubTrigger icon={<Ic nome={iconeTema} />}>Tema</DropdownMenu.SubTrigger>
-            <DropdownMenu.SubContent>
-              {TEMAS.map((t) => (
-                <DropdownMenu.Item key={t.id} icon={<Ic nome={t.icone} />} selected={t.id === tema} onClick={() => definir(t.id)}>
-                  {t.rotulo}
-                </DropdownMenu.Item>
-              ))}
-            </DropdownMenu.SubContent>
-          </DropdownMenu.Sub>
-          <DropdownMenu.Sub>
-            <DropdownMenu.SubTrigger icon={<Ic nome="trocar" />}>Trocar de conta</DropdownMenu.SubTrigger>
-            <DropdownMenu.SubContent>
-              {FUNCOES.map((f) => (
-                <DropdownMenu.Item key={f.id} selected={f.id === funcao.id} onClick={() => trocarConta(f.id)}>
-                  <span className="flex items-center gap-2.5">
+        <Popover.Portal>
+          <Popover.Positioner side="bottom" align="start" sideOffset={8}>
+            <Popover.Popup className="w-[288px] max-w-[calc(100vw-16px)] overflow-hidden p-0">
+              <div className="flex items-center border-b border-kumo-line pr-3">
+                <Ic nome="lupa" tamanho={14} className="ml-3 shrink-0 text-kumo-subtle" />
+                <input
+                  type="text"
+                  role="combobox"
+                  aria-label="Pesquisar contas"
+                  aria-controls="lista-contas"
+                  aria-expanded="true"
+                  aria-autocomplete="list"
+                  placeholder="Pesquisar contas…"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  className="min-w-0 grow border-0 bg-transparent px-2 py-2.5 font-sans text-sm text-kumo-default outline-none placeholder:text-kumo-subtle"
+                />
+              </div>
+              <div id="lista-contas" role="listbox" aria-label="Contas" className="max-h-[176px] overflow-y-auto p-1.5">
+                {contas.length === 0 && <div className="px-2.5 py-2 text-sm text-kumo-subtle">{T.topo.semResultados}</div>}
+                {contas.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    role="option"
+                    aria-selected={f.id === funcao.id}
+                    onClick={() => {
+                      if (f.id !== funcao.id) trocarConta(f.id);
+                      fechar();
+                    }}
+                    className={`${LINHA_POPUP} h-auto py-1.5 ${f.id === funcao.id ? "bg-kumo-tint" : ""}`}
+                  >
                     <Avatar nome={f.pessoa} tamanho={24} />
-                    <span className="flex min-w-0 flex-col leading-tight">
+                    <span className="flex min-w-0 flex-1 flex-col leading-tight">
                       <span className="truncate">{f.pessoa}</span>
-                      <span className="truncate text-xs text-kumo-subtle">{f.rotulo} · {emailDe(f)}</span>
+                      <span className="truncate text-xs text-kumo-subtle">
+                        {f.rotulo} · {emailDe(f)}
+                      </span>
                     </span>
-                  </span>
-                </DropdownMenu.Item>
-              ))}
-            </DropdownMenu.SubContent>
-          </DropdownMenu.Sub>
-          <DropdownMenu.Separator />
-          <DropdownMenu.Item icon={<Ic nome="sair" />} variant="danger" onClick={terminarSessao}>
-            Terminar sessão
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu>
+                    {f.id === funcao.id && <Ic nome="certo" tamanho={16} className="shrink-0" />}
+                  </button>
+                ))}
+              </div>
+              <div className="border-t border-kumo-line p-1.5">
+                <Link href="/registar/" onClick={fechar} className={LINHA_POPUP}>
+                  <Ic nome="mais" tamanho={16} className="shrink-0" />
+                  Criar conta
+                </Link>
+              </div>
+              <div className="border-t border-kumo-line p-1.5">
+                {ligacao("perfil", "Definições da conta", "pessoa")}
+              </div>
+              <div className="flex items-center justify-between border-t border-kumo-line py-1.5 pl-4 pr-2.5">
+                <span className="text-sm text-kumo-default">Tema</span>
+                <div className="flex gap-1">
+                  {TEMAS.map((t) => (
+                    <BotaoIcone key={t.id} dica={t.rotulo} icone={t.icone} tamanho="sm" variante={t.id === tema ? "secondary" : "ghost"} aoClicar={() => definir(t.id)} />
+                  ))}
+                </div>
+              </div>
+              <div className="border-t border-kumo-line p-1.5">
+                <button type="button" onClick={terminarSessao} className={`${LINHA_POPUP} text-kumo-danger`}>
+                  <Ic nome="sair" tamanho={16} className="shrink-0" />
+                  Terminar sessão
+                </button>
+              </div>
+            </Popover.Popup>
+          </Popover.Positioner>
+        </Popover.Portal>
+      </Popover.Root>
     </div>
   );
 }
