@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+*.tsbuildinfo
+next-env.d.ts
+public/vendor
+.env*
+!.env.example
+public/_teste
+_antigo
+.next-build
+servidor-auth/dados/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,77 @@
+# Pilha do painel. A web só fala com o túnel da Cloudflare; não publica portas no servidor.
+# O token do túnel vem do ambiente (.env, que não vai para o Git), nunca do ficheiro.
+services:
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_URL_SITE: ${NEXT_PUBLIC_URL_SITE:-}
+    image: painel/web:${VERSAO:-local}
+    container_name: painel-web
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks: [interna]
+
+  tunel:
+    image: cloudflare/cloudflared:latest
+    container_name: painel-tunel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      web:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    networks: [interna]
+    profiles: [publico]
+
+  # Pré-visualização local, sem túnel: docker compose --profile local up
+  local:
+    image: painel/web:${VERSAO:-local}
+    container_name: painel-local
+    ports:
+      - "127.0.0.1:3010:8080"
+    depends_on:
+      web:
+        condition: service_healthy
+    profiles: [local]
+    networks: [interna]
+
+  # Autenticação do painel: docker compose --profile auth up. O segredo vem do ambiente (cofre), nunca do ficheiro.
+  auth:
+    build: ./servidor-auth
+    image: painel/auth:${VERSAO:-local}
+    container_name: painel-auth
+    restart: unless-stopped
+    read_only: true
+    environment:
+      AUTH_SEGREDO: ${AUTH_SEGREDO:-}
+      AUTH_ORIGENS: ${AUTH_ORIGENS:-http://localhost:3010}
+      AUTH_DADOS: /dados/utilizadores.json
+    volumes:
+      - auth-dados:/dados
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks: [interna]
+    profiles: [auth]
+
+volumes:
+  auth-dados:
+
+networks:
+  interna:
+    driver: bridge

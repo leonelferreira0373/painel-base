@@ -1,0 +1,55 @@
+// Escolhe o ecrã de cada módulo e aplica o controlo de acesso simulado da função ativa.
+"use client";
+
+import { Button, Empty } from "@cloudflare/kumo";
+import { moduloPorIds } from "@/dados/estrutura";
+import { REGISTOS } from "@/dados/modulos";
+import { FUNCOES, podeVer } from "@/dados/rbac";
+import { T } from "@/dados/textos";
+import { useApp } from "@/lib/estado";
+import { Exportar } from "./analise/Exportar";
+import { Ficheiros } from "./analise/Ficheiros";
+import { GraficosPagina } from "./analise/Graficos";
+import { Perfil } from "./analise/Perfil";
+import { Ic, ICONES } from "./Icones";
+import { PAINEIS } from "./Paineis";
+import { Registos } from "./Registos";
+import { Pagina } from "./ui";
+import { VisaoGeral } from "./VisaoGeral";
+
+function SemAcesso() {
+  const { funcao, mudarFuncao } = useApp();
+  const alternativa = FUNCOES.find((f) => f.id !== funcao.id && f.id === "administrador") ?? FUNCOES[0];
+  return (
+    <Pagina>
+      <Empty
+        icon={<Ic nome="cadeado" tamanho={40} />}
+        title={T.acesso.titulo}
+        description={T.acesso.texto}
+        contents={
+          <Button variant="primary" icon={ICONES.pessoa} onClick={() => mudarFuncao(alternativa.id)}>
+            {alternativa.rotulo}
+          </Button>
+        }
+      />
+    </Pagina>
+  );
+}
+
+export function Modulo({ areaId, moduloId }: { areaId: string; moduloId: string }) {
+  const { funcao } = useApp();
+  const loc = moduloPorIds(areaId, moduloId);
+  if (!loc) return <SemAcesso />;
+  if (!podeVer(funcao, areaId, moduloId)) return <SemAcesso />;
+  if (areaId === "inicio") return <VisaoGeral />;
+  if (areaId === "analise") {
+    if (moduloId === "ficheiros") return <Ficheiros />;
+    if (moduloId === "perfil") return <Perfil />;
+    if (moduloId === "graficos") return <GraficosPagina />;
+    return <Exportar />;
+  }
+  const Painel = PAINEIS[moduloId];
+  if (Painel) return <Painel />;
+  if (REGISTOS[moduloId]) return <Registos moduloId={moduloId} />;
+  return <SemAcesso />;
+}

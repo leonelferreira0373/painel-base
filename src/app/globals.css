@@ -1,0 +1,125 @@
+@source "../../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
+@import "@cloudflare/kumo/styles";
+@import "tailwindcss";
+
+:root,
+:host {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+html {
+  interpolate-size: allow-keywords;
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--color-kumo-canvas);
+  color: rgb(49, 49, 49);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-mode="dark"] body {
+  color: var(--text-color-kumo-default);
+}
+
+/* Preferências da conta que mudam a página inteira. */
+html[data-movimento="reduzido"] *,
+html[data-movimento="reduzido"] ::before,
+html[data-movimento="reduzido"] ::after {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+}
+html[data-dicas="off"] [role="tooltip"],
+html[data-dicas="off"] .dica-info {
+  display: none !important;
+}
+
+/* As dicas não têm «bico»: o painel da Cloudflare não os usa. */
+div:has(> svg > path.fill-kumo-arrow-edge),
+svg:has(> path.fill-kumo-arrow-edge) {
+  display: none !important;
+}
+
+/* Telemóvel: tudo sangra até aos bordos do ecrã, sem cantos redondos nem margens laterais; os títulos mantêm a margem de 16 px. */
+@media (max-width: 639px) {
+  .pleno {
+    margin-inline: -16px;
+    border-radius: 0 !important;
+    border-inline-width: 0 !important;
+    box-shadow:
+      inset 0 1px 0 0 var(--color-kumo-hairline),
+      inset 0 -1px 0 0 var(--color-kumo-hairline) !important;
+  }
+  /* A pesquisa rápida ocupa o ecrã inteiro e acompanha o teclado. */
+  [role="dialog"][class*="max-w-2xl"] {
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    max-width: none !important;
+    height: 100dvh;
+    transform: none !important;
+    border-radius: 0 !important;
+  }
+  [role="dialog"][class*="max-w-2xl"] > div {
+    height: 100%;
+    max-height: none !important;
+    border-radius: 0 !important;
+  }
+}
+
+.sem-barra {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.sem-barra::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Desvanecimento nas pontas: quando uma área rola e há mais conteúdo para lá da borda, a ponta esbate em vez de cortar. */
+@property --fe { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fd { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fc { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fb { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.esbatido {
+  transition: --fe 0.2s ease, --fd 0.2s ease, --fc 0.2s ease, --fb 0.2s ease;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fe), #000 calc(100% - var(--fd)), transparent 100%), linear-gradient(to bottom, transparent 0, #000 var(--fc), #000 calc(100% - var(--fb)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fe), #000 calc(100% - var(--fd)), transparent 100%), linear-gradient(to bottom, transparent 0, #000 var(--fc), #000 calc(100% - var(--fb)), transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.esbatido[data-ini="1"] { --fe: 40px; }
+.esbatido[data-fim="1"] { --fd: 40px; }
+.esbatido[data-cima="1"] { --fc: 28px; }
+.esbatido[data-baixo="1"] { --fb: 28px; }
+main.esbatido[data-cima="1"] { --fc: 18px; }
+main.esbatido[data-baixo="1"] { --fb: 18px; }
+
+/* Esqueletos de carregamento: barras cinzentas com um brilho que passa, como os da Cloudflare. */
+.esq {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--color-kumo-tint) 0%, color-mix(in srgb, var(--color-kumo-tint) 40%, var(--color-kumo-base)) 50%, var(--color-kumo-tint) 100%);
+  background-size: 220% 100%;
+  animation: esq 1.5s ease-in-out infinite;
+}
+@keyframes esq {
+  from { background-position: 220% 0; }
+  to { background-position: -220% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .esq { animation: none; }
+}

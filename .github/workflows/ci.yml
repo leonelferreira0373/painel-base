@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Padrões de código
+        run: npm run padroes
+      - name: Testes (inclui a coerência dos dados)
+        run: npm test
+      - name: Compilação (gera os tipos do Next e a exportação estática)
+        run: npm run build
+      - name: Tipos
+        run: npm run typecheck

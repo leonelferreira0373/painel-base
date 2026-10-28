@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+.git
+_antigo
+public/_teste
+public/vendor
+*.log
+tsconfig.tsbuildinfo
+.next-build
+servidor-auth
