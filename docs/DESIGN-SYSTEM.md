@@ -113,13 +113,31 @@ Usa-se sempre o componente do Kumo; **nunca** um `<button>`, `<input>` ou `<sele
 - **Uma só elevação.** Janelas (`Dialog`, `Confirmar`), menus (`DropdownMenu`), listas (`Select`), popovers e a pesquisa rápida têm a mesma sombra: o tamanho `shadow-lg` do Kumo mais o anel fino do tema. Vem de `--elevacao-popup` em `globals.css` (aplicada a `role="dialog"`, `menu` e `listbox`); **no tema escuro é mais escura**, porque uma sombra clara não se vê sobre fundo escuro. Nunca ponha sombras à mão num popup.
 - Popups de contas e menus têm 288 px de largura (`w-[288px]`, no máximo `100vw - 16px`) e cantos `rounded-lg`. As linhas dos popups usam a constante `LINHA_POPUP` do `Shell` (altura 36 px, `rounded-md`, realce `bg-kumo-tint`).
 - A pesquisa rápida e as janelas ficam **centradas na horizontal**; a pesquisa fica a 10 % do topo. No telemóvel, a pesquisa ocupa o ecrã inteiro.
-- **Seletor de contas** (`PerfilLateral`, no canto superior esquerdo da barra), igual ao da Cloudflare: campo «Pesquisar contas…» com a lupa de 14 px e linha por baixo; lista de contas com avatar, nome, função e e-mail e um visto na atual; separador; «Criar conta»; depois as definições da conta, o tema (três botões de ícone) e «Terminar sessão». Abre por baixo do seletor, alinhado à esquerda.
+- **Seletor de contas** (`PerfilLateral`, no canto superior esquerdo da barra), igual ao da Cloudflare: campo «Pesquisar contas…» com a lupa de 14 px e linha por baixo; lista de contas com avatar, nome, função e e-mail e um visto na atual; separador; «Criar conta»; e nada mais: as definições, o tema, o idioma, o fuso e «Terminar sessão» estão no menu do utilizador (secção 5d). Abre por baixo do seletor, alinhado à esquerda.
 
 ## 5b. Barras de scroll
 
 - Todas as barras de scroll são **finas**, sem fundo nem setas, com o polegar na cor de linha do tema (`scrollbar-width: thin; scrollbar-color: var(--color-kumo-line) transparent`, em `@layer base` de `globals.css`). Não se estilizam barras à mão.
 - A barra lateral usa a barra do próprio Kumo (`ScrollArea`): 6 px, polegar `bg-kumo-line` que só aparece ao passar o rato ou ao rolar, com desvanecimento em cima e em baixo.
 - Para esconder a barra mantendo o scroll (a página principal, filas deslizantes), use `sem-barra`.
+
+## 5c. Etiquetas de estado, ordenar e copiar
+
+- **Etiqueta de estado** (`Estado`): pílula branca (escura no tema escuro) com anel fino, sombra `shadow-xs` e um **ponto colorido**: verde (concluído, ativo), vermelho (recusado, bloqueado), âmbar (atenção) ou cinzento (neutro). Nunca uma etiqueta plana. Os estados que se atualizam sozinhos (por exemplo, o do cliente no cabeçalho) usam a mesma etiqueta.
+- **Colunas ordenáveis**: o duplo «⌃⌄» (`IconeOrdem`). Ao ordenar, o lado escolhido fica a **negrito e escuro** e o outro apagado; sem ordenação, ambos apagados.
+- **Copiar**: `BotaoCopiar` (`conta/Pecas.tsx`). **Sem avisos flutuantes**: o próprio botão passa a visto (copiou) ou a triângulo de aviso (não conseguiu), e a dica diz o que aconteceu («Copiado», «Não foi possível copiar para a área de transferência»).
+
+## 5d. Menu do utilizador, pesquisa e atalhos
+
+- **Menu do utilizador** (`MenuUtilizador`, canto superior direito do cabeçalho, como o da Cloudflare): e-mail, Definições da conta, Aparência ▸ (claro, escuro, sistema), Idioma ▸, Fuso horário ▸ e Terminar sessão. Os submenus abrem para o lado onde houver espaço (a colisão é do Base UI: não a reimplemente).
+- **Pesquisa rápida** (`Pesquisa`): «Recentes» (até 5, com a área ao lado), os módulos por área, as definições da conta, «Dicas de pesquisa» quando o campo está vazio e um rodapé «↑ ↓ para navegar · ↵ para escolher».
+- **Atalhos de teclado configuráveis**: `dados/atalhos.ts` define as ações e as combinações de origem; o utilizador muda-as em Definições da conta → Atalhos (`SecaoAtalhos`) e `AtalhosGlobais` (no `Shell`) executa-os. Tem de incluir Ctrl ou Alt (ou ser uma tecla F), não pode ser uma do navegador nem repetir outra. Para um atalho novo, ver `docs/ADICIONAR-MODULO.md`, receita 11.
+
+## 5e. Assistente de IA
+
+- O botão **«Perguntar à IA»** (ícone de faíscas e texto; só o ícone abaixo de 768 px) fica no cabeçalho, ao lado da pesquisa. Abre o assistente `ai-chat` (github.com/ferreirakorp/ai-chat): painel em baixo, à direita, com respostas em fluxo, raciocínio visível, avaliação de cada resposta e histórico neste dispositivo.
+- **Autorização**: a conversa só é guardada para a equipa depois de a pessoa carregar em «Autorizo» (ou recusar com o botão vermelho); pode parar e apagar quando quiser. Esta lógica é do módulo; não se duplica.
+- O botão redondo do módulo fica escondido (`styles/assistente.css`); as cores vêm das variáveis `--aia-*` ligadas aos tokens do tema. Conteúdo e perguntas prontas em `dados/assistente.ts`. Ver `docs/ASSISTENTE.md`.
 
 ## 6. Gráficos
 
@@ -183,7 +201,7 @@ Sempre que uma área rola e há mais conteúdo para lá da borda, a ponta **desv
 ## 12. Avatar e perfil
 
 - O avatar sem fotografia é um círculo com o mesmo CSS do botão principal e as **iniciais em branco** (`Avatar`, `iniciaisDe`). Com fotografia, mostra a imagem.
-- O popup do perfil (`PerfilLateral` no `Shell`) é o seletor de contas da secção 5a: trocar de conta, criar conta, definições da conta, tema (claro, escuro, sistema) e terminar sessão.
+- O seletor de contas (`PerfilLateral` no `Shell`, secção 5a) troca de conta e cria contas; o menu do utilizador (`MenuUtilizador`, secção 5d) tem as definições da conta, a aparência, o idioma, o fuso e terminar sessão.
 
 ## 13. Formulários
 

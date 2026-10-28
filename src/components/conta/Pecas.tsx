@@ -2,8 +2,8 @@
 "use client";
 
 import { Button, Dialog, Surface, Switch } from "@cloudflare/kumo";
-import { useState, type ReactNode } from "react";
-import { DicaInfo } from "../Dica";
+import { useEffect, useState, type ReactNode } from "react";
+import { Dica, DicaInfo } from "../Dica";
 import { ICONES } from "../Icones";
 
 export function Cartao({ titulo, dica, acoes, children, perigo = false }: { titulo: string; dica?: string; acoes?: ReactNode; children: ReactNode; perigo?: boolean }) {
@@ -136,6 +136,30 @@ export function mascarar(email: string): string {
 export const codigoSimulado = () => String(Math.floor(100000 + Math.random() * 900000));
 
 /** Copia para a área de transferência, se o navegador deixar. */
+/** Botão de copiar: sem avisos flutuantes, o próprio botão passa a visto (copiou) ou a triângulo de aviso (não conseguiu), com a dica a explicar. */
+export function BotaoCopiar({ texto, rotulo, dica = "Copiar", tamanho = "base", variante = "secondary", quadrado = false }: { texto: string; rotulo?: string; dica?: string; tamanho?: "xs" | "sm" | "base"; variante?: "ghost" | "secondary"; quadrado?: boolean }) {
+  const [resultado, setResultado] = useState<"ok" | "erro" | null>(null);
+  useEffect(() => {
+    if (!resultado) return;
+    const t = window.setTimeout(() => setResultado(null), 2200);
+    return () => window.clearTimeout(t);
+  }, [resultado]);
+  const icone = resultado === "ok" ? ICONES.certo : resultado === "erro" ? ICONES.aviso : ICONES.copiar;
+  const copiarTexto = async () => setResultado((await copiar(texto)) ? "ok" : "erro");
+  const mensagem = resultado === "ok" ? "Copiado" : resultado === "erro" ? "Não foi possível copiar para a área de transferência" : dica;
+  return (
+    <Dica conteudo={mensagem}>
+      {quadrado ? (
+        <Button variant={variante} size={tamanho} shape="square" icon={icone} aria-label={mensagem} onClick={copiarTexto} />
+      ) : (
+        <Button variant={variante} size={tamanho} icon={icone} onClick={copiarTexto}>
+          {rotulo}
+        </Button>
+      )}
+    </Dica>
+  );
+}
+
 export async function copiar(texto: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(texto);

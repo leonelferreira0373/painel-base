@@ -160,11 +160,27 @@ Só se nenhuma peça existente serve:
 
 ---
 
+## 11. Um atalho de teclado novo
+
+1. **`src/dados/atalhos.ts`:** nova entrada em `ATALHOS` (`id`, `rotulo`, `descricao`, `padrao` como «Ctrl+K»).
+2. **`AtalhosGlobais`, em `src/components/Shell.tsx`:** um ramo novo `else if (id === "…")` com o que o atalho faz.
+3. A secção Atalhos das definições da conta mostra-o sozinha, com «Alterar» e «Repor».
+
+---
+
+## 12. O assistente de IA
+
+- **Conteúdo** (nome, convites, perguntas e respostas prontas, instruções da IA): `src/dados/assistente.ts`. As perguntas prontas servem de sugestões e de resposta quando a IA não está disponível.
+- **Cores**: `src/styles/assistente.css` liga as variáveis `--aia-*` aos tokens do tema.
+- **Servidor da IA** (opcional): ver `docs/ASSISTENTE.md`.
+
+---
+
 ## 10. Mudar de produto (identidade)
 
 Ao criar um painel novo a partir deste:
 
-1. `package.json`: `name` e `description`.
+1. `package.json`: `name` e `description`. `src/dados/projeto.ts`: `contaId`, o identificador (de demonstração) que vai no meio de todos os endereços; use um novo, aleatório, de 32 caracteres hexadecimais.
 2. `src/dados/textos.ts`: `meta.titulo` e `meta.descricao`. `src/dados/projeto.ts`: o endereço público (ou a variável `NEXT_PUBLIC_URL_SITE`).
 3. `src/app/icon.svg`: o ícone do site.
 4. A cor da marca: defina `--color-kumo-brand` (e, se quiser, as variações do botão principal) em `:root` no `src/app/globals.css`; confira os dois temas.

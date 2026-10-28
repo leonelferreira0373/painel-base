@@ -16,6 +16,7 @@ export const SECOES_CONTA: SecaoConta[] = [
   { id: "notificacoes", rotulo: "Notificações", icone: "campainha", descricao: "O que recebe, por onde, a que horas e quem decide por si quando está ausente." },
   { id: "lembretes", rotulo: "Lembretes", icone: "lembrete", descricao: "Avisos seus, com data, hora e repetição." },
   { id: "aparencia", rotulo: "Aparência", icone: "paleta", descricao: "Tema claro ou escuro, movimento, dicas e a barra lateral." },
+  { id: "atalhos", rotulo: "Atalhos", icone: "teclado", descricao: "As combinações de teclas para abrir a pesquisa, a barra lateral e outras ações." },
   { id: "tokens", rotulo: "Chaves de acesso pessoais", icone: "chave", descricao: "Chaves para ligar outras aplicações à sua conta, com validade e permissões." },
   { id: "dados", rotulo: "Dados e privacidade", icone: "cadeado", descricao: "Descarregar os seus dados, ver a atividade da conta e pedir a eliminação." },
 ];
@@ -57,12 +58,4 @@ export const AMBITOS = [
   { id: "ler", rotulo: "Ler", dica: "Consultar pedidos, clientes e documentos." },
   { id: "escrever", rotulo: "Escrever", dica: "Criar e alterar registos em seu nome." },
   { id: "exportar", rotulo: "Exportar", dica: "Descarregar dados em CSV, Excel ou PDF." },
-];
-
-export const ATALHOS = [
-  { teclas: "Ctrl + K", acao: "Abrir a pesquisa rápida" },
-  { teclas: "Esc", acao: "Fechar uma janela ou o menu aberto" },
-  { teclas: "Enter", acao: "Escolher o resultado selecionado na pesquisa" },
-  { teclas: "↑ ↓", acao: "Mover-se pelos resultados e pelos menus" },
-  { teclas: "→", acao: "Abrir um submenu" },
 ];

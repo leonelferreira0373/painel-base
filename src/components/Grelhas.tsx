@@ -2,6 +2,7 @@
 "use client";
 
 import { Button, DropdownMenu, Empty, Input, LayerCard, Pagination, Table, Tooltip } from "@cloudflare/kumo";
+import { caminho } from "@/dados/estrutura";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { T } from "@/dados/textos";
@@ -57,14 +58,24 @@ function SemLinhas({ pesquisa, aoLimpar }: { pesquisa: string; aoLimpar: () => v
   );
 }
 
-function Cabeca({ rotulo, ordenada, aoOrdenar, numerica, sub, dica, menu }: { rotulo: string; ordenada: boolean; aoOrdenar: () => void; numerica?: boolean; sub?: string; dica?: ReactNode; menu?: ReactNode }) {
+/** O duplo «⌃⌄» das colunas ordenáveis: ao ordenar, o lado escolhido fica a negrito e o outro apagado. */
+function IconeOrdem({ sentido }: { sentido: "asc" | "desc" | null }) {
+  return (
+    <span aria-hidden className="inline-flex flex-col items-center leading-none">
+      <Ic nome="cima" tamanho={10} peso={sentido === "asc" ? "bold" : "regular"} className={`-mb-[3px] ${sentido === "asc" ? "text-kumo-default" : "text-kumo-inactive"}`} />
+      <Ic nome="baixo" tamanho={10} peso={sentido === "desc" ? "bold" : "regular"} className={sentido === "desc" ? "text-kumo-default" : "text-kumo-inactive"} />
+    </span>
+  );
+}
+
+function Cabeca({ rotulo, ordenada, sentido, aoOrdenar, numerica, sub, dica, menu }: { rotulo: string; ordenada: boolean; sentido: "asc" | "desc" | null; aoOrdenar: () => void; numerica?: boolean; sub?: string; dica?: ReactNode; menu?: ReactNode }) {
   return (
     <Table.Head className={`group/cab ${numerica ? "text-right" : ""}`}>
       <div className={`flex items-center gap-1 ${numerica ? "justify-end" : ""}`}>
         <Dica conteudo={dica ?? `Ordenar por ${rotulo}. Clique outra vez para inverter e mais uma para limpar.`}>
           <button onClick={aoOrdenar} className={`inline-flex items-center gap-1.5 font-medium hover:text-kumo-default ${numerica ? "flex-row-reverse" : ""}`} aria-label={`${T.geral.ordenar}: ${rotulo}`}>
             {rotulo}
-            <Ic nome="ordenar" tamanho={12} className={ordenada ? "text-kumo-default" : "text-kumo-inactive"} />
+            <IconeOrdem sentido={ordenada ? sentido : null} />
           </button>
         </Dica>
         {menu}
@@ -121,7 +132,7 @@ export function GrelhaRegistos({ colunas, linhas, porPagina = 10, filtros }: { c
             <Table.Header>
               <Table.Row>
                 {colunas.map((c, i) => (
-                  <Cabeca key={c.rotulo} rotulo={c.rotulo} numerica={c.numerica} ordenada={ord?.col === i} aoOrdenar={() => setOrd((o) => (o?.col === i ? (o.desc ? null : { col: i, desc: true }) : { col: i, desc: false }))} />
+                  <Cabeca key={c.rotulo} rotulo={c.rotulo} numerica={c.numerica} ordenada={ord?.col === i} sentido={ord?.col === i ? (ord.desc ? "desc" : "asc") : null} aoOrdenar={() => setOrd((o) => (o?.col === i ? (o.desc ? null : { col: i, desc: true }) : { col: i, desc: false }))} />
                 ))}
                 <Table.Head />
               </Table.Row>
@@ -169,7 +180,7 @@ function MenuColuna({ nome, tipo, temData, aoVisualizar, aoRemover }: { nome: st
         content={`Opções da coluna ${nome}`}
         render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" size="xs" icon={ICONES.mais3} aria-label={`Opções da coluna ${nome}`} className="rotate-90 text-kumo-subtle opacity-0 transition-opacity focus-visible:opacity-100 group-hover/cab:opacity-100 data-[popup-open]:opacity-100 [@media(hover:none)]:opacity-100" />} />}
       />
-      <DropdownMenu.Content>
+      <DropdownMenu.Content collisionPadding={12}>
         <DropdownMenu.Group>
         <DropdownMenu.Label>Visualizar</DropdownMenu.Label>
         <DropdownMenu.Item icon={<Ic nome="serie" />} disabled={!temData} onClick={() => aoVisualizar("linha")}>
@@ -207,7 +218,7 @@ function Campos({ colunas, ocultas, aoAlternar, aoMostrarTodas }: { colunas: str
           }
         />
       </Dica>
-      <DropdownMenu.Content className="max-h-[340px] overflow-y-auto">
+      <DropdownMenu.Content collisionPadding={12} className="max-h-[340px] overflow-y-auto">
         {ocultas.size > 0 && (
           <>
             <DropdownMenu.Item icon={<Ic nome="olho" />} onClick={aoMostrarTodas}>
@@ -270,7 +281,7 @@ export function GrelhaDados({ colunas, linhas, tipos, porPagina = 25 }: { coluna
     });
   const visualizar = (coluna: number, tipo: TipoPedido) => {
     guardarPedido({ coluna, tipo });
-    router.push("/analise/graficos/");
+    router.push(caminho("analise", "graficos"));
   };
 
   const visiveis = indices.slice(pagina * porPagina, (pagina + 1) * porPagina);
@@ -293,7 +304,7 @@ export function GrelhaDados({ colunas, linhas, tipos, porPagina = 25 }: { coluna
                     sub={tipos[i]}
                     dica={<CorpoDica titulo={colunas[i]} texto={DICA_TIPO[tipos[i]]} linhas={[{ rotulo: "Tipo", valor: tipos[i] }, { rotulo: "Ordenar", valor: "Clique para ordenar, outra vez para inverter e mais uma para limpar." }]} />}
                     numerica={tipos[i] === "inteiro" || tipos[i] === "numero"}
-                    ordenada={ord?.col === i}
+                    ordenada={ord?.col === i} sentido={ord?.col === i ? (ord.desc ? "desc" : "asc") : null}
                     aoOrdenar={() => setOrd((o) => (o?.col === i ? (o.desc ? null : { col: i, desc: true }) : { col: i, desc: false }))}
                     menu={<MenuColuna nome={colunas[i]} tipo={tipos[i]} temData={temData} aoVisualizar={(t) => visualizar(i, t)} aoRemover={() => alternar(i)} />}
                   />

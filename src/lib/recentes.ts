@@ -25,7 +25,7 @@ export const lerFixados = () => ler(CHAVE_FIXOS);
 
 export function registarRecente(caminho: string): void {
   if (caminho === "/") return;
-  gravar(CHAVE, [caminho, ...lerRecentes().filter((c) => c !== caminho)].slice(0, 6));
+  gravar(CHAVE, [caminho, ...lerRecentes().filter((c) => c !== caminho)].slice(0, 5));
 }
 
 export function alternarFixado(caminho: string): void {

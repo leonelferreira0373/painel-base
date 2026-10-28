@@ -53,6 +53,10 @@ export interface Conta {
   foto?: string;
   assinatura: string;
   fuso: string;
+  /** Idioma da interface («pt-PT»). */
+  idioma?: string;
+  /** Atalhos de teclado que o utilizador mudou: identificador → combinação («Ctrl+K»). */
+  atalhos?: Record<string, string>;
   formatoData: string;
   semana: "segunda" | "domingo";
 

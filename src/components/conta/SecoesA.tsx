@@ -4,7 +4,7 @@
 import { Badge, Banner, Button, Dialog, Input, InputArea, Select } from "@cloudflare/kumo";
 import { useEffect, useRef, useState } from "react";
 import { AREAS } from "@/dados/estrutura";
-import { ATALHOS, FORMATOS_DATA, FUSOS } from "@/dados/conta";
+import { FORMATOS_DATA, FUSOS } from "@/dados/conta";
 import { podeVer } from "@/dados/rbac";
 import { useConta } from "@/lib/conta";
 import { useApp } from "@/lib/estado";
@@ -155,13 +155,6 @@ export function SecaoAparencia() {
         </Linha>
       </Cartao>
 
-      <Cartao titulo="Atalhos de teclado">
-        {ATALHOS.map((a) => (
-          <Linha key={a.teclas} titulo={a.acao}>
-            <kbd className="rounded bg-kumo-tint px-2 py-1 text-xs font-medium text-kumo-default">{a.teclas}</kbd>
-          </Linha>
-        ))}
-      </Cartao>
     </>
   );
 }

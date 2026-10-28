@@ -48,7 +48,7 @@ export function SemDados() {
       icon={<Ic nome="ficheiro" tamanho={40} />}
       title={T.analise.vazio}
       contents={
-        <Link href="/analise/ficheiros/" className="inline-flex h-9 items-center gap-2 rounded-lg bg-kumo-brand px-3 text-sm font-medium text-white hover:bg-kumo-brand-hover">
+        <Link href={caminho("analise", "ficheiros")} className="inline-flex h-9 items-center gap-2 rounded-lg bg-kumo-brand px-3 text-sm font-medium text-white hover:bg-kumo-brand-hover">
           <Ic nome="enviar" tamanho={16} />
           {T.analise.ficheiros.titulo}
         </Link>

@@ -1,16 +1,18 @@
 // Estrutura do painel, igual à do painel da Cloudflare: coluna de ícones que se expande, cabeçalho de 58 px com o caminho da página, conteúdo centrado e rodapé com ligações. No telemóvel, a barra lateral abre como gaveta.
 "use client";
 
-import { Breadcrumbs, Button, CommandPalette, Popover, Sidebar, Toasty, Tooltip, TooltipProvider, useSidebar } from "@cloudflare/kumo";
+import { Breadcrumbs, Button, CommandPalette, DropdownMenu, Popover, Sidebar, Toasty, Tooltip, TooltipProvider, useSidebar } from "@cloudflare/kumo";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { alternarFixado, lerFixados, lerRecentes, registarRecente } from "@/lib/recentes";
 import { AREAS, caminho, type Area, type Modulo } from "@/dados/estrutura";
-import { caminhoConta, SECOES_CONTA } from "@/dados/conta";
+import { PROJETO } from "@/dados/projeto";
+import { caminhoConta, FUSOS, SECOES_CONTA } from "@/dados/conta";
 import { emailDe, FUNCOES, podeVer } from "@/dados/rbac";
 import { T } from "@/dados/textos";
 import { ehPublica, useSessao } from "@/lib/auth";
+import { atalhosEfetivos, combinacaoDe } from "@/lib/atalhos";
 import { useConta } from "@/lib/conta";
 import { useApp } from "@/lib/estado";
 import { useTema, type Tema } from "@/lib/tema";
@@ -18,13 +20,17 @@ import { toasts } from "@/lib/toasts";
 import { useEntradaGlobal } from "./analise/Ficheiros";
 import { Avatar } from "./Avatar";
 import { CorpoDica, Dica } from "./Dica";
+import { AssistentePainel, EVENTO_ASSISTENTE } from "./AssistentePainel";
 import { EsbatidoGlobal } from "./Estados";
 import { Ic, ICONES } from "./Icones";
 import { BotaoIcone } from "./ui";
 
-export function localizar(pathname: string): { areaId: string; moduloId: string } {
-  const partes = pathname.split("/").filter(Boolean);
+/** Onde estamos: a área e o módulo (ou, nas páginas de um cliente, «cliente» e a página). O identificador da conta, quando existe, não conta. */
+export function localizar(pathname: string): { areaId: string; moduloId: string; cliente?: string } {
+  let partes = pathname.split("/").filter(Boolean);
+  if (partes[0] === PROJETO.contaId) partes = partes.slice(1);
   if (partes.length === 0) return { areaId: "inicio", moduloId: "visao-geral" };
+  if (partes.length >= 2 && !AREAS.some((x) => x.id === partes[0]) && partes[0] !== "conta") return { areaId: "cliente", moduloId: partes[1], cliente: partes[0] };
   return { areaId: partes[0], moduloId: partes[1] ?? "" };
 }
 
@@ -59,11 +65,10 @@ const TEMAS: { id: Tema; rotulo: string; icone: "sol" | "lua" | "monitor" }[] = 
 /** Linha de um menu em popup: a mesma altura, cantos e realce em todos os popups do painel. */
 const LINHA_POPUP = "flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-kumo-default transition-colors hover:bg-kumo-tint focus-visible:bg-kumo-tint focus-visible:outline-none";
 
-/** O popup do perfil, como o seletor de contas da Cloudflare: pesquisa, lista de contas com visto na atual e «Criar conta»; por baixo, as definições da conta, o tema e terminar sessão. */
+/** O seletor de contas, como o da Cloudflare: pesquisa, lista de contas com visto na atual e «Criar conta». O resto da conta (definições, aparência, idioma, fuso, terminar sessão) está no menu do utilizador, no cabeçalho. */
 function PerfilLateral() {
   const { funcao } = useApp();
-  const { conta, terminarSessao, trocarConta } = useConta();
-  const { tema, definir } = useTema();
+  const { conta, trocarConta } = useConta();
   const { open, isMobile, isPeeking, setOpenMobile } = useSidebar();
   const [aberto, setAberto] = useState(false);
   const [q, setQ] = useState("");
@@ -77,16 +82,10 @@ function PerfilLateral() {
     setAberto(false);
     if (isMobile) setOpenMobile(false);
   };
-  const ligacao = (secao: string, rotulo: string, icone: "pessoa" | "escudo" | "campainha" | "lembrete") => (
-    <Link key={secao} href={caminhoConta(secao)} onClick={fechar} className={LINHA_POPUP}>
-      <Ic nome={icone} tamanho={16} className="shrink-0 text-kumo-subtle" />
-      {rotulo}
-    </Link>
-  );
   return (
     <div className="flex h-[58px] min-w-0 flex-1 items-center">
       <Popover.Root open={aberto} onOpenChange={setAberto}>
-        <Dica bloco lado="right" conteudo={<CorpoDica titulo={conta.nome} texto={`${funcao.rotulo}. Abra o menu para trocar de conta, para as definições da conta e para o tema.`} />}>
+        <Dica bloco lado="right" conteudo={<CorpoDica titulo={conta.nome} texto={`${funcao.rotulo}. Abra o menu para trocar de conta ou criar uma nova.`} />}>
           <Popover.Trigger
             render={
               <button aria-label={T.topo.mudarFuncao} title="" className={`flex h-10 items-center rounded-lg text-left transition-colors hover:bg-kumo-tint ${expandido ? "-ml-2 w-[calc(100%+8px)] gap-2.5 px-2" : "w-8 justify-center"}`}>
@@ -102,7 +101,7 @@ function PerfilLateral() {
           />
         </Dica>
         <Popover.Portal>
-          <Popover.Positioner side="bottom" align="start" sideOffset={8}>
+          <Popover.Positioner collisionPadding={12} side="bottom" align="start" sideOffset={8}>
             <Popover.Popup className="w-[288px] max-w-[calc(100vw-16px)] overflow-hidden p-0">
               <div className="flex items-center border-b border-kumo-line pr-3">
                 <Ic nome="lupa" tamanho={14} className="ml-3 shrink-0 text-kumo-subtle" />
@@ -149,23 +148,6 @@ function PerfilLateral() {
                   <Ic nome="mais" tamanho={16} className="shrink-0" />
                   Criar conta
                 </Link>
-              </div>
-              <div className="border-t border-kumo-line p-1.5">
-                {ligacao("perfil", "Definições da conta", "pessoa")}
-              </div>
-              <div className="flex items-center justify-between border-t border-kumo-line py-1.5 pl-4 pr-2.5">
-                <span className="text-sm text-kumo-default">Tema</span>
-                <div className="flex gap-1">
-                  {TEMAS.map((t) => (
-                    <BotaoIcone key={t.id} dica={t.rotulo} icone={t.icone} tamanho="sm" variante={t.id === tema ? "secondary" : "ghost"} aoClicar={() => definir(t.id)} />
-                  ))}
-                </div>
-              </div>
-              <div className="border-t border-kumo-line p-1.5">
-                <button type="button" onClick={terminarSessao} className={`${LINHA_POPUP} text-kumo-danger`}>
-                  <Ic nome="sair" tamanho={16} className="shrink-0" />
-                  Terminar sessão
-                </button>
               </div>
             </Popover.Popup>
           </Popover.Positioner>
@@ -225,10 +207,10 @@ function Navegacao() {
   const expandido = open || isMobile || isPeeking;
 
   const entradaDe = (href: string) => {
-    const [a, m] = href.split("/").filter(Boolean);
+    const { areaId: a, moduloId: m } = localizar(href);
     const area = AREAS.find((x) => x.id === a);
     const mod = area?.modulos.find((x) => x.id === m);
-    return area && mod && podeVer(funcao, area.id, mod.id) ? { href, rotulo: mod.rotulo, area: area.rotulo, icone: mod.icone } : null;
+    return area && mod && podeVer(funcao, area.id, mod.id) ? { href: caminho(area.id, mod.id), rotulo: mod.rotulo, area: area.rotulo, icone: mod.icone } : null;
   };
   const listaFixados = fixados.map(entradaDe).filter((x): x is NonNullable<typeof x> => x !== null);
   const listaRecentes = recentes
@@ -389,22 +371,33 @@ function Pesquisa({ aberta, aoMudar }: { aberta: boolean; aoMudar: (v: boolean) 
   const router = useRouter();
   const { funcao } = useApp();
   const [q, setQ] = useState("");
+  const [recentes, setRecentes] = useState<string[]>([]);
+  useEffect(() => {
+    if (aberta) setRecentes(lerRecentes());
+  }, [aberta]);
   const grupos = useMemo(() => {
     const termo = q.trim().toLowerCase();
-    return AREAS.filter((a) => podeVer(funcao, a.id))
+    const dosRecentes = termo !== "" ? [] : recentes.flatMap((r) => {
+      const { areaId, moduloId } = localizar(r);
+      const area = AREAS.find((x) => x.id === areaId);
+      const mod = area?.modulos.find((x) => x.id === moduloId);
+      return area && mod && podeVer(funcao, area.id, mod.id) ? [{ id: `recente/${area.id}/${mod.id}`, title: mod.rotulo, sub: area.rotulo, icone: mod.icone, href: caminho(area.id, mod.id) }] : [];
+    }).slice(0, 5);
+    const inicio = dosRecentes.length > 0 ? [{ id: "recentes", label: T.topo.recentes, items: dosRecentes }] : [];
+    return [...inicio, ...AREAS.filter((a) => podeVer(funcao, a.id))
       .map((a) => ({
         id: a.id,
         label: a.rotulo,
-        items: a.modulos.filter((m) => podeVer(funcao, a.id, m.id) && (termo === "" || `${a.rotulo} ${m.rotulo}`.toLowerCase().includes(termo))).map((m) => ({ id: `${a.id}/${m.id}`, title: m.rotulo, icone: m.icone, href: caminho(a.id, m.id) })),
+        items: a.modulos.filter((m) => podeVer(funcao, a.id, m.id) && (termo === "" || `${a.rotulo} ${m.rotulo}`.toLowerCase().includes(termo))).map((m) => ({ id: `${a.id}/${m.id}`, title: m.rotulo, sub: undefined as string | undefined, icone: m.icone, href: caminho(a.id, m.id) })),
       }))
       .filter((g) => g.items.length > 0)
       .concat(
         (() => {
-          const itens = SECOES_CONTA.filter((c) => termo === "" || `conta definições ${c.rotulo}`.toLowerCase().includes(termo)).map((c) => ({ id: `conta/${c.id}`, title: c.rotulo, icone: c.icone, href: caminhoConta(c.id) }));
+          const itens = SECOES_CONTA.filter((c) => termo === "" || `conta definições ${c.rotulo}`.toLowerCase().includes(termo)).map((c) => ({ id: `conta/${c.id}`, title: c.rotulo, sub: undefined as string | undefined, icone: c.icone, href: caminhoConta(c.id) }));
           return itens.length > 0 ? [{ id: "conta", label: "Definições da conta", items: itens }] : [];
         })(),
-      );
-  }, [q, funcao]);
+      )];
+  }, [q, funcao, recentes]);
   type Item = (typeof grupos)[number]["items"][number];
   return (
     <CommandPalette.Root
@@ -434,6 +427,7 @@ function Pesquisa({ aberta, aoMudar }: { aberta: boolean; aoMudar: (v: boolean) 
                         <Ic nome={item.icone} />
                       </span>
                       {item.title}
+                      {item.sub && <span className="text-kumo-subtle">— {item.sub}</span>}
                     </span>
                   </CommandPalette.Item>
                 )}
@@ -442,8 +436,118 @@ function Pesquisa({ aberta, aoMudar }: { aberta: boolean; aoMudar: (v: boolean) 
           )}
         </CommandPalette.Results>
         <CommandPalette.Empty>{T.topo.semResultados}</CommandPalette.Empty>
+        {q.trim() === "" && (
+          <div className="border-t border-kumo-hairline px-3 pb-2 pt-3">
+            <div className="pb-1 text-xs font-medium text-kumo-subtle">{T.topo.dicasTitulo}</div>
+            {T.topo.dicasPesquisa.map((d) => (
+              <div key={d} className="flex items-center gap-2.5 py-1 text-sm text-kumo-subtle">
+                <Ic nome="info" tamanho={14} className="shrink-0" />
+                {d}
+              </div>
+            ))}
+          </div>
+        )}
       </CommandPalette.List>
+      <CommandPalette.Footer>
+        <span className="flex items-center gap-4 text-xs text-kumo-subtle">
+          <span className="flex items-center gap-1.5">
+            <kbd className="rounded bg-kumo-tint px-1.5 py-0.5 text-[11px]">↑</kbd>
+            <kbd className="rounded bg-kumo-tint px-1.5 py-0.5 text-[11px]">↓</kbd>
+            {T.topo.navegar}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <kbd className="rounded bg-kumo-tint px-1.5 py-0.5 text-[11px]">↵</kbd>
+            {T.topo.escolher}
+          </span>
+        </span>
+      </CommandPalette.Footer>
     </CommandPalette.Root>
+  );
+}
+
+/** Os atalhos de teclado do painel, com as combinações que o utilizador escolheu (Definições da conta → Atalhos). */
+function AtalhosGlobais({ aoPesquisar }: { aoPesquisar: () => void }) {
+  const router = useRouter();
+  const { conta } = useConta();
+  const { efetivo, definir } = useTema();
+  const { toggleSidebar } = useSidebar();
+  const mapa = useMemo(() => atalhosEfetivos(conta.atalhos), [conta.atalhos]);
+  useEffect(() => {
+    const aoTecla = (e: KeyboardEvent) => {
+      const combinacao = combinacaoDe(e);
+      if (!combinacao) return;
+      const id = Object.keys(mapa).find((k) => mapa[k] === combinacao);
+      if (!id) return;
+      const alvo = e.target as HTMLElement | null;
+      const aEscrever = !!alvo && (alvo.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName));
+      if (aEscrever && !/^(Ctrl|Alt)/.test(combinacao)) return;
+      e.preventDefault();
+      if (id === "pesquisa") aoPesquisar();
+      else if (id === "barra") toggleSidebar();
+      else if (id === "inicio") router.push("/");
+      else if (id === "conta") router.push(caminhoConta("perfil"));
+      else if (id === "tema") definir(efetivo === "claro" ? "escuro" : "claro");
+    };
+    window.addEventListener("keydown", aoTecla);
+    return () => window.removeEventListener("keydown", aoTecla);
+  }, [mapa, aoPesquisar, toggleSidebar, router, efetivo, definir]);
+  return null;
+}
+
+/** O menu do utilizador, no canto do cabeçalho, como o da Cloudflare: e-mail, definições da conta, aparência, idioma, fuso horário e terminar sessão. Os submenus abrem para o lado onde houver espaço. */
+function MenuUtilizador() {
+  const { conta, mudar, terminarSessao } = useConta();
+  const { tema, definir } = useTema();
+  const idioma = conta.idioma ?? "pt-PT";
+  useEffect(() => {
+    document.documentElement.lang = idioma;
+  }, [idioma]);
+  return (
+    <DropdownMenu>
+      <Tooltip content={`${conta.nome}. Menu da conta`} render={<DropdownMenu.Trigger render={<button aria-label="Menu da conta" className="flex size-9 items-center justify-center rounded-lg transition-colors hover:bg-kumo-tint"><Avatar foto={conta.foto} nome={conta.nome} tamanho={26} /></button>} />} />
+      <DropdownMenu.Content collisionPadding={12} className="w-[232px]">
+        <DropdownMenu.Group>
+          <DropdownMenu.Label className="truncate">{conta.email}</DropdownMenu.Label>
+        </DropdownMenu.Group>
+        <DropdownMenu.Separator />
+        <DropdownMenu.LinkItem href={caminhoConta("perfil")} icon={<Ic nome="pessoa" />} render={<Link href={caminhoConta("perfil")} />}>
+          Definições da conta
+        </DropdownMenu.LinkItem>
+        <DropdownMenu.Sub>
+          <DropdownMenu.SubTrigger icon={<Ic nome="paleta" />}>Aparência</DropdownMenu.SubTrigger>
+          <DropdownMenu.SubContent sideOffset={10} collisionPadding={12}>
+            {TEMAS.map((t) => (
+              <DropdownMenu.Item key={t.id} icon={<Ic nome={t.icone} />} selected={t.id === tema} onClick={() => definir(t.id)}>
+                {t.rotulo}
+              </DropdownMenu.Item>
+            ))}
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
+        <DropdownMenu.Sub>
+          <DropdownMenu.SubTrigger icon={<Ic nome="globo" />}>Idioma</DropdownMenu.SubTrigger>
+          <DropdownMenu.SubContent sideOffset={10} collisionPadding={12}>
+            <DropdownMenu.Item selected={idioma === "pt-PT"} onClick={() => mudar({ idioma: "pt-PT" }, "Idioma alterado")}>
+              Português
+            </DropdownMenu.Item>
+            <DropdownMenu.Item disabled>English (em breve)</DropdownMenu.Item>
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
+        <DropdownMenu.Sub>
+          <DropdownMenu.SubTrigger icon={<Ic nome="relogio" />}>Fuso horário</DropdownMenu.SubTrigger>
+          <DropdownMenu.SubContent sideOffset={10} collisionPadding={12}>
+            {FUSOS.map((f) => (
+              <DropdownMenu.Item key={f.id} selected={f.id === conta.fuso} onClick={() => mudar({ fuso: f.id }, "Fuso horário alterado")}>
+                {f.rotulo}
+              </DropdownMenu.Item>
+            ))}
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item icon={<Ic nome="sair" />} variant="danger" onClick={terminarSessao}>
+          Terminar sessão
+        </DropdownMenu.Item>
+      </DropdownMenu.Content>
+    </DropdownMenu>
   );
 }
 
@@ -486,8 +590,10 @@ function Cabecalho({ aoPesquisar }: { aoPesquisar: () => void }) {
         </Breadcrumbs>
       </div>
       <div className="flex items-center gap-1">
+        <Tooltip content={T.topo.perguntarIa} render={<Button variant="ghost" className="h-8" aria-label={T.topo.perguntarIa} icon={<Ic nome="ia" tamanho={16} peso="fill" className="-translate-y-px text-kumo-subtle" />} onClick={() => window.dispatchEvent(new Event(EVENTO_ASSISTENTE))}><span className="hidden md:inline">{T.topo.perguntarIa}</span></Button>} />
         <Tooltip content={T.topo.pesquisar} render={<Button variant="ghost" shape="square" icon={ICONES.lupa} aria-label={T.topo.pesquisar} onClick={aoPesquisar} />} />
         <span className="hidden text-xs text-kumo-subtle sm:inline">{T.topo.simulacao}</span>
+        <MenuUtilizador />
       </div>
     </header>
   );
@@ -497,8 +603,8 @@ function Rodape() {
   const { funcao } = useApp();
   const ligacoes = [
     { href: "/", rotulo: T.visao.titulo },
-    ...(podeVer(funcao, "analise", "ficheiros") ? [{ href: "/analise/ficheiros/", rotulo: "Análise de dados" }] : []),
-    ...(podeVer(funcao, "admin", "atividade") ? [{ href: "/admin/atividade/", rotulo: "Registo de atividade" }] : []),
+    ...(podeVer(funcao, "analise", "ficheiros") ? [{ href: caminho("analise", "ficheiros"), rotulo: "Análise de dados" }] : []),
+    ...(podeVer(funcao, "admin", "atividade") ? [{ href: caminho("admin", "atividade"), rotulo: "Registo de atividade" }] : []),
   ];
   return (
     <footer className="flex shrink-0 flex-wrap items-center justify-center gap-x-5 gap-y-1 border-t border-kumo-hairline bg-kumo-canvas px-3 py-2.5 text-xs text-kumo-subtle">
@@ -521,6 +627,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const publica = ehPublica(pathname);
   const [aberta, setAberta] = useState(false);
   const [pesquisa, setPesquisa] = useState(false);
+  const alternarPesquisa = useCallback(() => setPesquisa((p) => !p), []);
   const podeAnalisar = podeVer(funcao, "analise", "ficheiros") && !publica;
   useEffect(() => setAberta(conta.barraAberta), [conta.barraAberta]);
   // Sem sessão, só as páginas abertas se mostram; com sessão, a conta de demonstração acompanha a entrada.
@@ -532,7 +639,7 @@ export function Shell({ children }: { children: ReactNode }) {
     if (sessao && sessao.funcaoId !== funcao.id) mudarFuncao(sessao.funcaoId);
   }, [sessao, funcao.id, mudarFuncao]);
   const irParaAnalise = useCallback(() => {
-    if (!window.location.pathname.startsWith("/analise/")) router.push("/analise/ficheiros/");
+    if (!window.location.pathname.includes("/analise/")) router.push(caminho("analise", "ficheiros"));
   }, [router]);
   useEntradaGlobal(podeAnalisar, irParaAnalise);
   useEffect(() => {
@@ -540,17 +647,9 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [pathname, publica]);
   useEffect(() => {
     const abrir = () => setPesquisa(true);
-    const tecla = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setPesquisa((p) => !p);
-      }
-    };
     window.addEventListener("painel:pesquisa", abrir);
-    window.addEventListener("keydown", tecla);
     return () => {
       window.removeEventListener("painel:pesquisa", abrir);
-      window.removeEventListener("keydown", tecla);
     };
   }, []);
 
@@ -571,6 +670,8 @@ export function Shell({ children }: { children: ReactNode }) {
             <Cabecalho aoPesquisar={() => setPesquisa(true)} />
             <main className="sem-barra min-h-0 flex-1 overflow-y-auto">{children}</main>
             <EsbatidoGlobal />
+            <AtalhosGlobais aoPesquisar={alternarPesquisa} />
+            <AssistentePainel />
             <Rodape />
           </div>
         </Sidebar.Provider>

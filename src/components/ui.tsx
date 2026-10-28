@@ -103,7 +103,7 @@ export function CartaoMetrica({
         {temMenu && (
           <DropdownMenu>
             <Tooltip content="Opções do cartão" render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" size="xs" icon={ICONES.mais3} aria-label="Opções do cartão" className="-mr-1.5 text-kumo-subtle" />} />} />
-            <DropdownMenu.Content>
+            <DropdownMenu.Content collisionPadding={12}>
               {href && (
                 <DropdownMenu.LinkItem href={href} icon={<Ic nome="olho" />} render={<Link href={href} />}>
                   Ver detalhes
@@ -117,7 +117,7 @@ export function CartaoMetrica({
               {temPeriodo && (
                 <DropdownMenu.Sub>
                   <DropdownMenu.SubTrigger icon={<Ic nome="calendario" />}>{periodo!.rotulo}</DropdownMenu.SubTrigger>
-                  <DropdownMenu.SubContent>
+                  <DropdownMenu.SubContent sideOffset={10} collisionPadding={12}>
                     {PERIODOS.map((p) => (
                       <DropdownMenu.Item key={p.rotulo} selected={mesmoPeriodo(p, periodo!)} onClick={() => aoMudarPeriodo!(p)}>
                         {p.rotulo}
@@ -129,7 +129,7 @@ export function CartaoMetrica({
               {temTipo && (
                 <DropdownMenu.Sub>
                   <DropdownMenu.SubTrigger icon={<Ic nome={tipoAtual?.icone ?? "serie"} />}>Visualizar como</DropdownMenu.SubTrigger>
-                  <DropdownMenu.SubContent>
+                  <DropdownMenu.SubContent sideOffset={10} collisionPadding={12}>
                     {TIPOS_CARTAO.map((t) => (
                       <DropdownMenu.Item key={t.id} icon={<Ic nome={t.icone} />} selected={t.id === tipo} onClick={() => aoMudarTipo!(t.id)}>
                         {t.rotulo}

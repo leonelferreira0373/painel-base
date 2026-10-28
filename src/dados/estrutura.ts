@@ -1,6 +1,7 @@
 // Estrutura de navegação: áreas (barra lateral), módulos (submenu) e o que cada módulo é.
 // Para acrescentar uma página ao painel basta um novo módulo aqui (ver docs/ADICIONAR-MODULO.md).
 import type { Icone } from "@/components/Icones";
+import { PROJETO } from "./projeto";
 
 /** Como se desenha o módulo: `analise` e `visao` são ecrãs próprios; `registos` usa a tabela genérica; `painel` é um componente à medida (ver `PAINEIS` em components/Paineis.tsx). */
 export type TipoModulo = "analise" | "visao" | "registos" | "painel";
@@ -91,4 +92,4 @@ export function moduloPorIds(areaId: string, moduloId: string): { area: Area; mo
   return area && modulo ? { area, modulo } : undefined;
 }
 
-export const caminho = (areaId: string, moduloId: string) => (areaId === "inicio" ? "/" : `/${areaId}/${moduloId}/`);
+export const caminho = (areaId: string, moduloId: string) => (areaId === "inicio" ? "/" : `/${PROJETO.contaId}/${areaId}/${moduloId}/`);

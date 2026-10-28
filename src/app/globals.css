@@ -134,7 +134,7 @@ main.esbatido[data-baixo="1"] { --fb: 18px; }
 
 /* Elevação dos popups: janelas, menus, listas e a pesquisa têm todos a sombra do menu do Kumo; no tema escuro é mais escura, porque a sombra clara não se vê sobre fundo escuro. */
 :root {
-  --elevacao-popup: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --elevacao-popup: 0 12px 32px -6px rgb(0 0 0 / 0.2), 0 4px 12px -4px rgb(0 0 0 / 0.14);
 }
 [data-mode="dark"] {
   --elevacao-popup: 0 16px 32px -4px rgb(0 0 0 / 0.7), 0 6px 12px -4px rgb(0 0 0 / 0.55);

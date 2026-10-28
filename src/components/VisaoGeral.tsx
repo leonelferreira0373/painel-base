@@ -6,6 +6,7 @@ import { DICA_CARTAO } from "@/dados/dicas";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AREAS, caminho } from "@/dados/estrutura";
+import { localizar } from "./Shell";
 import { podeVer } from "@/dados/rbac";
 import type { Linha } from "@/dados/tipos";
 import { T } from "@/dados/textos";
@@ -107,7 +108,7 @@ function Lista({ titulo, href, itens, aoOcultar }: { titulo: string; href?: stri
         )}
         <DropdownMenu>
           <Tooltip content={`Opções: ${titulo}`} render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" size="xs" icon={ICONES.mais3} aria-label={`Opções: ${titulo}`} className="text-kumo-subtle" />} />} />
-          <DropdownMenu.Content>
+          <DropdownMenu.Content collisionPadding={12}>
             {href && (
               <DropdownMenu.LinkItem href={href} icon={<Ic nome="olho" />} render={<Link href={href} />}>
                 Ver tudo
@@ -209,7 +210,7 @@ export function VisaoGeral() {
   const listas = LISTAS_VISAO.map((l) => ({ ...l, itens: (registos[l.registos] ?? []).slice(0, 5).map((r) => ({ chave: r.id, icone: l.icone, texto: l.texto(r), href: l.href })) }));
   const recentesItens = recentes
     .map((c) => {
-      const [a, m] = c.split("/").filter(Boolean);
+      const { areaId: a, moduloId: m } = localizar(c);
       const area = AREAS.find((x) => x.id === a);
       const mod = area?.modulos.find((x) => x.id === m);
       return area && mod && podeVer(funcao, area.id, mod.id) ? { chave: c, icone: mod.icone, texto: `${area.rotulo} / ${mod.rotulo}`, href: caminho(area.id, mod.id) } : null;
@@ -291,7 +292,7 @@ export function VisaoGeral() {
             <SeletorPeriodo periodo={periodo} aoMudar={mudarPeriodo} />
             <DropdownMenu>
               <Tooltip content="Adicionar métrica ou lista que ocultou" render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" icon={ICONES.mais} aria-label="Adicionar métrica" />} />} />
-              <DropdownMenu.Content>
+              <DropdownMenu.Content collisionPadding={12}>
                 {escondidos.length === 0 && <DropdownMenu.Item disabled>Todos os cartões estão visíveis</DropdownMenu.Item>}
                 {escondidos.map((e) => (
                   <DropdownMenu.Item key={e.id} icon={<Ic nome="mais" />} onClick={() => mostrar(e.id)}>

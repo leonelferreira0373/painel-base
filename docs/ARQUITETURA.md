@@ -14,6 +14,10 @@ servidor-auth (opcional)     ← autenticação real, atrás de /api/auth/
 
 Não há base de dados nem servidor de aplicação. Os registos dos módulos são fictícios (`semente()`), vivem em memória e a interface é otimista: as ações mudam o estado de imediato e mostram um aviso.
 
+## Endereços
+
+Como na Cloudflare, todos os endereços levam o identificador da conta no meio: `/<contaId>/<área>/<módulo>/`. O identificador está em `src/dados/projeto.ts` e `caminho(área, módulo)` (`dados/estrutura.ts`) constrói sempre o endereço certo: **nunca escreva um endereço à mão**. A página inicial é `/`; as definições da conta são `/conta/<secção>/`. A rota é `src/app/[area]/[modulo]/[pagina]/page.tsx` (os nomes dos segmentos têm de coincidir com os da rota antiga `/<área>/<módulo>/`, que continua a abrir).
+
 ## Fluxo de dados de um módulo de registos
 
 1. `src/dados/estrutura.ts` diz que o módulo existe → o Next gera `/<área>/<módulo>/` (`app/[area]/[modulo]/page.tsx`).

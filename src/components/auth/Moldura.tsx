@@ -30,7 +30,7 @@ export function Lingua({ soIcone = false }: { soIcone?: boolean }) {
           )
         }
       />
-      <DropdownMenu.Content>
+      <DropdownMenu.Content collisionPadding={12}>
         <DropdownMenu.Item selected>Português</DropdownMenu.Item>
         <DropdownMenu.Item disabled>English</DropdownMenu.Item>
       </DropdownMenu.Content>

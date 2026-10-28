@@ -1,0 +1,25 @@
+/* O assistente de IA (módulo ai-chat) com as cores do painel: o módulo só lê as variáveis --aia-*. O botão redondo do módulo fica escondido, porque o botão «Perguntar à IA» do cabeçalho é que abre o assistente. */
+:root {
+  --aia-azul: var(--color-kumo-brand);
+  --aia-amarelo: var(--color-kumo-warning);
+  --aia-cinza: var(--text-color-kumo-subtle);
+  --aia-branco: var(--color-kumo-base);
+  --aia-vermelho: var(--color-kumo-danger);
+  --aia-vermelho-forte: var(--color-kumo-danger);
+  --aia-verde: var(--color-kumo-success);
+  --aia-azul-bebe: var(--color-kumo-tint);
+  --aia-azul-bebe-forte: var(--color-kumo-hairline);
+  --aia-tipo: var(--font-sans);
+}
+.aia-botao {
+  display: none !important;
+}
+/* O ponto de estado é plano: verde com alguém online (âmbar quando ninguém está), sem o relevo 3D do módulo. */
+:root {
+  --aia-verde: rgb(34 197 94);
+}
+.aia-vivo,
+.aia-ponto {
+  background: var(--_cor, var(--aia-verde)) !important;
+  box-shadow: none !important;
+}

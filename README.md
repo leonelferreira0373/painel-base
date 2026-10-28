@@ -12,6 +12,8 @@
 - **Controlo de acesso por função** (demonstração; ver `docs/AUTENTICACAO.md`).
 - **Definições da conta:** perfil, segurança, e-mail e telefone, notificações, lembretes, aparência, chaves de acesso pessoais, dados e privacidade.
 - **Entrada:** entrar, registar, recuperar palavra-passe e e-mail, verificação em dois passos, páginas legais.
+- **Assistente de IA** (módulo [`ai-chat`](https://github.com/ferreirakorp/ai-chat)) aberto pelo botão «Perguntar à IA», com autorização para guardar as conversas.
+- **Pesquisa rápida** com recentes e dicas, **atalhos de teclado configuráveis** e menu do utilizador com aparência, idioma e fuso horário.
 - **Tema claro e escuro**, desvanecimento nas pontas das áreas com scroll, dicas em todo o lado, estados vazios e de carregamento.
 - **Análise de dados no navegador:** CSV, JSON, XML, Excel, PDF (com OCR), Word, ZIP, e-mails e imagens → perfil, qualidade, gráficos, exportação em CSV, Excel e PDF. Nada sai do dispositivo.
 - **`servidor-auth/`:** serviço de autenticação sem dependências (scrypt, cookie assinado, TOTP).

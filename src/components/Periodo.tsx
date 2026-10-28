@@ -178,7 +178,7 @@ export function SeletorPeriodo({ periodo, aoMudar }: { periodo: Periodo; aoMudar
         />
       </Dica>
       <Popover.Portal>
-        <Popover.Positioner side="bottom" align="end">
+        <Popover.Positioner collisionPadding={12} side="bottom" align="end">
           <Popover.Popup className="w-[min(580px,calc(100vw-16px))] overflow-hidden p-0">
             <div className="border-b border-kumo-hairline p-2">
               <Input

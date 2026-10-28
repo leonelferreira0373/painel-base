@@ -10,11 +10,13 @@ import { Dica } from "../Dica";
 import { Esbatido } from "../Estados";
 import { Ic } from "../Icones";
 import { Pagina, Titulo } from "../ui";
+import { SecaoAtalhos } from "./SecaoAtalhos";
 import { SecaoAparencia, SecaoContactos, SecaoPerfil } from "./SecoesA";
 import { SecaoDados, SecaoSeguranca, SecaoTokens } from "./SecoesB";
 import { SecaoLembretes, SecaoNotificacoes } from "./SecoesC";
 
 const SECOES: Record<string, () => React.ReactNode> = {
+  atalhos: () => <SecaoAtalhos />,
   perfil: () => <SecaoPerfil />,
   seguranca: () => <SecaoSeguranca />,
   contactos: () => <SecaoContactos />,

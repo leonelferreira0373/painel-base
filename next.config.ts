@@ -9,6 +9,8 @@ const config: NextConfig = {
   reactStrictMode: true,
   trailingSlash: true,
   images: { unoptimized: true },
+  // O assistente de IA (github.com/ferreirakorp/ai-chat) vem em TypeScript: o Next compila-o.
+  transpilePackages: ["ai-chat"],
 };
 
 export default config;

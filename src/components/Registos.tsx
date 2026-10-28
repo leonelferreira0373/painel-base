@@ -110,7 +110,7 @@ export function Registos({ moduloId }: { moduloId: string }) {
             disponiveis.length === 0 ? null : (
               <DropdownMenu>
                 <Tooltip content={`Ações de ${String(l.processo ?? l.id)}`} render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" size="sm" icon={ICONES.mais3} aria-label={`Ações de ${String(l.processo ?? l.id)}`} />} />} />
-                <DropdownMenu.Content>
+                <DropdownMenu.Content collisionPadding={12}>
                   {disponiveis.map((t) => {
                     const permitido = editar && t.funcoes.includes(funcao.id);
                     return (

@@ -20,6 +20,7 @@
     "@phosphor-icons/react": "^2.1.10",
     "@tesseract.js-data/eng": "^1.0.0",
     "@tesseract.js-data/por": "^1.0.0",
+    "ai-chat": "https://codeload.github.com/ferreirakorp/ai-chat/tar.gz/7accc79f2ed829c27b89463b5a20ebb94c81cfc5",
     "echarts": "^6.1.0",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",

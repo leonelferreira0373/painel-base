@@ -13,7 +13,7 @@ import { Dica } from "../Dica";
 import { Esbatido } from "../Estados";
 import { ICONES, Ic } from "../Icones";
 import { CodigoDialog } from "./CodigoDialog";
-import { Cartao, Confirmar, copiar, dataHora, descarregar, haTempo, Interruptor, Linha, LinhaCampo, mascarar, soData } from "./Pecas";
+import { BotaoCopiar, Cartao, Confirmar, dataHora, descarregar, haTempo, Interruptor, Linha, LinhaCampo, mascarar, soData } from "./Pecas";
 
 function Janela({ aberto, aoMudar, titulo, children, largo = false }: { aberto: boolean; aoMudar: (v: boolean) => void; titulo: string; children: React.ReactNode; largo?: boolean }) {
   return (
@@ -99,9 +99,7 @@ function CodigosRecuperacao({ codigos, aoFechar }: { codigos: string[] | null; a
         ))}
       </ul>
       <div className="mt-6 flex flex-wrap justify-end gap-2">
-        <Button variant="secondary" icon={ICONES.copiar} onClick={async () => avisar((await copiar(texto)) ? "Códigos copiados" : "Não consegui copiar")}>
-          Copiar
-        </Button>
+        <BotaoCopiar texto={texto} rotulo="Copiar" dica="Copiar os códigos" />
         <Button variant="secondary" icon={ICONES.transferir} onClick={() => descarregar("codigos-de-recuperacao.txt", `${texto}\n`)}>
           Descarregar
         </Button>
@@ -237,9 +235,7 @@ export function SecaoSeguranca() {
         extra={
           <div className="mt-4 flex items-center justify-between gap-2 rounded-lg bg-kumo-tint px-3 py-2">
             <code className="text-sm font-medium tracking-wider">{segredo}</code>
-            <Dica conteudo="Copiar a chave">
-              <Button variant="ghost" shape="square" size="sm" icon={ICONES.copiar} aria-label="Copiar a chave" onClick={async () => avisar((await copiar(segredo.replace(/\s/g, ""))) ? "Chave copiada" : "Não consegui copiar")} />
-            </Dica>
+            <BotaoCopiar texto={segredo.replace(/\s/g, "")} dica="Copiar a chave" variante="ghost" tamanho="sm" quadrado />
           </div>
         }
         codigo={() => codigoTemporal(segredoDe(funcao.id))}
@@ -331,9 +327,7 @@ export function SecaoTokens() {
         <Banner variant="alert" title="Copie-a agora" description="Não volta a ser mostrada. Se a perder, revogue-a e crie outra." />
         <div className="mt-4 break-all rounded-lg bg-kumo-tint px-3 py-2 font-mono text-sm">{novo}</div>
         <div className="mt-6 flex justify-end gap-2">
-          <Button variant="secondary" icon={ICONES.copiar} onClick={async () => avisar((await copiar(novo ?? "")) ? "Chave copiada" : "Não consegui copiar")}>
-            Copiar
-          </Button>
+          <BotaoCopiar texto={novo ?? ""} rotulo="Copiar" dica="Copiar a chave" />
           <Button variant="primary" onClick={() => setNovo(null)}>
             Já a guardei
           </Button>
