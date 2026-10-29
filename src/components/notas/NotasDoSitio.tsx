@@ -7,7 +7,7 @@ import "@/styles/notas.css";
 import { copiarEstruturado, estruturaDeRegisto } from "@/lib/copiar-dados";
 import { useApp } from "@/lib/estado";
 import { useConta } from "@/lib/conta";
-import { perguntarAIa } from "@/lib/ia-contexto";
+import { EVENTO_FECHAR_FLUTUANTES, perguntarAIa } from "@/lib/ia-contexto";
 import { decifrarConteudo, EVENTO_ABRIR_NOTA, euSou, haTempo, notaVisivel, notasDoSitio, removerNota, textoDaExpiracao, useNotas, type AlvoDeNota, type AnexoDaNota, type Nota, type Quem } from "@/lib/notas";
 import { Confirmar } from "../conta/Pecas";
 import { MenuCartao, SeparadorDeMenu } from "../Flutuantes";
@@ -27,6 +27,7 @@ interface Aberta {
 function CorpoDaNota({ html, chave }: { html: string; chave?: CryptoKey }) {
   const ref = useRef<HTMLDivElement>(null);
   const limpo = useMemo(() => sanitizarHtml(html), [html]);
+  const marcado = useMemo(() => ({ __html: limpo }), [limpo]);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -34,7 +35,7 @@ function CorpoDaNota({ html, chave }: { html: string; chave?: CryptoKey }) {
     void resolverAnexos(el, chave).then((u) => (urls = u));
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [limpo, chave]);
-  return <div ref={ref} className="nota-corpo" dangerouslySetInnerHTML={{ __html: limpo }} />;
+  return <div ref={ref} className="nota-corpo" dangerouslySetInnerHTML={marcado} />;
 }
 
 export function NotasDoSitio() {
@@ -69,6 +70,11 @@ export function NotasDoSitio() {
     setAlvo(null);
     setAEscrever(null);
   }, []);
+  // perguntar à IA a partir de uma nota fecha a janela das notas (o chat abre por cima)
+  useEffect(() => {
+    window.addEventListener(EVENTO_FECHAR_FLUTUANTES, fechar);
+    return () => window.removeEventListener(EVENTO_FECHAR_FLUTUANTES, fechar);
+  }, [fechar]);
 
   const abrirComSenha = async (n: Nota) => {
     if (!n.cifra) return;
@@ -88,15 +94,17 @@ export function NotasDoSitio() {
   return (
     <>
     <Dialog.Root open={!!alvo} onOpenChange={(v) => !v && fechar()}>
-      <Dialog size="lg" className="max-h-[90dvh] overflow-y-auto p-5 sm:p-6" data-sem-nota>
+      <Dialog size="lg" className="flex max-h-[90dvh] flex-col overflow-hidden p-0" data-sem-nota>
         {alvo && (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-4">
+          <>
+            {/* o título fica sempre à vista: só o que está por baixo rola (antes rolava tudo e o título saía por cima do ecrã) */}
+            <div className="flex shrink-0 items-center justify-between gap-4 px-5 pb-3 pt-5 sm:px-6 sm:pt-6">
               <Dialog.Title className="min-w-0 text-lg font-semibold">
                 <span className="block truncate">Notas · {alvo.rotulo}</span>
               </Dialog.Title>
               <Dialog.Close render={(p) => <Button {...p} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
             </div>
+            <div className={`flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 sm:px-6 ${aEscrever ? "pb-5 sm:pb-6" : "pb-3"}`}>
             {aEscrever ? (
               <EditorDeNota
                 alvo={alvo}
@@ -115,7 +123,21 @@ export function NotasDoSitio() {
                     const c = conteudoDe(n);
                     const minha = euSou(n, quem);
                     return (
-                      <article key={n.id} className="nota-papel flex flex-col gap-2 rounded-xl p-3.5 shadow-xs ring ring-black/10 dark:ring-white/15" data-cor={n.cor}>
+                      <article
+                        key={n.id}
+                        className={`nota-papel flex flex-col gap-2 rounded-xl p-3.5 shadow-xs ring ring-black/10 dark:ring-white/15 ${minha && c ? "cursor-pointer transition-shadow hover:shadow-md" : ""}`}
+                        data-cor={n.cor}
+                        tabIndex={minha && c ? 0 : undefined}
+                        aria-label={minha && c ? "Abrir a nota para editar" : undefined}
+                        // clicar na nota abre-a para editar (as dos outros só se leem); botões, menus, ligações e campos fazem o seu trabalho
+                        onClick={(e) => {
+                          if (!minha || !c || (e.target as Element).closest("button, a, input, form, audio, video, [role=menu], [role=menuitem]")) return;
+                          editar(n);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && e.target === e.currentTarget && minha && c) editar(n);
+                        }}
+                      >
                         <header className="flex items-start justify-between gap-2">
                           <div className="min-w-0 text-xs">
                             <div className="font-semibold">{n.autor}</div>
@@ -142,7 +164,7 @@ export function NotasDoSitio() {
                               <DropdownMenu.Item icon={<Ic nome="copiar" />} disabled={!c} onClick={() => c && void copiarEstruturado(estruturaDeRegisto(`Nota em ${n.alvo.rotulo}`, { autor: n.autor, para: n.para, criada: n.criada, atualizada: n.atualizada, expira: n.expira ?? null, texto: c.corpo.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim(), ficheiros: c.anexos.map((a) => a.nome) }, n.alvo.pagina))}>
                                 Copiar a nota
                               </DropdownMenu.Item>
-                              <DropdownMenu.Item icon={<Ic nome="ia" />} disabled={!c} onClick={() => c && perguntarAIa(`Resume esta nota e diz o que devo fazer`, { contexto: { titulo: `uma nota em ${n.alvo.rotulo}`, dados: { autor: n.autor, texto: c.corpo.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() } } })}>
+                              <DropdownMenu.Item icon={<Ic nome="ia" />} disabled={!c} onClick={() => c && perguntarAIa("Resumir esta nota", { contexto: { titulo: `uma nota em ${n.alvo.rotulo}`, dados: { autor: n.autor, texto: c.corpo.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() } } })}>
                                 Perguntar à IA
                               </DropdownMenu.Item>
                               {minha && <SeparadorDeMenu />}
@@ -185,14 +207,17 @@ export function NotasDoSitio() {
                     );
                   })}
                 </div>
-                <div className="flex justify-end">
-                  <Button variant="primary" icon={ICONES.mais} onClick={() => setAEscrever("nova")}>
-                    Nova nota
-                  </Button>
-                </div>
               </>
             )}
-          </div>
+            </div>
+            {!aEscrever && (
+              <div className="flex shrink-0 justify-end px-5 pb-5 pt-1 sm:px-6 sm:pb-6">
+                <Button variant="primary" icon={ICONES.mais} onClick={() => setAEscrever("nova")}>
+                  Nova nota
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </Dialog>
     </Dialog.Root>

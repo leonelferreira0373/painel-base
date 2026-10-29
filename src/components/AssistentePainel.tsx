@@ -16,9 +16,14 @@ import { faqAtivas, faqComoDocumentos, useFaq } from "@/lib/faq";
 import { criarTransporteDoPainel } from "@/lib/ia-agente";
 import { instrucoesFinais, procurar, useControlosIA, type DocumentoDeMemoria } from "@/lib/ia-controlos";
 import { consumirContexto, textoDoContexto } from "@/lib/ia-contexto";
-import { useEmUso } from "@/lib/ia-uso";
+import { EVENTO_CHAT_NOVA, reporContexto, useEmUso } from "@/lib/ia-uso";
 import { abrirPesquisas, useTrabalhos } from "@/lib/pesquisa-profunda";
 import { useApp } from "@/lib/estado";
+import { sessaoAtual } from "@/lib/atividade";
+import { quemFala } from "@/lib/ia-quem-fala";
+import { useSessao } from "@/lib/auth";
+import { BotaoCopiar } from "./Copiar";
+import { Frase, semMarcas } from "./Frase";
 import { AnelDeContexto, ContextoDaIa } from "./ia/AnelDeContexto";
 import { CartaoDeAprovacao } from "./ia/CartaoDeAprovacao";
 import { CartaoDePesquisaPronta } from "./pesquisa/MotorDePesquisas";
@@ -46,6 +51,7 @@ export function AssistentePainel() {
   const router = useRouter();
   const pathname = usePathname();
   const { funcao } = useApp();
+  const { sessao } = useSessao();
   const controlos = useControlosIA();
   const { itens: memoria } = useArmazem<DocumentoDeMemoria>("memoria");
   const { faq } = useFaq();
@@ -68,8 +74,8 @@ export function AssistentePainel() {
   const paginas = useMemo(() => ["/", ...AREAS.filter((a) => a.id !== "inicio").flatMap((a) => a.modulos.map((m) => caminho(a.id, m.id)))], []);
 
   // o transporte lê o estado mais recente a cada pergunta, sem se refazer
-  const vivo = useRef({ controlos, memoria, faq, funcao, pathname, catalogo });
-  vivo.current = { controlos, memoria, faq, funcao, pathname, catalogo };
+  const vivo = useRef({ controlos, memoria, faq, funcao, pathname, catalogo, sessao });
+  vivo.current = { controlos, memoria, faq, funcao, pathname, catalogo, sessao };
   const transporte = useMemo(
     () =>
       PROJETO.urlIa
@@ -83,12 +89,12 @@ export function AssistentePainel() {
               return oficial ? oficial.resposta.trim() : null;
             },
             sistema: (pergunta) => {
-              const { controlos: c, memoria: m, faq: f, funcao: fn, pathname: p } = vivo.current;
+              const { controlos: c, memoria: m, faq: f, funcao: fn, pathname: p, sessao: s } = vivo.current;
               const passagens = procurar([...faqComoDocumentos(f), ...m], pergunta, 3);
               return [
                 instrucoesFinais(c, m, faqAtivas(f).length),
                 "Podes agir no painel como uma pessoa, com as ferramentas (procurar páginas, abrir uma página, ver o ecrã, clicar, escrever, escolher, premir teclas, ler e acrescentar perguntas à FAQ). Para ir a uma página usa procurar_paginas e depois abrir_pagina; só vês o ecrã quando precisas de clicar ou escrever. Se o pedido era só abrir ou explicar, responde logo, sem mais passos. Nunca inventes dados do painel. Cada ação que muda alguma coisa precisa da licença de quem fala contigo (o painel pede-a). Responde curto, em português de Portugal.",
-                `Quem fala contigo tem a função «${fn.rotulo}» e está na página ${p}.`,
+                quemFala(fn, s, p, sessaoAtual()),
                 (() => {
                   const ctx = consumirContexto();
                   return ctx ? textoDoContexto(ctx) : "";
@@ -103,6 +109,12 @@ export function AssistentePainel() {
     [router],
   );
 
+  // uma conversa nova começa com o anel de contexto a zero; fechar e abrir o chat não o repõe
+  useEffect(() => {
+    const repor = () => reporContexto("assistente");
+    window.addEventListener(EVENTO_CHAT_NOVA, repor);
+    return () => window.removeEventListener(EVENTO_CHAT_NOVA, repor);
+  }, []);
   useEffect(() => {
     const abrir = () => {
       const botao = document.querySelector<HTMLButtonElement>(".aia-botao");
@@ -129,6 +141,8 @@ export function AssistentePainel() {
         endpoint={ASSISTENTE.endpoint}
         paginas={paginas}
         Ligacao={NextLink}
+        textoDaPessoa={(texto) => <Frase inverso>{texto}</Frase>}
+        acoesDaMensagem={(texto) => <BotaoCopiar texto={semMarcas(texto)} variante="ghost" tamanho="xs" quadrado dica="Copiar a mensagem" />}
         seletorDaHero={false}
         atrasoMs={0}
         chaveDeSessao={ASSISTENTE.chaveDeSessao}

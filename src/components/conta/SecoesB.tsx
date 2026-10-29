@@ -309,7 +309,7 @@ export function SecaoTokens() {
           }}
         >
           <div className="flex flex-col gap-4">
-            <Input label="Nome" placeholder="Por exemplo, folha de cálculo do mês" value={nome} onChange={(e) => setNome(e.target.value)} />
+            <Input label="Nome" placeholder="Ex.: folha de cálculo do mês" value={nome} onChange={(e) => setNome(e.target.value)} />
             <SeletorPersonalizavel label="Validade" valor={validade} opcoes={VALIDADE.opcoes} personalizado={VALIDADE.personalizado} aoMudar={setValidade} />
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">O que pode fazer</span>

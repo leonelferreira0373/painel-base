@@ -29,10 +29,14 @@ export function textoDoContexto(c: ContextoDaPergunta, maximo = 5000): string {
   return `A pessoa está a perguntar sobre isto, que tem à frente${c.pagina ? ` em ${c.pagina}` : ""}: ${c.titulo}.${dados ? `\nDados (JSON): ${dados}` : ""}`;
 }
 
-/** Abre o chat e faz a pergunta: com `enviar` envia-a logo; senão fica escrita para a pessoa acabar. */
+/** Quem abriu uma janelinha ou uma janela para a pessoa perguntar à IA fecha-a quando a pergunta sai: o chat abre por cima e as duas coisas abertas ao mesmo tempo ficavam mal. */
+export const EVENTO_FECHAR_FLUTUANTES = "painel:fechar-flutuantes";
+
+/** Abre o chat e faz a pergunta: com `enviar` envia-a logo; senão fica escrita para a pessoa acabar. Fecha antes as janelinhas e as janelas que estavam abertas. */
 export function perguntarAIa(texto: string, opcoes: { contexto?: ContextoDaPergunta; enviar?: boolean } = {}): void {
+  window.dispatchEvent(new Event(EVENTO_FECHAR_FLUTUANTES));
   if (opcoes.contexto) pendente = { contexto: { pagina: window.location.pathname, ...opcoes.contexto }, ate: Date.now() + 5 * 60_000 };
   window.dispatchEvent(new Event("bridge:assistente"));
-  // o chat leva um instante a abrir
-  window.setTimeout(() => window.dispatchEvent(new CustomEvent("painel:chat-perguntar", { detail: { texto, enviar: opcoes.enviar === true } })), 450);
+  // o chat leva um instante a abrir; o que fica só escrito (num campo de texto) não pode levar os «» dos termos
+  window.setTimeout(() => window.dispatchEvent(new CustomEvent("painel:chat-perguntar", { detail: { texto: opcoes.enviar === true ? texto : texto.replace(/[«»]/g, ""), enviar: opcoes.enviar === true } })), 450);
 }

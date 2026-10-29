@@ -30,11 +30,8 @@ export function Estado({ valor, modulo, variante: forcada }: { valor: string; mo
     </Badge>
   );
   if (!significado && passos.length === 0) return etiqueta;
-  const linhas =
-    passos.length > 0
-      ? passos.map((p) => ({ rotulo: "Passo seguinte", valor: `${p.rotulo} · ${p.quem}${p.permitido ? " (a sua função pode)" : " (a sua função não pode)"}` }))
-      : temFluxo
-        ? [{ rotulo: "Passo seguinte", valor: "Nenhum: é um estado final." }]
-        : [];
-  return <Dica conteudo={<CorpoDica titulo={valor} texto={significado ?? undefined} linhas={linhas} />}>{etiqueta}</Dica>;
+  // os passos seguintes numa só lista (antes cada um repetia o cabeçalho «Passo seguinte»)
+  const listas = passos.length > 0 ? [{ cabecalho: passos.length === 1 ? "Passo seguinte" : "Passos seguintes", itens: passos.map((p) => ({ titulo: p.rotulo, detalhe: `Quem pode: ${p.quem}`, alcance: p.permitido ? ("sim" as const) : ("nao" as const), alcanceTexto: p.permitido ? "A sua função pode fazê-lo." : "A sua função não pode fazê-lo." })) }] : [];
+  const texto = [significado, temFluxo && passos.length === 0 ? "É um estado final: já não há passos seguintes." : null].filter(Boolean).join(" ");
+  return <Dica conteudo={<CorpoDica titulo={valor} texto={texto || undefined} listas={listas} />}>{etiqueta}</Dica>;
 }

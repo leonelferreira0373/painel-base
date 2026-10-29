@@ -1,4 +1,4 @@
-// A cor de cada gráfico: cada pessoa pinta o gráfico que quiser à sua maneira e a escolha fica guardada neste navegador, gráfico a gráfico (a chave é a página mais o título do gráfico). Funções puras para derivar uma paleta e tons de uma cor; o resto é guardar e ler.
+// A cor de cada gráfico e de cada elemento dele (cada barra, fatia ou série): cada pessoa pinta o que quiser à sua maneira e a escolha fica guardada neste navegador, gráfico a gráfico (a chave é a página mais o título do gráfico). Funções puras para derivar uma paleta e tons de uma cor; o resto é guardar e ler.
 import { useCallback, useEffect, useState } from "react";
 import { hexParaHsv, hsvParaHex } from "./cor";
 
@@ -46,6 +46,7 @@ export const idDoGrafico = (pagina: string, titulo: string): string => `${pagina
 // ---------- guardar e ler (só no navegador) ----------
 
 const CHAVE = "painel.cores-graficos";
+const CHAVE_ELEMENTOS = "painel.cores-elementos";
 export const EVENTO_CORES = "painel:cores-graficos";
 
 export function lerCores(): Record<string, string> {
@@ -81,6 +82,7 @@ export function definirGama(cor: string | null): void {
   const todas: Record<string, string> = cor && corValida(cor) ? { [ID_DA_GAMA]: cor.toLowerCase() } : {};
   try {
     window.localStorage.setItem(CHAVE, JSON.stringify(todas));
+    window.localStorage.removeItem(CHAVE_ELEMENTOS);
   } catch {
     /* sem armazenamento */
   }
@@ -102,4 +104,73 @@ export function useCorDoGrafico(id?: string): [string | undefined, (cor: string 
   }, []);
   const mudar = useCallback((nova: string | null) => id && definirCor(id, nova), [id]);
   return [corEfetiva(cores, id), mudar, id ? cores[id] : undefined];
+}
+
+// ---------- a cor de cada elemento (cada barra, fatia ou série) ----------
+
+/** Gráfico → elemento → cor. O elemento é identificado pela sua chave (a da barra ou fatia, o nome da série), por isso a escolha acompanha-o mesmo quando os dados mudam. */
+export type CoresDosElementos = Record<string, Record<string, string>>;
+
+export function lerCoresDosElementos(): CoresDosElementos {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(CHAVE_ELEMENTOS) ?? "{}") as Record<string, unknown>;
+    const saida: CoresDosElementos = {};
+    for (const [grafico, itens] of Object.entries(v)) {
+      if (!itens || typeof itens !== "object") continue;
+      const validos = Object.fromEntries(Object.entries(itens as Record<string, unknown>).filter(([, c]) => corValida(c))) as Record<string, string>;
+      if (Object.keys(validos).length) saida[grafico] = validos;
+    }
+    return saida;
+  } catch {
+    return {};
+  }
+}
+
+function guardarElementos(todas: CoresDosElementos): void {
+  try {
+    window.localStorage.setItem(CHAVE_ELEMENTOS, JSON.stringify(todas));
+  } catch {
+    /* sem armazenamento */
+  }
+  window.dispatchEvent(new Event(EVENTO_CORES));
+}
+
+/** Guarda a cor de um elemento de um gráfico; `null` repõe a original dele. */
+export function definirCorDoElemento(grafico: string, elemento: string, cor: string | null): void {
+  const todas = lerCoresDosElementos();
+  const deste = { ...(todas[grafico] ?? {}) };
+  if (cor && corValida(cor)) deste[elemento] = cor.toLowerCase();
+  else delete deste[elemento];
+  if (Object.keys(deste).length) todas[grafico] = deste;
+  else delete todas[grafico];
+  guardarElementos(todas);
+}
+
+/** Repõe as cores originais de todos os elementos de um gráfico. */
+export function reporCoresDosElementos(grafico: string): void {
+  const todas = lerCoresDosElementos();
+  delete todas[grafico];
+  guardarElementos(todas);
+}
+
+/** A cor de um elemento: a que a pessoa escolheu para ele, senão a de origem. */
+export const corDoElemento = (escolhidas: Record<string, string> | undefined, elemento: string, padrao: string): string => escolhidas?.[elemento] ?? padrao;
+
+const SEM_ELEMENTOS: Record<string, string> = {};
+
+/** As cores escolhidas para os elementos de um gráfico, sempre atualizadas, e como mudar a de um (ou repor a dele com `null`). */
+export function useCoresDosElementos(id?: string): [Record<string, string>, (elemento: string, cor: string | null) => void] {
+  const [todas, setTodas] = useState<CoresDosElementos>({});
+  useEffect(() => {
+    const ler = () => setTodas(lerCoresDosElementos());
+    ler();
+    window.addEventListener(EVENTO_CORES, ler);
+    window.addEventListener("storage", ler);
+    return () => {
+      window.removeEventListener(EVENTO_CORES, ler);
+      window.removeEventListener("storage", ler);
+    };
+  }, []);
+  const mudar = useCallback((elemento: string, cor: string | null) => id && definirCorDoElemento(id, elemento, cor), [id]);
+  return [(id && todas[id]) || SEM_ELEMENTOS, mudar];
 }

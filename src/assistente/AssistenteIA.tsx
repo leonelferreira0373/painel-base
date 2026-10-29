@@ -80,7 +80,6 @@ import {
   IconeInfo,
   IconeLixo,
   IconeSetaDiagonal,
-  IconeSetaEsquerda,
   IconeTresPontos,
 } from "./cliente/icones";
 import { MenuDoChat } from "./cliente/MenuDoChat";
@@ -306,6 +305,10 @@ export type PropsDoAssistenteIA = {
   avatar?: ReactNode;
   /** O componente das ligações para páginas do site (por omissão `a`; no Next, `next/link`). */
   Ligacao?: ElementType;
+  /** Como se desenha o texto que a pessoa escreveu (por omissão, tal e qual). O painel usa-o para mostrar os termos entre «» como etiquetas. */
+  textoDaPessoa?: (texto: string) => ReactNode;
+  /** O que fica por baixo de cada mensagem (um botão de copiar, por exemplo). Recebe o texto da mensagem e quem a escreveu. */
+  acoesDaMensagem?: (texto: string, de: "bot" | "eu") => ReactNode;
   /** O elemento da hero: o chat só aparece depois de a pessoa a passar. Sem ele, depois de descer 40 % do ecrã; com `false`, está sempre à vista. */
   seletorDaHero?: string | false;
   /** Quanto o botão espera depois de a hero ficar para trás (por omissão 300 ms). */
@@ -320,7 +323,7 @@ export type PropsDoAssistenteIA = {
   Carregar?: ComponentType<{ rotulo: string }>;
   /** O botão de enviar do projecto (um `<button type="submit">`), no lugar do redondo do módulo; `desativado` quando não há nada escrito. */
   BotaoDeEnviar?: ComponentType<{ rotulo: string; desativado: boolean }>;
-  /** O que vive à direita da escrita, antes do botão de enviar (o painel põe aqui o anel de contexto da IA). */
+  /** O que vive à esquerda da escrita, no lugar onde havia a seta de voltar (o painel põe aqui o anel de contexto da IA). */
   Lateral?: ReactNode;
   /** Anexar ficheiros de qualquer formato (o botão do clipe, largar em cima do chat, colar). */
   anexos?: AnexosDoAssistente;
@@ -349,6 +352,8 @@ export function AssistenteIA({
   paginas = ["/"],
   avatar,
   Ligacao = "a",
+  textoDaPessoa = (texto: string): ReactNode => texto,
+  acoesDaMensagem,
   seletorDaHero,
   atrasoMs = ATRASO_PADRAO_MS,
   chaveDeSessao = "aia-v1",
@@ -1049,6 +1054,8 @@ export function AssistenteIA({
 
   /** Põe o chat numa conversa nova e vazia (o que já se disse fica no histórico) e o assistente volta a dar as boas-vindas. */
   const comecarConversaNova = () => {
+    // o painel repõe o anel de contexto: a conversa nova começa vazia
+    window.dispatchEvent(new Event("painel:chat-nova"));
     void transporte.nova?.().catch(() => undefined);
     mudarFila(() => []);
     atualizar((a) => ({ ...vazio(), convites: a.convites, silencio: true, conversa: novoId(), abertura: true }));
@@ -1804,6 +1811,7 @@ export function AssistenteIA({
                       {m.raciocinio && (m.texto || m.cartoes?.length) && !aChegar ? (
                         <Avaliar textos={textos} avaliacao={m.avaliacao} aoEnviar={(a) => avaliar(m, a)} />
                       ) : null}
+                      {acoesDaMensagem && m.texto && !aChegar ? <div className="aia-acoes-da-mensagem">{acoesDaMensagem(m.texto, "bot")}</div> : null}
                     </>
                   ) : (
                     <>
@@ -1812,12 +1820,13 @@ export function AssistenteIA({
                           <span className="aia-eu-espera" data-saindo="sim">
                             <Carregar rotulo={textos.fila.espera} />
                           </span>
-                          <span className="aia-eu-texto">{m.texto}</span>
+                          <span className="aia-eu-texto">{textoDaPessoa(m.texto)}</span>
                         </p>
                       ) : (
                         <>
                           {m.anexo && anexos ? <div className="aia-anexo">{anexos.renderizar(m.anexo)}</div> : null}
-                          {m.texto ? <p className="aia-eu">{m.texto}</p> : null}
+                          {m.texto ? <p className="aia-eu">{textoDaPessoa(m.texto)}</p> : null}
+                          {acoesDaMensagem && m.texto ? <div className="aia-acoes-da-mensagem" data-de="eu">{acoesDaMensagem(m.texto, "eu")}</div> : null}
                         </>
                       )}
                       <span className="aia-foto" aria-hidden="true">
@@ -1931,10 +1940,8 @@ export function AssistenteIA({
 
             <form className="aia-rodape" onSubmit={aoSubmeter}>
               <div className="aia-escrita">
-                {/* sair da conversa e fechar o chat: a seta de voltar vive aqui, ao lado da escrita (já não há X no cabeçalho) */}
-                <button type="button" className="aia-voltar" onClick={fechar} aria-label={dados.fechar} title={dados.fechar} onMouseDown={(e) => e.preventDefault()}>
-                  <IconeSetaEsquerda className="aia-icone-medio" />
-                </button>
+                {/* à esquerda da escrita vive o que o projecto quiser (o painel põe aqui o anel de contexto da IA); o chat fecha-se com o Escape, com a alça no telemóvel ou com o botão que o abriu */}
+                {Lateral ? <span className="aia-lateral">{Lateral}</span> : null}
                 {anexos ? (
                   <>
                     <button
@@ -1983,7 +1990,6 @@ export function AssistenteIA({
                       : undefined
                   }
                 />
-                {Lateral}
                 {/* o toque não tira o foco da escrita: o teclado fica aberto e a pessoa continua a escrever (as mensagens seguintes ficam em fila) */}
                 {BotaoDeEnviar ? (
                   <span className="aia-enviar-do-projecto" onMouseDown={(e) => e.preventDefault()}>

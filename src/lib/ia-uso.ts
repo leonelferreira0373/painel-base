@@ -1,5 +1,5 @@
 // O que a IA gastou, a sério: cada chamada (a pesquisa em linguagem natural e o assistente) traz da Cloudflare os tokens e as neurons que usou; aqui guardam-se, neste navegador, o histórico (com a pergunta e a resposta, que só ficam aqui), o que cada contexto ocupa da janela do modelo e o que se gastou nesta sessão; e pede-se ao Worker o que se gastou hoje no total (a quota gratuita). Funções puras e um hook; o que se vê (o anel, a janela, o histórico) está em components/ia/.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { PROJETO } from "@/dados/projeto";
 import { NEURONS_GRATIS_POR_DIA, modeloDe, ocupacaoDaJanela, type UsoDeChamada } from "./ia-modelos";
 
@@ -118,16 +118,60 @@ export function lerHistoricoDaIa(): RegistoDeUso[] {
   }
 }
 
-/** O contexto em que cada origem está agora (a última chamada) e o que se gastou desde que a página abriu. */
-const estado: { contextos: Partial<Record<OrigemDaIa, RegistoDeUso>>; sessao: TotaisDeUso } = { contextos: {}, sessao: totaisVazios() };
+// ---------- o contexto e a sessão: guardados, para não reiniciarem ----------
+
+const CHAVE_REPOSTO = "painel.ia.contextoReposto";
+const CHAVE_SESSAO = "painel.ia.sessaoInicio";
+export const EVENTO_CHAT_NOVA = "painel:chat-nova";
+
+function lerReposto(): Partial<Record<OrigemDaIa, string>> {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(CHAVE_REPOSTO) ?? "{}") as unknown;
+    return v && typeof v === "object" ? (v as Partial<Record<OrigemDaIa, string>>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * O contexto de uma origem é a última chamada que ela fez. Vem do histórico guardado, por isso sobrevive a fechar e abrir o chat, a mudar de página e a recarregar: só volta a zero
+ * numa conversa nova (ou ao apagar o histórico). `historico` vem do mais novo para o mais velho.
+ */
+export function ultimaChamadaDe(origem: OrigemDaIa, historico: RegistoDeUso[], reposto: Partial<Record<OrigemDaIa, string>> = {}): RegistoDeUso | null {
+  const r = historico.find((x) => x.origem === origem);
+  if (!r) return null;
+  const marco = reposto[origem];
+  return marco && r.quando <= marco ? null : r;
+}
+
+/** Uma conversa nova (ou a pesquisa começada de novo): o anel volta a zero até à próxima chamada. */
+export function reporContexto(origem: OrigemDaIa): void {
+  try {
+    window.localStorage.setItem(CHAVE_REPOSTO, JSON.stringify({ ...lerReposto(), [origem]: new Date().toISOString() }));
+  } catch {
+    /* sem armazenamento */
+  }
+  window.dispatchEvent(new Event(EVENTO_USO_DA_IA));
+}
+
+/** O que se gastou nesta sessão (neste separador, mesmo que a página recarregue): as chamadas desde que o separador começou a usar a IA. */
+export function inicioDaSessao(): string {
+  try {
+    const v = window.sessionStorage.getItem(CHAVE_SESSAO);
+    if (v) return v;
+    const agora = new Date().toISOString();
+    window.sessionStorage.setItem(CHAVE_SESSAO, agora);
+    return agora;
+  } catch {
+    return "";
+  }
+}
 
 const nova = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 export function registarUsoDaIa(r: Omit<RegistoDeUso, "id" | "quando"> & { id?: string; quando?: string }): RegistoDeUso {
   const registo: RegistoDeUso = { id: r.id ?? nova(), quando: r.quando ?? new Date().toISOString(), ...r };
-  estado.contextos[registo.origem] = registo;
-  const s = estado.sessao;
-  estado.sessao = { chamadas: s.chamadas + 1, tokensEntrada: s.tokensEntrada + registo.uso.tokensEntrada, tokensSaida: s.tokensSaida + registo.uso.tokensSaida, neurons: s.neurons + registo.uso.neurons, custoUsd: s.custoUsd + registo.uso.custoUsd };
+  inicioDaSessao();
   try {
     window.localStorage.setItem(CHAVE, JSON.stringify([registo, ...lerHistoricoDaIa()].slice(0, MAXIMO_DE_REGISTOS)));
   } catch {
@@ -155,8 +199,11 @@ export function apagarHistoricoDaIa(): void {
   } catch {
     /* sem armazenamento */
   }
-  estado.contextos = {};
-  estado.sessao = totaisVazios();
+  try {
+    window.localStorage.removeItem(CHAVE_REPOSTO);
+  } catch {
+    /* sem armazenamento */
+  }
   window.dispatchEvent(new Event(EVENTO_USO_DA_IA));
 }
 
@@ -205,12 +252,41 @@ export function useEmUso(origem: OrigemDaIa): boolean {
   return typeof window !== "undefined" && emUsoAte[origem] > Date.now();
 }
 
+// ---------- a fase: o que a IA está a fazer agora (para o botão da IA no cabeçalho) ----------
+
+export type FaseDaIa = "pensar" | "escrever";
+export const EVENTO_FASE_DA_IA = "painel:ia-fase";
+let faseAtual: FaseDaIa | null = null;
+
+/** Diz o que a IA do chat está a fazer: a pensar (cérebro), a escrever (lápis) ou nada. */
+export function marcarFase(fase: FaseDaIa | null): void {
+  if (faseAtual === fase) return;
+  faseAtual = fase;
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(EVENTO_FASE_DA_IA));
+}
+
+const subscreverFase = (aoMudar: () => void) => {
+  window.addEventListener(EVENTO_FASE_DA_IA, aoMudar);
+  return () => window.removeEventListener(EVENTO_FASE_DA_IA, aoMudar);
+};
+
+/** O que a IA está a fazer agora; `null` quando está parada. */
+export function useFaseDaIa(): FaseDaIa | null {
+  return useSyncExternalStore(subscreverFase, () => faseAtual, () => null);
+}
+
 /** O estado da IA neste navegador, sempre atualizado: o contexto de cada origem, o gasto da sessão, o histórico e o gasto de hoje. */
 export function useUsoDaIa() {
   const [versao, setVersao] = useState(0);
   const [hoje, setHoje] = useState<GastoDeHoje | null>(null);
+  // lê-se depois de a página aparecer (no servidor não há histórico): a primeira pintura é igual à do servidor e logo a seguir entra o que está guardado
+  const [lido, setLido] = useState<{ historico: RegistoDeUso[]; reposto: Partial<Record<OrigemDaIa, string>> }>({ historico: [], reposto: {} });
   useEffect(() => {
-    const ler = () => setVersao((v) => v + 1);
+    const ler = () => {
+      setLido({ historico: lerHistoricoDaIa(), reposto: lerReposto() });
+      setVersao((v) => v + 1);
+    };
+    ler();
     window.addEventListener(EVENTO_USO_DA_IA, ler);
     window.addEventListener("storage", ler);
     return () => {
@@ -220,11 +296,16 @@ export function useUsoDaIa() {
   }, []);
   const recarregarHoje = useCallback(() => void lerGastoDeHoje().then(setHoje), []);
   useEffect(recarregarHoje, [recarregarHoje, versao]);
+  const { historico, reposto } = lido;
   const contexto = (origem: OrigemDaIa) => {
-    const r = estado.contextos[origem];
+    const r = ultimaChamadaDe(origem, historico, reposto);
     if (!r) return null;
     const tokens = r.uso.tokensEntrada + r.uso.tokensSaida;
     return { registo: r, tokens, janela: r.uso.janela, ocupacao: ocupacaoDaJanela(tokens, r.uso.janela), modelo: modeloDe(r.uso.modelo) };
   };
-  return { versao, contexto, sessao: estado.sessao, historico: typeof window === "undefined" ? [] : lerHistoricoDaIa(), hoje, recarregarHoje };
+  const sessao = useMemo(() => {
+    const inicio = historico.length === 0 ? "" : inicioDaSessao();
+    return somarUso(historico.filter((r) => r.quando >= inicio));
+  }, [historico]);
+  return { versao, contexto, sessao, historico, hoje, recarregarHoje };
 }

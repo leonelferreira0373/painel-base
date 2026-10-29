@@ -14,6 +14,7 @@ import { Estado } from "../Estado";
 import { ICONES } from "../Icones";
 import { SeletorPersonalizavel } from "../SeletorPersonalizavel";
 import { Pagina, Titulo } from "../ui";
+import { ImplementacoesDoGitHub } from "./GitHubReal";
 import { AvisoDeApi, dataHora, TabelaSimples, useGuardado, type ColunaSimples } from "./SuperPecas";
 
 const ORIGEM = gerarImplementacoes();
@@ -78,6 +79,7 @@ export function Implementacoes() {
     <Pagina>
       <Titulo titulo="Implementações" />
       <AvisoDeApi erro={api.erro} aoTentar={api.recarregar} />
+      <ImplementacoesDoGitHub />
       <Cartao titulo="Em produção">
         <div className="flex flex-col gap-3 p-4">
           <div className="flex h-3 overflow-hidden rounded-full bg-kumo-recessed ring ring-kumo-line" role="img" aria-label={`Versão A com ${100 - (e.b ? e.percentagemB : 0)} % do tráfego${e.b ? ` e versão B com ${e.percentagemB} %` : ""}`}>

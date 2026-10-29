@@ -6,6 +6,8 @@ const config: NextConfig = {
   // Permite construir noutra pasta sem estragar o servidor de desenvolvimento (NEXT_DIST_DIR=.next-build).
   distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
+  // o círculo «N» do Next no canto do ecrã (só em desenvolvimento) tapava os botões e o campo do chat nos testes no telemóvel
+  devIndicators: false,
   reactStrictMode: true,
   trailingSlash: true,
   images: { unoptimized: true },

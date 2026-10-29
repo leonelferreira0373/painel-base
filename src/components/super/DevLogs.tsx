@@ -10,6 +10,7 @@ import { perguntarAIa } from "@/lib/ia-contexto";
 import { contagemPorNivel, filtrarLinhas, horaDaLinha, juntarLinhas, linhaSimulada, linhasParaTexto, NIVEIS, ROTULO_DO_NIVEL, type FonteDeLogs, type LinhaDeLog, type NivelDeLog } from "@/lib/logs";
 import { abrirAnalise } from "@/lib/pesquisa-profunda";
 import { copiar } from "../Copiar";
+import { ItemPerguntarComMais } from "../ItensDeMenuComMais";
 import { Dica } from "../Dica";
 import { MenuCartao, SeparadorDeMenu } from "../Flutuantes";
 import { ICONES, Ic } from "../Icones";
@@ -234,9 +235,10 @@ export function RegistosDoServidor() {
                     Descarregar o .log
                   </DropdownMenu.Item>
                   <SeparadorDeMenu />
-                  <DropdownMenu.Item icon={<Ic nome="ia" />} onClick={() => perguntarAIa("O que se passa nestes registos do servidor? Há algo a corrigir?", { contexto: { titulo: "os registos do servidor", dados: contexto(), pagina: window.location.pathname } })}>
-                    Perguntar à IA
-                  </DropdownMenu.Item>
+                  <ItemPerguntarComMais
+                    pergunta="Analisar os registos do servidor"
+                    perguntar={(texto) => perguntarAIa(texto, { contexto: { titulo: "os registos do servidor", dados: contexto(), pagina: window.location.pathname } })}
+                  />
                   <SeparadorDeMenu />
                   <DropdownMenu.Item icon={<Ic nome="lixo" />} variant="danger" onClick={dados.limpar}>
                     Limpar a vista
@@ -246,7 +248,7 @@ export function RegistosDoServidor() {
             </span>
           </div>
           {/* os níveis numa só linha: se não couberem, rolam na horizontal com o desvanecimento nas pontas */}
-          <div className="sem-barra -mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto px-4 [&>*]:shrink-0">
+          <div className="sem-barra -mx-4 -my-1 flex flex-nowrap items-center gap-2 overflow-x-auto px-4 py-1 [&>*]:shrink-0">
             {NIVEIS.map((n) => (
               <Button key={n} size="sm" variant={niveis.has(n) ? "primary" : "secondary"} aria-pressed={niveis.has(n)} onClick={() => alternarNivel(n)}>
                 {ROTULO_DO_NIVEL[n]} <span className="tabular-nums opacity-70">{contagem[n]}</span>

@@ -4,7 +4,7 @@ import { caminho } from "@/dados/estrutura";
 import { faqAtivas, guardarFaqAgora, lerFaq, faqNova, erroDaFaq, type Faq } from "./faq";
 import { clicar, descreverRef, escolher, esperarMs, escrever, lerEcra, premirTecla } from "./ia-ecra";
 import { registar } from "./atividade";
-import { marcarEmUso, registarUsoDaIa } from "./ia-uso";
+import { marcarEmUso, marcarFase, registarUsoDaIa } from "./ia-uso";
 import type { UsoDeChamada } from "./ia-modelos";
 import { pontuarPaginas, type PaginaPesquisavel } from "./pesquisa-ia";
 
@@ -199,19 +199,26 @@ export function criarTransporteDoPainel(cfg: ConfiguracaoDoAgente): TransporteDo
         // uma pergunta pronta (um pill) responde-se com a resposta oficial, sem gastar a IA
         yield { passo: { titulo: "A usar a resposta oficial da equipa", icone: "cerebro" } };
         registar("ia", `A IA respondeu com a resposta oficial: «${oficial.slice(0, 140)}»`);
-        for (const bloco of oficial.match(/\S+\s*|\s+/g) ?? [oficial]) {
-          if (sinal.aborted) return;
-          yield { t: bloco };
-          await esperar(10);
+        marcarFase("escrever");
+        try {
+          for (const bloco of oficial.match(/\S+\s*|\s+/g) ?? [oficial]) {
+            if (sinal.aborted) return;
+            yield { t: bloco };
+            await esperar(10);
+          }
+        } finally {
+          marcarFase(null);
         }
         yield { fim: true };
         return;
       }
       marcarEmUso("assistente", 60_000);
+      marcarFase("pensar");
       const feitas = new Map<string, string>();
       try {
         for (let passo = 0; passo < limite; passo++) {
           if (sinal.aborted) return;
+          marcarFase("pensar");
           let r: Response;
           try {
             r = await fetch(`${cfg.urlIa}/assistente`, { method: "POST", headers: { "Content-Type": "application/json", "X-Sessao-Ia": conversa }, body: JSON.stringify({ mensagens, ferramentas: esquema, sessao: conversa }), signal: sinal });
@@ -236,6 +243,7 @@ export function criarTransporteDoPainel(cfg: ConfiguracaoDoAgente): TransporteDo
             const final = d.texto.trim() || "Não consegui responder a isto.";
             registar("ia", `A IA respondeu: «${final.slice(0, 140)}»`);
             // a resposta chega aos poucos, como se escrevesse
+            marcarFase("escrever");
             for (const bloco of final.match(/\S+\s*|\s+/g) ?? [final]) {
               if (sinal.aborted) return;
               yield { t: bloco };
@@ -285,6 +293,7 @@ export function criarTransporteDoPainel(cfg: ConfiguracaoDoAgente): TransporteDo
         yield { fim: true };
       } finally {
         marcarEmUso("assistente", 3_000);
+        marcarFase(null);
       }
     },
   };

@@ -12,6 +12,8 @@
 html {
   interpolate-size: allow-keywords;
   height: 100%;
+  /* no telemóvel o navegador pintava um retângulo cinzento sobre tudo o que se tocava (uma linha inteira, um cartão); o painel já anima o próprio botão */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -66,9 +68,17 @@ svg:has(> path.fill-kumo-arrow-edge) {
     max-width: none;
     border-radius: 0 !important;
     border-inline-width: 0 !important;
-    box-shadow:
-      inset 0 1px 0 0 var(--color-kumo-hairline),
-      inset 0 -1px 0 0 var(--color-kumo-hairline) !important;
+    /* a linha de cima e a de baixo são bordos a sério (não sombras interiores): um gráfico que chega ao fundo do cartão cobria a sombra e deixava um traço escuro */
+    border-block: 1px solid var(--color-kumo-line) !important;
+    box-shadow: none !important;
+  }
+  /* as partes de dentro (o título cinzento e o corpo branco de um painel) também são retas e sem anel: só o cartão tem moldura, e o corpo separa-se do título por uma linha fina */
+  .pleno > * {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .pleno[class*="bg-kumo-elevated"] > :last-child:not(:first-child) {
+    border-top: 1px solid var(--color-kumo-hairline);
   }
   /* No cabeçalho só aparece a página atual (o caminho completo não cabe e ficava «Operações > E…»); o Kumo desenha o caminho do telemóvel num bloco à parte. */
   header nav[aria-label="breadcrumb"] > .contents > :not(:last-child) {
@@ -247,6 +257,10 @@ h3 {
 }
 [class*="bg-kumo-overlay"] {
   z-index: 89;
+}
+/* Tudo o que se abre a partir de um controlo (listas dos seletores, menus, janelinhas, dicas) fica por cima das janelas: sem isto as listas abriam por trás da janela e «o botão não abria». */
+[data-base-ui-portal] > div[data-side] {
+  z-index: 100;
 }
 
 /* Um seletor com rótulo ocupa a largura do campo, como os campos de texto (o do Kumo só tem a largura do texto e os formulários ficavam desalinhados). */

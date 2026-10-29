@@ -49,7 +49,7 @@ export function SecaoAtalhos() {
 
   return (
     <>
-      <Cartao titulo="Atalhos de teclado" dica="Escolha as combinações que mais lhe convêm. Cada uma tem de incluir Ctrl ou Alt (ou ser uma tecla F) e não pode ser uma das do navegador.">
+      <Cartao titulo="Atalhos de teclado" dica="Combinações que abrem e mudam o painel sem tirar as mãos do teclado. Para mudar uma, carregue em «Alterar» e prima a nova combinação; «Esc» cancela. Cada uma tem de incluir Ctrl ou Alt (ou ser uma tecla F) e não pode ser uma das do navegador, para não entrar em conflito com ele.">
         {ATALHOS.map((a) => {
           const alterado = efetivos[a.id] !== a.padrao;
           const gravando = aGravar === a.id;
@@ -83,7 +83,7 @@ export function SecaoAtalhos() {
           </Button>
         </div>
       </Cartao>
-      <Cartao titulo="Atalhos fixos" dica="Fazem parte dos menus e das janelas; não se mudam.">
+      <Cartao titulo="Atalhos fixos" dica="Teclas que funcionam sempre que há uma janela, um menu ou a pesquisa aberta: fechar, escolher e andar pelas opções. Fazem parte do próprio painel, por isso não se podem alterar nem desligar.">
         {ATALHOS_FIXOS.map((a) => (
           <Linha key={a.teclas} titulo={a.acao}>
             <kbd className="rounded bg-kumo-tint px-2 py-1 text-xs font-medium text-kumo-default">{a.teclas}</kbd>

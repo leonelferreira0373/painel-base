@@ -155,6 +155,7 @@ export const AREAS: Area[] = [
       { id: "comportamento", descricao: "Nome, tom, tamanho das respostas, instruções e limites do assistente.", palavras: "chatbot, assistente, tom, instruções, nome do assistente", rotulo: "Comportamento", icone: "engrenagem", tipo: "pagina" },
       { id: "memoria", descricao: "Os PDF e as notas que o assistente tem na memória.", palavras: "chatbot, documentos, pdf, notas, conhecimento", rotulo: "Memória", icone: "pdf", tipo: "pagina" },
       { id: "testar", descricao: "Ver o que o assistente encontraria na memória e as instruções que recebe.", palavras: "chatbot, experimentar, perguntar ao assistente", rotulo: "Testar", icone: "lupa", tipo: "pagina" },
+      { id: "uso", descricao: "Tudo o que a IA gastou: tokens, neurons e dinheiro de cada chamada, com a pergunta e a resposta.", palavras: "gasto, custo, tokens, consumo, histórico da ia, quota, dinheiro, contexto", rotulo: "Utilização", icone: "serie", tipo: "pagina" },
     ],
   },
   {

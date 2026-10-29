@@ -4,17 +4,13 @@
 import { Button } from "@cloudflare/kumo";
 import { useEffect, useState } from "react";
 import { copiarEstruturado, type PayloadEstruturado } from "@/lib/copiar-dados";
+import { escreverNaPrancheta } from "@/lib/prancheta";
 import { Dica } from "./Dica";
 import { Ic, type Icone } from "./Icones";
 
-/** Copia para a área de transferência, se o navegador deixar. */
+/** Copia para a área de transferência (pela API moderna ou, se não houver, pelo método clássico). */
 export async function copiar(texto: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(texto);
-    return true;
-  } catch {
-    return false;
-  }
+  return escreverNaPrancheta(texto);
 }
 
 export type EstadoDeCopia = "ocioso" | "ok" | "erro";

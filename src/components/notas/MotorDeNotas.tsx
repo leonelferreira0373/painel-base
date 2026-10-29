@@ -33,7 +33,7 @@ export function useQuem(): Quem {
 const slug = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 /** As janelas que não levam botão de nota (o chat, as próprias notas, os avisos e as janelas do painel que já têm o seu sítio). */
-const SEM_NOTA = /^(Notas ·|Exportar e importar|Analisar com IA|Pesquisa em curso|Cor de|Cor deste)/;
+const SEM_NOTA = /^(Notas ·|Nota ·|Exportar e importar|Analisar com IA|Pesquisa em curso|Cor de|Cor deste)/;
 
 interface JanelaComBotao {
   janela: Element;
@@ -118,7 +118,11 @@ export function MotorDeNotas() {
       setJanelas((l) => [...l, { janela: j, gancho, alvo: { tipo: "janela", chave: `janela:${slug(pathname)}:${slug(titulo)}`, rotulo: titulo, pagina: pathname } }]);
     };
     const verificar = () => document.querySelectorAll('[role="dialog"]').forEach(ligar);
-    const limpar = () => setJanelas((l) => l.filter((x) => x.janela.isConnected));
+    const limpar = () =>
+      setJanelas((l) => {
+        const vivas = l.filter((x) => x.janela.isConnected);
+        return vivas.length === l.length ? l : vivas;
+      });
     const o = new MutationObserver(() => {
       verificar();
       limpar();

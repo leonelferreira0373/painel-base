@@ -1,4 +1,4 @@
-// O menu de três pontos (na vertical) dos cartões, dos KPIs e das listas: mudar a cor (a gama de todos os gráficos de uma vez, ou só a deste), exportar em qualquer formato, copiar os dados estruturados, deixar uma nota, perguntar à IA e investigar com a IA (a pesquisa a fundo). O resultado de copiar aparece no próprio botão (visto ou aviso), nunca num aviso flutuante. `ItensDeKpi` entra em qualquer menu de cartão; `MenuDoKpi` é o menu completo de um KPI; `MenuDeDados` é o das listas.
+// O menu de três pontos (na vertical) dos cartões, dos KPIs e das listas: mudar a cor (a gama de todos os gráficos de uma vez, só a deste, ou a de cada elemento dele: uma barra, uma fatia, uma série), exportar em qualquer formato, copiar os dados estruturados, deixar uma nota, perguntar à IA e investigar com a IA (a pesquisa a fundo). O resultado de copiar aparece no próprio botão (visto ou aviso), nunca num aviso flutuante. `ItensDeKpi` entra em qualquer menu de cartão; `MenuDoKpi` é o menu completo de um KPI; `MenuDeDados` é o das listas.
 "use client";
 
 import { Button, Dialog, DropdownMenu, Input, Tooltip } from "@cloudflare/kumo";
@@ -8,50 +8,80 @@ import { registar } from "@/lib/atividade";
 import { copiarEstruturado, estruturaDeTabela, type PayloadEstruturado } from "@/lib/copiar-dados";
 import { abrirDados } from "@/lib/dados-da-pagina";
 import { copiarImagem, type DadosExportaveis } from "@/lib/exportar-dados";
-import { COR_DE_PARTIDA, CORES_DE_GRAFICO, corValida, definirCor, definirGama, ID_DA_GAMA, idDoGrafico, lerCores, useCorDoGrafico } from "@/lib/cores-graficos";
+import { COR_DE_PARTIDA, CORES_DE_GRAFICO, corValida, definirCor, definirCorDoElemento, definirGama, ID_DA_GAMA, idDoGrafico, lerCores, reporCoresDosElementos, useCoresDosElementos, useCorDoGrafico } from "@/lib/cores-graficos";
+import { useElementosDoGrafico } from "@/lib/elementos-do-grafico";
 import { perguntarAIa } from "@/lib/ia-contexto";
 import { abrirNota } from "@/lib/notas";
 import { abrirAnalise } from "@/lib/pesquisa-profunda";
 import { IconeMorfico, useResultadoTemporario } from "./Copiar";
+import { ItemCopiarComMais, ItemPerguntarComMais } from "./ItensDeMenuComMais";
 import { MenuCartao, SeparadorDeMenu, SubMenuCartao } from "./Flutuantes";
 import { Ic, ICONES } from "./Icones";
 import { EscolhaDeCor } from "./SeletorDeCor";
 
 // ---------- a cor ----------
 
-type Escopo = "gama" | "grafico";
+/** `elemento` abre a janela já no primeiro elemento do gráfico (a barra 1, a fatia 1…). */
+type Escopo = "gama" | "grafico" | "elemento";
 
-/** A janela de escolher outra cor (a gama inteira ou só um gráfico). O menu abre-a com `abrir`; `janela` põe-se ao lado do menu. */
+/** A janela de escolher outra cor: a gama inteira, só um gráfico, ou um elemento dele (uma barra, uma fatia, uma série). O menu abre-a com `abrir`; `janela` põe-se ao lado do menu. */
 export function useJanelaDeCor(idDaCor?: string): { abrir: (e: Escopo) => void; janela: ReactNode } {
   const [escopo, setEscopo] = useState<Escopo | null>(null);
   const [cor, , propria] = useCorDoGrafico(idDaCor);
+  const elementos = useElementosDoGrafico(idDaCor);
+  const [escolhidas] = useCoresDosElementos(idDaCor);
+  /** O elemento que se está a pintar; `null` é o gráfico todo. */
+  const [chave, setChave] = useState<string | null>(null);
   const [gama, setGama] = useState<string | undefined>(undefined);
   const [escrito, setEscrito] = useState("");
   useEffect(() => {
     if (escopo) setGama(lerCores()[ID_DA_GAMA]);
-  }, [escopo]);
-  const atual = escopo === "gama" ? (gama ?? COR_DE_PARTIDA) : (propria ?? cor ?? COR_DE_PARTIDA);
-  useEffect(() => setEscrito(escopo ? atual : ""), [escopo]); // eslint-disable-line react-hooks/exhaustive-deps
+    setChave(escopo === "elemento" ? (elementos[0]?.chave ?? null) : null);
+  }, [escopo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const elemento = escopo !== "gama" ? elementos.find((e) => e.chave === chave) : undefined;
+  const atual = escopo === "gama" ? (gama ?? COR_DE_PARTIDA) : elemento ? (escolhidas[elemento.chave] ?? elemento.padrao) : (propria ?? cor ?? COR_DE_PARTIDA);
+  useEffect(() => setEscrito(escopo ? atual : ""), [escopo, chave]); // eslint-disable-line react-hooks/exhaustive-deps
   const aplicar = (hex: string) => {
     const h = hex.toLowerCase();
     if (escopo === "gama") {
       definirGama(h);
       setGama(h);
       registar("definicao", `Mudou a cor de todos os gráficos para ${h}`, { depois: h });
+    } else if (idDaCor && elemento) {
+      definirCorDoElemento(idDaCor, elemento.chave, h);
+      registar("definicao", `Mudou a cor de «${elemento.rotulo}» no gráfico ${idDaCor.split(":")[1] ?? ""} para ${h}`, { depois: h });
     } else if (idDaCor) {
       definirCor(idDaCor, h);
       registar("definicao", `Mudou a cor do gráfico ${idDaCor.split(":")[1] ?? ""} para ${h}`, { depois: h });
     }
     setEscrito(h);
   };
+  const temEscolhas = Object.keys(escolhidas).length > 0;
   const janela = (
     <Dialog.Root open={escopo !== null} onOpenChange={(v) => !v && setEscopo(null)}>
       <Dialog size="sm" className="p-5">
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
-            <Dialog.Title className="text-lg font-semibold">{escopo === "gama" ? "Cor de todos os gráficos" : "Cor deste gráfico"}</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">{escopo === "gama" ? "Cor de todos os gráficos" : elemento ? "Cor de um elemento" : "Cor deste gráfico"}</Dialog.Title>
             <Dialog.Close render={(p) => <Button {...p} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
           </div>
+          {escopo !== "gama" && elementos.length > 1 && (
+            <div role="radiogroup" aria-label="O que pintar" className="sem-barra -mx-1 -my-1 flex gap-1.5 overflow-x-auto px-1 py-1">
+              {[{ chave: null as string | null, rotulo: "Todo o gráfico", cor: propria ?? cor ?? COR_DE_PARTIDA }, ...elementos.map((e) => ({ chave: e.chave as string | null, rotulo: e.rotulo, cor: escolhidas[e.chave] ?? e.padrao }))].map((o) => (
+                <button
+                  key={o.chave ?? "*"}
+                  type="button"
+                  role="radio"
+                  aria-checked={chave === o.chave}
+                  onClick={() => setChave(o.chave)}
+                  className="inline-flex max-w-[180px] shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-kumo-default ring ring-kumo-line transition-colors hover:bg-kumo-tint aria-checked:bg-kumo-tint aria-checked:ring-2 aria-checked:ring-kumo-default"
+                >
+                  <Amostra hex={o.cor} />
+                  <span className="min-w-0 truncate">{o.rotulo}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <EscolhaDeCor valor={corValida(atual) ? atual : COR_DE_PARTIDA} aoMudar={aplicar} />
           <Input
             label="Código da cor"
@@ -64,7 +94,22 @@ export function useJanelaDeCor(idDaCor?: string): { abrir: (e: Escopo) => void; 
             }}
             error={escrito !== "" && !corValida(escrito.startsWith("#") ? escrito : `#${escrito}`) ? "Use seis dígitos, de 0 a 9 e de a a f." : undefined}
           />
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-2">
+            {escopo !== "gama" && idDaCor && elementos.length > 1 ? (
+              <Button
+                variant="ghost"
+                icon={ICONES.repor}
+                disabled={elemento ? !escolhidas[elemento.chave] : !temEscolhas}
+                onClick={() => {
+                  if (elemento) definirCorDoElemento(idDaCor, elemento.chave, null);
+                  else reporCoresDosElementos(idDaCor);
+                }}
+              >
+                {elemento ? "Repor este elemento" : "Repor os elementos"}
+              </Button>
+            ) : (
+              <span />
+            )}
             <Button variant="primary" onClick={() => setEscopo(null)}>
               Concluído
             </Button>
@@ -82,6 +127,9 @@ function Amostra({ hex }: { hex: string }) {
 
 function ItensDeCor({ idDaCor, aoOutraCor }: { idDaCor: string; aoOutraCor: (e: Escopo) => void }) {
   const [cor, , propria] = useCorDoGrafico(idDaCor);
+  const elementos = useElementosDoGrafico(idDaCor);
+  const [escolhidas] = useCoresDosElementos(idDaCor);
+  const temEscolhas = Object.keys(escolhidas).length > 0;
   const gama = lerCores()[ID_DA_GAMA];
   return (
     <DropdownMenu.Sub>
@@ -131,8 +179,13 @@ function ItensDeCor({ idDaCor, aoOutraCor }: { idDaCor: string; aoOutraCor: (e: 
             <DropdownMenu.Item icon={<Ic nome="paleta" />} onClick={() => aoOutraCor("grafico")}>
               Outra cor…
             </DropdownMenu.Item>
+            {elementos.length > 1 && (
+              <DropdownMenu.Item icon={<Ic nome="barras" />} onClick={() => aoOutraCor("elemento")}>
+                Cada elemento…
+              </DropdownMenu.Item>
+            )}
             <SeparadorDeMenu />
-            <DropdownMenu.Item icon={<Ic nome="repor" />} disabled={!propria && !cor} onClick={() => definirCor(idDaCor, null)}>
+            <DropdownMenu.Item icon={<Ic nome="repor" />} disabled={!propria && !cor && !temEscolhas} onClick={() => (definirCor(idDaCor, null), reporCoresDosElementos(idDaCor))}>
               {gama ? "Usar a cor de todos" : "Voltar à cor original"}
             </DropdownMenu.Item>
           </SubMenuCartao>
@@ -181,24 +234,15 @@ export function ItensDeKpi({ dados, estruturado, titulo, tipo = "cartao", idDaCo
           Exportar…
         </DropdownMenu.Item>
       )}
-      <DropdownMenu.Item icon={<Ic nome="copiar" />} onClick={copiarDados}>
-        Copiar dados
-      </DropdownMenu.Item>
-      {dados && (
-        <DropdownMenu.Item icon={<Ic nome="imagem" />} onClick={async () => aoResultado(await copiarImagem(dados))}>
-          Copiar como imagem
-        </DropdownMenu.Item>
-      )}
-      <SeparadorDeMenu />
+      {(dados || estruturado) && <ItemCopiarComMais aoCopiar={copiarDados} aoImagem={dados ? async () => aoResultado(await copiarImagem(dados)) : undefined} />}
       <DropdownMenu.Item icon={<Ic nome="lembrete" />} onClick={() => abrirNota(alvoDeNota)}>
         Deixar nota
       </DropdownMenu.Item>
-      <DropdownMenu.Item icon={<Ic nome="ia" />} onClick={() => perguntarAIa(`Explica-me ${tipo === "lista" ? "este quadro" : "este cartão"}: ${titulo}`, { contexto: { titulo, dados: paraIa(), pagina } })}>
-        Perguntar à IA
-      </DropdownMenu.Item>
-      <DropdownMenu.Item icon={<Ic nome="lupa" />} onClick={() => abrirAnalise({ titulo, tipo, pagina, dados: paraIa() })}>
-        Investigar com IA
-      </DropdownMenu.Item>
+      <ItemPerguntarComMais
+        pergunta={tipo === "lista" ? "Explicar este quadro" : "Explicar este cartão"}
+        perguntar={(texto) => perguntarAIa(texto, { contexto: { titulo, dados: paraIa(), pagina } })}
+        aoInvestigar={() => abrirAnalise({ titulo, tipo, pagina, dados: paraIa() })}
+      />
     </>
   );
 }

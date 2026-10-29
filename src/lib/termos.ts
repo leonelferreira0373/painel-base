@@ -1,4 +1,4 @@
-// O que cada termo do painel quer dizer. Um termo aparece como etiqueta cinzenta («Firewall», «TTL», «Concluído») e, ao clicar, abre uma explicação a sério, com o que é, onde está e o que se pode fazer com ele. Aqui estão as explicações: um glossário técnico, o significado dos estados, as páginas do painel, as funções, os formatos de exportação e os tipos de ação. O que não se conhece diz-se com honestidade (e a pessoa pode perguntar à IA).
+// O que cada termo do painel quer dizer. Um termo aparece como etiqueta cinzenta («Firewall», «TTL», «Concluído») e, ao clicar, abre uma explicação a sério, com o que é, onde está e o que se pode fazer com ele. Aqui estão as explicações: um glossário técnico, o significado dos estados, as páginas do painel, as funções, os formatos de exportação e os tipos de ação. Um valor que não está aqui (o nome de um registo, um número) é só um destaque: não abre nenhuma explicação, em vez de fingir uma.
 import { significadoDoEstado } from "@/dados/dicas";
 import { AREAS } from "@/dados/estrutura";
 import { SECOES_CONTA } from "@/dados/conta";
@@ -13,7 +13,7 @@ export interface ExplicacaoDeTermo {
   texto: string;
   /** Onde está ou a que pertence (opcional). */
   onde?: string;
-  /** Se a explicação veio de um conhecimento do painel (senão é só o aviso de que não se conhece). */
+  /** Se há uma explicação a sério (senão a etiqueta não abre nada). */
   conhecido: boolean;
 }
 
@@ -66,6 +66,50 @@ const GLOSSARIO: Record<string, string> = {
   "reconn": "Reconhecimento: a pesquisa a fundo da IA sobre um tema, na internet e nos dados do painel, que acaba num documento com fontes.",
 };
 
+/** Uma ação, botão, tecla ou estado do painel que se cita numa frase como «termo». */
+interface EntradaDoPainel {
+  tipo: string;
+  texto: string;
+  onde?: string;
+}
+
+/** Cada uma com o rótulo tal como aparece no ecrã. */
+const ENTRADAS: [string, EntradaDoPainel][] = [
+  ["Investigar com IA", { tipo: "Ação do menu", onde: "Menu de três pontos dos cartões, das listas e dos registos", texto: "Pede à IA uma análise a fundo do cartão, da lista ou do registo onde carregou nos três pontos. Abre a janela «Analisar com IA», onde escolhe a profundidade (rápida, normal ou profunda), o tamanho da resposta e se a IA também pesquisa na internet. A análise entra numa fila, corre em segundo plano e a IA avisa no chat quando acabar; acompanha-se em «Pesquisa em curso»." }],
+  ["Analisar com IA", { tipo: "Janela", texto: "A janela onde se pede uma análise a fundo à IA: o que quer saber (opcional), a profundidade da pesquisa (rápida, cerca de 1 minuto; normal, cerca de 2; profunda, cerca de 5), o tamanho da resposta (curta, equilibrada, detalhada ou extensa), a ênfase e se pode pesquisar na internet. «Começar» põe a análise na fila." }],
+  ["Pesquisa em curso", { tipo: "Painel da IA", texto: "O painel das análises a fundo da IA. Lista as que estão na fila, a pesquisar, em pausa ou acabadas, com os passos já dados, as fontes consultadas e o resultado. Pode acompanhar uma análise em direto e mandar-lhe uma correção a meio para a IA mudar de rumo." }],
+  ["Perguntar à IA", { tipo: "Ação do menu", texto: "Abre o chat da IA já com uma pergunta sobre este cartão, lista ou registo, e envia-lhe os dados que estão no ecrã para ela responder com base neles." }],
+  ["Deixar nota", { tipo: "Ação do menu", texto: "Escreve uma nota adesiva presa a este cartão, lista ou janela. Pode ser só para si ou para outras pessoas, ter data para expirar, palavra-passe e lembretes por e-mail." }],
+  ["Copiar dados", { tipo: "Ação do menu", texto: "Copia a informação do cartão ou da lista como texto legível (o título, os campos com os valores, e de que página e quando foi copiada), pronta para colar num documento ou numa conversa com a IA." }],
+  ["Copiar como imagem", { tipo: "Ação do menu", texto: "Copia o cartão ou o gráfico como uma imagem, para colar num documento ou numa mensagem." }],
+  ["Alterar", { tipo: "Botão", onde: "Definições da conta > Atalhos", texto: "O botão ao lado de cada atalho de teclado. Carregue nele e prima a nova combinação: fica guardada logo. «Esc» cancela." }],
+  ["Esc", { tipo: "Tecla", texto: "A tecla Escape. Fecha a janela ou o menu que está aberto e, nos atalhos, cancela a gravação de uma combinação nova." }],
+  ["Igual ao sistema", { tipo: "Opção do tema", onde: "Definições da conta > Aparência", texto: "O painel acompanha o aparelho: fica claro de dia e escuro à noite, conforme a definição do telemóvel ou do computador." }],
+  ["Personalizado", { tipo: "Escolha feita à mão", texto: "O que fica quando muda alguma coisa de um pacote ou de um modelo: em vez de uma das opções prontas, passa a ser a sua combinação. Pode voltar a uma opção pronta quando quiser." }],
+  ["Carregar ficheiros", { tipo: "Botão", onde: "Ficheiros", texto: "Escolhe ficheiros do seu aparelho para os guardar na pasta aberta. Também pode largá-los na área da pasta." }],
+  ["Carregar imagens", { tipo: "Botão", onde: "Galeria", texto: "Escolhe imagens do seu aparelho para as juntar à galeria. Ficam guardadas neste navegador." }],
+  ["Preferências de cookies", { tipo: "Ligação", texto: "Abre a janela onde decide que cookies aceita: os essenciais são sempre necessários e os de análise e de marketing são opcionais. Pode mudar a escolha a qualquer momento." }],
+  ["Falar com a equipa", { tipo: "Botão do assistente", texto: "Passa a conversa do assistente para uma pessoa da equipa. Indique o número do pedido para a resposta ser mais rápida." }],
+  ["Novo registo", { tipo: "Botão", texto: "Cria um registo novo no módulo aberto (por exemplo, um pedido de transporte). Preencha os campos obrigatórios e guarde: o registo aparece logo na lista." }],
+  ["Definições da conta", { tipo: "Espaço pessoal", texto: "O sítio onde trata da sua conta: perfil, segurança, e-mail e telefone, notificações, lembretes, aparência, atalhos, tokens da API, exportar e dados e privacidade." }],
+  ["Em análise", { tipo: "Estado", texto: "O pedido foi recebido e está a ser avaliado: ainda não há decisão." }],
+  ["Confirmado", { tipo: "Estado", texto: "O pedido foi aceite e está marcado. Já não precisa de nenhuma decisão." }],
+  ["Recusado", { tipo: "Estado", texto: "O pedido não foi aceite. Pode ver a razão no registo e fazer um novo pedido, se fizer sentido." }],
+  ["Novo", { tipo: "Estado", texto: "Acabou de aparecer e ainda ninguém lhe pegou. Passa a outro estado quando alguém o tratar." }],
+  ["Agendada", { tipo: "Estado", texto: "Tem data e hora marcadas: sai sozinha à hora definida, sem ninguém carregar em nada." }],
+  ["A enviar", { tipo: "Estado", texto: "Está a ser enviada agora a toda a audiência. Quando acabar passa a enviada, com os números de entregues, abertos e falhas." }],
+  ["dados de demonstração", { tipo: "Modo de ligação", texto: "O painel funciona sozinho, no navegador, com dados de exemplo e sem servidor. Para usar dados reais, ligue-o a um servidor que cumpra o contrato da API." }],
+  ["bpt_", { tipo: "Prefixo", texto: "O início de todos os tokens criados no painel («bpt_» e 40 letras e números). Serve para reconhecer um token do painel, por exemplo se for colado por engano num sítio público." }],
+  ["desde", { tipo: "Parâmetro da API", texto: "Filtro de um pedido: só devolve o que aconteceu depois deste momento. Chamado de segundo a segundo, dá o tempo real." }],
+  ["antes", { tipo: "Parâmetro da API", texto: "Filtro de um pedido: só atua sobre o que é anterior a esta data (por exemplo, só apaga as linhas mais antigas)." }],
+  ["contagem", { tipo: "Cálculo", texto: "Conta os registos de cada ponto do gráfico, sem somar nenhum valor." }],
+  ["default", { tipo: "Seletor do DKIM", texto: "O nome da chave de assinatura do e-mail: a chave pública fica no DNS em «default._domainkey» do seu domínio e o servidor assina cada mensagem com a chave privada correspondente." }],
+  ["quentes", { tipo: "Termo do Marketing", texto: "As páginas do site mais vistas, com o tempo médio de leitura e a taxa de rejeição (quem sai sem fazer mais nada)." }],
+  ["Rastreio", { tipo: "Página do Marketing", onde: "Marketing", texto: "Onde se vê como o site envia ao painel os eventos de visita e de clique, e o script que se instala no site para o fazer." }],
+];
+
+const ENTRADAS_POR_NOME = new Map(ENTRADAS.map(([rotulo, e]) => [norm(rotulo), e]));
+
 /** Os tipos de estado comuns, para o aviso de onde se vê. */
 const NOME_DO_TIPO: Record<string, string> = { sessao: "Sessão", navegacao: "Navegação" };
 
@@ -74,6 +118,9 @@ export function explicarTermo(termo: string, contexto?: string): ExplicacaoDeTer
   const n = norm(termo);
   const g = GLOSSARIO[n];
   if (g) return { tipo: "Termo técnico", texto: g, conhecido: true };
+
+  const entrada = ENTRADAS_POR_NOME.get(n);
+  if (entrada) return { ...entrada, conhecido: true };
 
   const estado = significadoDoEstado("*", termo);
   if (estado) return { tipo: "Estado", texto: estado, conhecido: true };
@@ -98,7 +145,8 @@ export function explicarTermo(termo: string, contexto?: string): ExplicacaoDeTer
   // um pedaço de rota do site («Compras» dentro de «Compras > Homens»)
   if (contexto) return { tipo: "Página do site", texto: `«${termo}» é uma página (ou uma secção) do site. Aqui conta quantas vezes foi pedida ou clicada.`, onde: contexto, conhecido: true };
 
-  return { tipo: "Valor", texto: `«${termo}» é um valor que o painel mostra aqui (um nome, um dado ou um estado). Não tenho mais detalhes guardados sobre ele: pergunte à IA para saber o que significa neste ecrã.`, conhecido: false };
+  // sem explicação a sério não se inventa uma: a etiqueta fica como destaque e não abre nada
+  return { tipo: "Valor", texto: "", conhecido: false };
 }
 
 /** Quantos termos tem o glossário (para os testes). */

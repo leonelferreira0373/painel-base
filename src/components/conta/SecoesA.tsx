@@ -1,7 +1,7 @@
 // Definições da conta, parte 1: perfil (nome, fotografia, assinatura, formatos), aparência (tema, movimento, dicas, barra) e e-mail e telefone.
 "use client";
 
-import { Badge, Banner, Button, Dialog, Input, InputArea, Select } from "@cloudflare/kumo";
+import { Badge, Banner, Button, Dialog, Input, InputArea, Popover, Select } from "@cloudflare/kumo";
 import { PersonalizarAparencia } from "./Personalizar";
 import { useEffect, useRef, useState } from "react";
 import { AREAS } from "@/dados/estrutura";
@@ -13,6 +13,12 @@ import { lerTelefone, paisPorFuso, telefoneDe } from "@/lib/telefone";
 import { useTema, type Tema } from "@/lib/tema";
 import { Avatar } from "../Avatar";
 import { CampoDeTelefone } from "../CampoDeTelefone";
+import { Dica } from "../Dica";
+import { PopupCartao } from "../Flutuantes";
+import { Anel } from "../ia/AnelDeContexto";
+import { EscolhaDeCor } from "../SeletorDeCor";
+import { COR_DE_PARTIDA } from "@/lib/cores-graficos";
+import { coresDoAnel, definirCorDoAnel, useCorDoAnel } from "@/lib/ia-aparencia";
 import { ICONES, Ic } from "../Icones";
 import { CodigoDialog } from "./CodigoDialog";
 import { Cartao, codigoSimulado, emailValido, Interruptor, Linha, LinhaCampo, mascarar } from "./Pecas";
@@ -160,8 +166,38 @@ export function SecaoAparencia() {
         </Linha>
       </Cartao>
 
+      <CorDoAnelDeContexto />
+
       <PersonalizarAparencia />
     </>
+  );
+}
+
+/** A cor do anel de contexto da IA (a área redonda ao lado da escrita do chat): qualquer cor, com pré-visualização, ou as cores do aviso. */
+function CorDoAnelDeContexto() {
+  const cor = useCorDoAnel();
+  const [aberta, setAberta] = useState(false);
+  return (
+    <Cartao titulo="Anel de contexto da IA" dica="A área redonda ao lado de onde escreve ao assistente: o arco mostra quanto da janela do modelo a última resposta ocupou. Sem cor escolhida, o arco muda de verde para âmbar e vermelho à medida que enche.">
+      <Linha titulo="Cor do anel">
+        <span className="inline-flex items-center gap-3">
+          <span className="grid size-9 place-items-center rounded-full" style={cor ? { background: coresDoAnel(cor).fundo } : undefined}>
+            <Anel ocupacao={0.62} ativo tamanho={22} corPropria={cor} />
+          </span>
+          <Popover.Root open={aberta} onOpenChange={setAberta}>
+            <Dica conteudo="Escolher a cor do anel">
+              <Popover.Trigger render={<Button variant="secondary">{cor ? cor.toUpperCase() : "Cores do aviso"}</Button>} />
+            </Dica>
+            <PopupCartao alinhar="end" modalNoTelemovel aoFechar={() => setAberta(false)} className="w-[min(320px,calc(100vw-24px))] p-3">
+              <EscolhaDeCor valor={cor ?? COR_DE_PARTIDA} aoMudar={(hex) => definirCorDoAnel(hex)} />
+            </PopupCartao>
+          </Popover.Root>
+          <Button variant="ghost" disabled={!cor} onClick={() => definirCorDoAnel(null)}>
+            Repor
+          </Button>
+        </span>
+      </Linha>
+    </Cartao>
   );
 }
 

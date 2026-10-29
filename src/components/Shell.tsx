@@ -3,7 +3,7 @@
 
 import { Breadcrumbs, Button, CommandPalette, DropdownMenu, Popover, Sidebar, Toasty, Tooltip, TooltipProvider, useSidebar } from "@cloudflare/kumo";
 import { AparenciaPessoal } from "./AparenciaPessoal";
-import { MenuCartao, PopupCartao, SeparadorDeMenu, SubMenuCartao } from "./Flutuantes";
+import { MenuCartao, PopupCartao, SeparadorDoMenuDaConta, SubMenuCartao } from "./Flutuantes";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -38,6 +38,8 @@ import { MotorDeNotas } from "./notas/MotorDeNotas";
 import { abrirDados } from "@/lib/dados-da-pagina";
 import { registar as registarNaAtividade } from "@/lib/atividade";
 import { EsbatidoGlobal } from "./Estados";
+import { IconeDaEstrela } from "./ia/IconeDaEstrela";
+import { TitulosEmDicas } from "./TitulosEmDicas";
 import { Ic, ICONES, type Icone } from "./Icones";
 import { BotaoIcone } from "./ui";
 import { Frase } from "./Frase";
@@ -593,12 +595,12 @@ function MenuUtilizador() {
   }, [idioma]);
   return (
     <DropdownMenu>
-      <Tooltip content={`${conta.nome}. Menu da conta`} render={<DropdownMenu.Trigger render={<button aria-label="Menu da conta" className="flex size-9 items-center justify-center rounded-lg transition-colors hover:bg-kumo-tint"><Avatar foto={conta.foto} nome={conta.nome} tamanho={26} /></button>} />} />
+      <Tooltip content={`${conta.nome}. Menu da conta`} render={<DropdownMenu.Trigger render={<button aria-label="Menu da conta" className="flex size-10 items-center justify-center rounded-lg transition-colors hover:bg-kumo-tint"><Avatar foto={conta.foto} nome={conta.nome} tamanho={34} /></button>} />} />
       <MenuCartao>
         <DropdownMenu.Item disabled>
           <span className="max-w-40 truncate text-xs">{conta.email}</span>
         </DropdownMenu.Item>
-        <SeparadorDeMenu />
+        <SeparadorDoMenuDaConta />
         <DropdownMenu.LinkItem href={caminhoConta("perfil")} icon={<Ic nome="pessoa" />} render={<Link href={caminhoConta("perfil")} />}>
           Definições da conta
         </DropdownMenu.LinkItem>
@@ -631,7 +633,7 @@ function MenuUtilizador() {
             ))}
           </SubMenuCartao>
         </DropdownMenu.Sub>
-        <SeparadorDeMenu />
+        <SeparadorDoMenuDaConta />
         <DropdownMenu.Item icon={<Ic nome="sair" />} variant="danger" onClick={terminarSessao}>
           Terminar sessão
         </DropdownMenu.Item>
@@ -684,8 +686,7 @@ function Cabecalho({ aoPesquisar }: { aoPesquisar: () => void }) {
       </div>
       <div className="flex items-center gap-1">
         <ChipDePesquisas />
-        <Tooltip content={T.topo.perguntarIa} render={<Button variant="ghost" className="h-8" aria-label={T.topo.perguntarIa} icon={<Ic nome="ia" tamanho={16} peso="fill" className="-translate-y-px text-kumo-subtle" />} onClick={() => window.dispatchEvent(new Event(EVENTO_ASSISTENTE))}><span className="hidden md:inline">{T.topo.perguntarIa}</span></Button>} />
-        <Tooltip content="Exportar e importar" render={<Button variant="ghost" shape="square" icon={ICONES.transferir} aria-label="Exportar e importar" onClick={() => abrirDados("exportar")} />} />
+        <Tooltip content={T.topo.perguntarIa} render={<Button variant="ghost" className="h-8" aria-label={T.topo.perguntarIa} icon={<IconeDaEstrela />} onClick={() => window.dispatchEvent(new Event(EVENTO_ASSISTENTE))}><span className="hidden md:inline">{T.topo.perguntarIa}</span></Button>} />
         <Tooltip content={T.topo.pesquisar} render={<Button variant="ghost" shape="square" icon={ICONES.lupa} aria-label={T.topo.pesquisar} onClick={aoPesquisar} />} />
         <span className="hidden text-xs text-kumo-subtle sm:inline">{T.topo.simulacao}</span>
         <MenuUtilizador />
@@ -765,6 +766,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <Cabecalho aoPesquisar={() => setPesquisa(true)} />
             <main className="sem-barra min-h-0 flex-1 overflow-y-auto">{children}</main>
             <EsbatidoGlobal />
+            <TitulosEmDicas />
             <AtalhosGlobais aoPesquisar={alternarPesquisa} />
             <AparenciaPessoal />
             <AssistentePainel />

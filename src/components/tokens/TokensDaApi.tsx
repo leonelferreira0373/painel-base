@@ -33,6 +33,7 @@ import {
 } from "@/lib/tokens";
 import { VALIDADE } from "@/dados/personalizados";
 import { BotaoCopiar } from "../Copiar";
+import { ItemPerguntarComMais } from "../ItensDeMenuComMais";
 import { Dica } from "../Dica";
 import { Estado } from "../Estado";
 import { ICONES, Ic } from "../Icones";
@@ -281,12 +282,11 @@ function MenuDoToken({ t, agora, aoEditar, aoRodar, aoRevogar, aoApagar }: { t: 
         <DropdownMenu.Item icon={<Ic nome="copiar" />} onClick={() => void copiarEstruturado(estruturaDeRegisto(`Token da API: ${t.nome}`, dados, window.location.pathname))}>
           Copiar dados
         </DropdownMenu.Item>
-        <DropdownMenu.Item icon={<Ic nome="ia" />} onClick={() => perguntarAIa(`Explica-me o token da API «${t.nome}»: o que pode fazer e se está seguro.`, { contexto: { titulo: `o token ${t.nome}`, dados, pagina: window.location.pathname } })}>
-          Perguntar à IA
-        </DropdownMenu.Item>
-        <DropdownMenu.Item icon={<Ic nome="lupa" />} onClick={() => abrirAnalise({ titulo: `Token da API: ${t.nome}`, tipo: "registo", pagina: window.location.pathname, dados })}>
-          Investigar com IA
-        </DropdownMenu.Item>
+        <ItemPerguntarComMais
+          pergunta="Explicar este token"
+          perguntar={(texto) => perguntarAIa(texto, { contexto: { titulo: `o token ${t.nome}`, dados, pagina: window.location.pathname } })}
+          aoInvestigar={() => abrirAnalise({ titulo: `Token da API: ${t.nome}`, tipo: "registo", pagina: window.location.pathname, dados })}
+        />
         <SeparadorDeMenu />
         <DropdownMenu.Item icon={<Ic nome="proibido" />} variant="danger" disabled={revogado} onClick={aoRevogar}>
           Revogar
@@ -323,7 +323,7 @@ function JanelaDoToken({ token, modelo, aoFechar, aoGuardar }: { token: TokenDaA
           <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pb-4">
-          <Input label="Nome do token" value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} placeholder="Por exemplo, agente de IA" autoComplete="off" />
+          <Input label="Nome do token" value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} placeholder="Ex.: agente de IA" autoComplete="off" />
           {!token && (
             <Select
               label="Começar de um modelo"
@@ -339,21 +339,20 @@ function JanelaDoToken({ token, modelo, aoFechar, aoGuardar }: { token: TokenDaA
           <div className="flex flex-col gap-2">
             <span className="text-base font-medium text-kumo-default">Permissões</span>
             {f.permissoes.map((p, i) => (
-              <div key={i} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7rem_auto] sm:items-center">
+              // cada permissão é uma caixa de duas colunas iguais: área e módulo em cima, acesso e «Tirar» em baixo (num só rego os quatro não cabiam e os seletores sobrepunham-se)
+              <div key={i} className="grid grid-cols-1 gap-2 rounded-lg p-2 ring ring-kumo-line sm:grid-cols-[repeat(2,minmax(0,1fr))]">
                 <Select aria-label="Área" className="w-full" value={p.area} onValueChange={(v) => mudarPermissao(i, { area: String(v), modulo: "*" })} items={itensDeArea} />
                 <Select aria-label="Módulo" className="w-full" value={p.modulo} disabled={p.area === "*"} onValueChange={(v) => mudarPermissao(i, { modulo: String(v) })} items={p.area === "*" ? { "*": "Todos os módulos" } : itensDeModulo(p.area)} />
-                <div className="flex items-center gap-2 sm:contents">
-                  <div className="min-w-0 flex-1 sm:contents">
-                    <Select aria-label="Acesso" className="w-full" value={p.acesso} onValueChange={(v) => mudarPermissao(i, { acesso: String(v) as PermissaoDeToken["acesso"] })} items={ACESSOS} />
-                  </div>
-                  <Dica conteudo="Tirar esta permissão">
-                    <Button variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Tirar esta permissão" disabled={f.permissoes.length === 1} onClick={() => setF({ ...f, modelo: "personalizado", permissoes: f.permissoes.filter((_, j) => j !== i) })} />
-                  </Dica>
+                <Select aria-label="Acesso" className="w-full" value={p.acesso} onValueChange={(v) => mudarPermissao(i, { acesso: String(v) as PermissaoDeToken["acesso"] })} items={ACESSOS} />
+                <div className="flex min-w-0 items-center sm:justify-end">
+                  <Button variant="ghost" icon={ICONES.fechar} disabled={f.permissoes.length === 1} onClick={() => setF({ ...f, modelo: "personalizado", permissoes: f.permissoes.filter((_, j) => j !== i) })}>
+                    Tirar permissão
+                  </Button>
                 </div>
               </div>
             ))}
             <div>
-              <Button variant="secondary" size="sm" icon={ICONES.mais} onClick={() => setF({ ...f, modelo: "personalizado", permissoes: [...f.permissoes, { area: RECURSOS[0]?.area ?? "*", modulo: "*", acesso: "ler" }] })}>
+              <Button variant="secondary" icon={ICONES.mais} onClick={() => setF({ ...f, modelo: "personalizado", permissoes: [...f.permissoes, { area: RECURSOS[0]?.area ?? "*", modulo: "*", acesso: "ler" }] })}>
                 Adicionar permissão
               </Button>
             </div>

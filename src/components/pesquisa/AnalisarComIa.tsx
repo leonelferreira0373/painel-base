@@ -19,8 +19,6 @@ const lerConfig = (): ConfigDaPesquisa => {
   }
 };
 
-const TIPO: Record<AlvoDeAnalise["tipo"], string> = { cartao: "Cartão", lista: "Lista", registo: "Registo", pagina: "Página", livre: "Pergunta livre" };
-
 const itens = <T extends string>(o: Record<T, { rotulo: string }>, extra?: (k: T) => string) => Object.fromEntries((Object.keys(o) as T[]).map((k) => [k, extra ? `${o[k].rotulo} · ${extra(k)}` : o[k].rotulo]));
 
 export function AnalisarComIa() {
@@ -50,7 +48,6 @@ export function AnalisarComIa() {
     const hipotese = [...lerTrabalhos(), { ...criarFicticio(config) }];
     return etasDaFila(hipotese).get("novo") ?? null;
   }, [alvo, config]);
-  const linhas = alvo && typeof alvo.dados === "object" && alvo.dados !== null ? (alvo.dados as { linhas?: unknown[] }).linhas?.length : undefined;
 
   const mudar = <K extends keyof ConfigDaPesquisa>(k: K, v: ConfigDaPesquisa[K]) => setConfig((c) => ({ ...c, [k]: v }));
   const comecar = () => {
@@ -76,31 +73,29 @@ export function AnalisarComIa() {
               <Dialog.Close render={(p) => <Button {...p} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
             </div>
             {livre ? (
-              <Input label="Sobre o quê?" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Um nome curto para esta análise" autoComplete="off" autoFocus />
+              <Input label="Título" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Título da análise" autoComplete="off" autoFocus />
             ) : (
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                <span className="font-medium">
-                  <Frase>{`«${alvo.titulo}»`}</Frase>
-                </span>
-                <span className="text-kumo-subtle">
-                  {TIPO[alvo.tipo]}
-                  {linhas !== undefined ? ` · ${linhas.toLocaleString("pt-PT")} ${linhas === 1 ? "linha" : "linhas"}` : ""}
-                </span>
+              <div className="text-sm font-medium">
+                <Frase>{`«${alvo.titulo}»`}</Frase>
               </div>
             )}
-            <InputArea label="O que quer saber?" value={pedido} onValueChange={setPedido} minRows={3} autoResize placeholder={livre ? "Escreva a pergunta ou o tema, com o detalhe que quiser" : "Opcional. Por exemplo: compara com o mercado e diz o que devo fazer primeiro"} autoFocus={!livre} />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <InputArea label={livre ? "Pergunta" : "Instruções (opcional)"} value={pedido} onValueChange={setPedido} minRows={3} autoResize placeholder={livre ? "Descreva a pergunta ou o tema com o detalhe necessário." : "Ex.: comparar com o mercado e priorizar ações."} autoFocus={!livre} />
+            {/* duas colunas iguais (com `1fr` a coluna do texto mais comprido ficava maior) e o interruptor com rótulo e altura de seletor, para tudo alinhar */}
+            <div className="grid gap-3 sm:grid-cols-[repeat(2,minmax(0,1fr))]">
               <Select label="Profundidade da pesquisa" value={config.profundidade} onValueChange={(v) => mudar("profundidade", String(v) as Profundidade)} items={itens(PROFUNDIDADES, (k) => PROFUNDIDADES[k].estimativa)} />
               <Select label="Foco da resposta" value={config.foco} onValueChange={(v) => mudar("foco", String(v) as Foco)} items={itens(FOCOS)} />
               <Select label="Ênfase" value={config.enfase} onValueChange={(v) => mudar("enfase", String(v) as Enfase)} items={itens(ENFASES)} />
-              <div className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 ring ring-kumo-line">
-                <span className="text-sm font-medium">Pesquisar na internet</span>
-                <Interruptor marcado={config.internet} aoMudar={(v) => mudar("internet", v)} rotulo="Pesquisar na internet" />
+              <div className="flex flex-col gap-2">
+                <span className="text-base font-medium text-kumo-default">Internet</span>
+                <div className="flex h-9 items-center justify-between gap-3 rounded-lg px-3 ring ring-kumo-line">
+                  <span className="min-w-0 truncate text-sm">Pesquisar na internet</span>
+                  <Interruptor marcado={config.internet} aoMudar={(v) => mudar("internet", v)} rotulo="Pesquisar na internet" />
+                </div>
               </div>
             </div>
             {naFila > 0 && espera !== null && (
               <p className="text-sm text-kumo-subtle">
-                Já há {naFila} {naFila === 1 ? "análise" : "análises"} na fila: esta acaba daqui a cerca de {textoDoTempo(espera)}.
+                {naFila} {naFila === 1 ? "análise" : "análises"} na fila. Conclusão estimada em {textoDoTempo(espera)}.
               </p>
             )}
             <div className="flex items-center justify-end gap-2">
@@ -108,7 +103,7 @@ export function AnalisarComIa() {
                 Cancelar
               </Button>
               <Button variant="primary" icon={ICONES.ia} disabled={livre && !tituloFinal} onClick={comecar}>
-                Começar
+                Iniciar análise
               </Button>
             </div>
           </div>

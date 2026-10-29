@@ -2,9 +2,9 @@
 "use client";
 
 import { Button, Popover, Tooltip } from "@cloudflare/kumo";
-import { useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { copiarEstruturado, estruturaDeRegisto } from "@/lib/copiar-dados";
-import { perguntarAIa } from "@/lib/ia-contexto";
+import { EVENTO_FECHAR_FLUTUANTES, perguntarAIa } from "@/lib/ia-contexto";
 import { PopupCartao } from "./Flutuantes";
 import { Frase, semMarcas } from "./Frase";
 import { Ic } from "./Icones";
@@ -21,10 +21,20 @@ export function Dica({ conteudo, children, lado = "top", linha = false, bloco = 
   );
 }
 
-/** Corpo de uma dica com título, texto e uma lista opcional de linhas «rótulo: valor». */
-export function CorpoDica({ titulo, texto, linhas }: { titulo?: string; texto?: string; linhas?: { rotulo: string; valor: ReactNode }[] }) {
+/** Um item de uma lista de dica: o que é, um pormenor e, se fizer sentido, se está ao alcance (visto ✓) ou não (cadeado). */
+export interface ItemDeDica {
+  titulo: ReactNode;
+  detalhe?: ReactNode;
+  /** «sim» põe um visto, «nao» um cadeado; sem isto o item leva só um ponto. */
+  alcance?: "sim" | "nao";
+  /** O que diz o visto ou o cadeado, por extenso. */
+  alcanceTexto?: string;
+}
+
+/** Corpo de uma dica: título, texto, linhas «rótulo: valor» e, se for preciso, listas com um cabeçalho (os passos seguintes de um estado, por exemplo). */
+export function CorpoDica({ titulo, texto, linhas, listas }: { titulo?: string; texto?: string; linhas?: { rotulo: string; valor: ReactNode }[]; listas?: { cabecalho: string; itens: ItemDeDica[] }[] }) {
   return (
-    <div className="flex max-w-[280px] flex-col gap-1 text-left text-[13px] leading-snug">
+    <div className="flex max-w-[300px] flex-col gap-1.5 text-left text-[13px] leading-snug">
       {titulo && <b className="font-semibold">{titulo}</b>}
       {texto && (
         <span>
@@ -32,15 +42,34 @@ export function CorpoDica({ titulo, texto, linhas }: { titulo?: string; texto?: 
         </span>
       )}
       {linhas && linhas.length > 0 && (
-        <dl className="mt-0.5 flex flex-col gap-0.5">
-          {linhas.map((l) => (
-            <div key={l.rotulo} className="flex flex-col">
-              <dt className="text-[11px] uppercase tracking-wide opacity-70">{l.rotulo}</dt>
+        <dl className="mt-0.5 flex flex-col gap-1">
+          {linhas.map((l, i) => (
+            <div key={`${l.rotulo}-${i}`} className="flex flex-col">
+              <dt className="text-[11px] font-medium uppercase tracking-wide opacity-70">{l.rotulo}</dt>
               <dd className="m-0">{l.valor}</dd>
             </div>
           ))}
         </dl>
       )}
+      {listas?.map((l, i) => (
+        <div key={`${l.cabecalho}-${i}`} className="mt-0.5 flex flex-col gap-1">
+          <div className="text-[11px] font-medium uppercase tracking-wide opacity-70">{l.cabecalho}</div>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+            {l.itens.map((it, j) => (
+              <li key={j} className="flex items-start gap-2">
+                <span aria-hidden className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-current/15">
+                  {it.alcance === "sim" ? <Ic nome="certo" tamanho={10} /> : it.alcance === "nao" ? <Ic nome="cadeado" tamanho={10} /> : <span className="size-1 rounded-full bg-current" />}
+                </span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-medium">{it.titulo}</span>
+                  {it.detalhe && <span className="opacity-80">{it.detalhe}</span>}
+                  {it.alcanceTexto && <span className="opacity-80">{it.alcanceTexto}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }
@@ -53,6 +82,13 @@ const FORMA_DO_INFO = "dica-info -m-1 inline-flex cursor-pointer items-center ro
  */
 export function DicaInfo({ texto, titulo }: { texto: string; titulo?: string }) {
   const [aberta, setAberta] = useState(false);
+  // perguntar à IA a partir da explicação fecha-a (o chat abre por cima)
+  useEffect(() => {
+    if (!aberta) return;
+    const fechar = () => setAberta(false);
+    window.addEventListener(EVENTO_FECHAR_FLUTUANTES, fechar);
+    return () => window.removeEventListener(EVENTO_FECHAR_FLUTUANTES, fechar);
+  }, [aberta]);
   const propriedades = {
     type: "button" as const,
     "aria-label": titulo ? `Mais sobre ${titulo}` : "Mais informação",

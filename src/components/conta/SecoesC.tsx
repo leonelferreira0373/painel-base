@@ -133,7 +133,7 @@ export function SecaoLembretes() {
     <>
       <Cartao titulo="Novo lembrete" dica="Avisa-o à hora marcada enquanto o painel estiver aberto; por e-mail, também fora dele.">
         <LinhaCampo>
-          <Input label="O que quer lembrar" placeholder="Por exemplo, confirmar a recolha das 06:00" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+          <Input label="Assunto" placeholder="Ex.: confirmar a recolha das 06:00" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
           <div className="grid gap-4 sm:grid-cols-3">
             <SeletorDeDataHora label="Quando" valor={quando} aoMudar={setQuando} erro={passado ? "Escolha uma hora que ainda não passou." : undefined} />
             <SeletorPersonalizavel label="Repetir" valor={repetir} opcoes={REPETICAO.opcoes} personalizado={REPETICAO.personalizado} aoMudar={(v) => setRepetir(v as Repeticao)} />

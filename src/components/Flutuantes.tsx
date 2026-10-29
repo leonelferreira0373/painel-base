@@ -19,7 +19,8 @@ export function PopupCartao({ children, className = "", lado = "bottom", alinhar
   return (
     <Popover.Portal>
       <Popover.Positioner collisionPadding={MARGEM_AO_BORDO} side={lado} align={alinhar} sideOffset={DISTANCIA_AO_GATILHO} data-modal-telemovel={modalNoTelemovel ? "" : undefined} onClick={modalNoTelemovel && aoFechar ? (e) => e.target === e.currentTarget && aoFechar() : undefined}>
-        <Popover.Popup className={`${SUPERFICIE_FLUTUANTE} overflow-hidden p-0 ${className}`}>{children}</Popover.Popup>
+        {/* aberto com o rato ou o dedo, o foco não salta para o primeiro botão (ficava com o anel azul); com o teclado vai para lá */}
+        <Popover.Popup initialFocus={(tipo) => tipo === "keyboard"} className={`${SUPERFICIE_FLUTUANTE} overflow-hidden p-0 ${className}`}>{children}</Popover.Popup>
       </Popover.Positioner>
     </Popover.Portal>
   );
@@ -30,8 +31,13 @@ export function MenuCartao(props: ComponentProps<typeof DropdownMenu.Content>) {
   return <DropdownMenu.Content collisionPadding={MARGEM_AO_BORDO} {...props} className={`${SUPERFICIE_FLUTUANTE} ${props.className ?? ""}`} />;
 }
 
-/** O separador de um menu: de ponta a ponta do cartão, como o da Cloudflare (o do Kumo deixa 2 px de cada lado). */
+/** Os menus dos três pontinhos não levam linhas divisórias: as opções agrupam-se pela ordem e pelos ícones. Fica por compatibilidade e não desenha nada. */
 export function SeparadorDeMenu() {
+  return null;
+}
+
+/** A linha divisória do menu da conta (o único menu que a leva, como o da Cloudflare): de ponta a ponta do cartão (o do Kumo deixa 2 px de cada lado). */
+export function SeparadorDoMenuDaConta() {
   return <DropdownMenu.Separator className="-mx-1.5" />;
 }
 

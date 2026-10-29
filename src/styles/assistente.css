@@ -63,32 +63,16 @@
   height: 1.15rem;
 }
 
-/* sair da conversa e fechar o chat: a seta de voltar vive na área de escrita */
+/* à esquerda da escrita vive o que o projecto quiser (o painel põe aqui o anel de contexto da IA) */
 .aia .aia-escrita {
   padding-left: 0.3rem;
 }
-.aia .aia-voltar {
+.aia .aia-lateral {
   flex: none;
   display: grid;
   place-items: center;
-  width: 2.25rem;
+  min-width: 2.25rem;
   height: 2.25rem;
-  padding: 0;
-  border: 0;
-  border-radius: 9999px;
-  background: none;
-  color: var(--chat-azul);
-  cursor: pointer;
-  transition: background-color 0.15s ease-out;
-}
-@media (hover: hover) {
-  .aia .aia-voltar:hover {
-    background: var(--chat-amarelo);
-  }
-}
-.aia .aia-voltar:focus-visible {
-  outline: 2px solid var(--chat-azul);
-  outline-offset: 1px;
 }
 
 /* o menu das opções: um cartão do painel (anel, elevação, cantos de 16 px), sem o «Fechar» e os itens com folga */
@@ -199,4 +183,16 @@
   --chat-azul: var(--text-color-kumo-default);
   --chat-cinza: var(--text-color-kumo-subtle);
   color: var(--text-color-kumo-subtle);
+}
+
+/* o botão de copiar (e o que mais vier) por baixo de cada mensagem: pequeno, à esquerda da resposta e à direita da pessoa */
+.aia .aia-acoes-da-mensagem {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: -0.25rem;
+  padding-inline: 0.25rem;
+}
+.aia .aia-acoes-da-mensagem[data-de="eu"] {
+  justify-content: flex-end;
 }

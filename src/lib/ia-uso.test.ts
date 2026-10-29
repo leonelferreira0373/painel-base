@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MODELO_PADRAO, usoDaResposta } from "./ia-modelos";
-import { aPagar, quadradosDe, repartirContexto, somarUso, tomDoAnel } from "./ia-uso";
+import { aPagar, quadradosDe, repartirContexto, somarUso, tomDoAnel, ultimaChamadaDe, type RegistoDeUso } from "./ia-uso";
 
 const uso = (tin: number, tout: number) => usoDaResposta(MODELO_PADRAO, { prompt_tokens: tin, completion_tokens: tout }, 100);
 
@@ -57,5 +57,23 @@ describe("tomDoAnel", () => {
     expect(tomDoAnel(0.2)).toBe("sucesso");
     expect(tomDoAnel(0.6)).toBe("aviso");
     expect(tomDoAnel(0.85)).toBe("perigo");
+  });
+});
+
+const registo = (id: string, origem: RegistoDeUso["origem"], quando: string) => ({ id, origem, quando, uso: uso(1000, 100) }) as RegistoDeUso;
+
+describe("ultimaChamadaDe", () => {
+  const historico = [registo("c", "assistente", "2026-10-29T12:00:00.000Z"), registo("b", "pesquisa", "2026-10-29T11:00:00.000Z"), registo("a", "assistente", "2026-10-29T10:00:00.000Z")];
+  it("o contexto é a chamada mais recente da origem, venha o histórico de onde vier", () => {
+    expect(ultimaChamadaDe("assistente", historico)?.id).toBe("c");
+    expect(ultimaChamadaDe("pesquisa", historico)?.id).toBe("b");
+    expect(ultimaChamadaDe("analise", historico)).toBeNull();
+    expect(ultimaChamadaDe("assistente", [])).toBeNull();
+  });
+  it("uma conversa nova repõe o anel a zero, mas só até à chamada seguinte", () => {
+    const reposto = { assistente: "2026-10-29T12:30:00.000Z" };
+    expect(ultimaChamadaDe("assistente", historico, reposto)).toBeNull();
+    expect(ultimaChamadaDe("pesquisa", historico, reposto)?.id).toBe("b");
+    expect(ultimaChamadaDe("assistente", [registo("d", "assistente", "2026-10-29T13:00:00.000Z"), ...historico], reposto)?.id).toBe("d");
   });
 });

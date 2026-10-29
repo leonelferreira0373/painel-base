@@ -139,7 +139,7 @@ export function JanelaDeFiltro({ rotulo, opcoes, escondidos, aoMudar, aoFechar }
         </span>
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
-            <Input aria-label="Descreva o que quer ver" placeholder="Descreva o que quer ver, por exemplo: tudo o que tem a ver com e-mails" value={pedido} onChange={(e) => setPedido(e.target.value)} autoComplete="off" className="w-full" />
+            <Input aria-label="Filtrar por descrição" placeholder="Ex.: tudo o que tem a ver com e-mails" value={pedido} onChange={(e) => setPedido(e.target.value)} autoComplete="off" className="w-full" />
           </div>
           <Button type="submit" variant="secondary" disabled={!pedido.trim() || aPensar} icon={aPensar ? <Loader size={14} /> : ICONES.enviar}>
             Perguntar

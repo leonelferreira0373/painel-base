@@ -19,7 +19,7 @@ export function LinhaOrdenada({ conteudo: nomeEmElementos, nome, valor, proporca
     </>
   );
   return (
-    <div onMouseEnter={aoPassar} className={`group/linha relative flex h-11 items-center gap-2 border-b border-kumo-hairline text-sm transition-colors last:border-b-0 hover:bg-kumo-tint/60 focus-within:bg-kumo-tint ${ativa ? "bg-kumo-tint/60" : ""}`}>
+    <div onMouseEnter={aoPassar} className={`group/linha relative flex h-11 items-center gap-2 border-b border-kumo-hairline text-sm transition-colors last:border-b-0 [@media(hover:hover)]:hover:bg-kumo-tint/60 has-[:focus-visible]:bg-kumo-tint ${ativa ? "bg-kumo-tint/60" : ""}`}>
       {aoAbrir ? (
         <button type="button" onFocus={aoPassar} onClick={aoAbrir} aria-label={rotulo} className="flex h-full min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-none">
           {conteudo}

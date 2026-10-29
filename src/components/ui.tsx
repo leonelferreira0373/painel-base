@@ -16,6 +16,8 @@ import { Ic, ICONES, type Icone } from "./Icones";
 import { AreaMini } from "./graficos/Pequenos";
 import { mesmoPeriodo, PERIODOS, type Periodo } from "./Periodo";
 import { GatilhoDoMenu, ItensDeKpi, MenuDoKpi, useJanelaDeCor } from "./MenuDeDados";
+import { IndicadorDeVariacao } from "./IndicadorDeVariacao";
+import { useTemGrafico } from "@/lib/elementos-do-grafico";
 import { IndicadorDeNotas } from "./notas/MotorDeNotas";
 import { useResultadoTemporario } from "./Copiar";
 import type { DadosExportaveis } from "@/lib/exportar-dados";
@@ -42,7 +44,7 @@ export function Titulo({ titulo, children }: { titulo: string; children?: ReactN
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <h1 className="text-2xl font-semibold tracking-tight text-kumo-default">{titulo}</h1>
       {(children || !editar) && (
-        <div className="sem-barra -mx-4 grid auto-cols-[minmax(max-content,1fr)] grid-flow-col gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex sm:overflow-visible sm:px-0 sm:items-center">
+        <div className="sem-barra -mx-4 -my-1 grid auto-cols-[minmax(max-content,1fr)] grid-flow-col gap-2 overflow-x-auto px-4 py-1 sm:mx-0 sm:my-0 sm:flex sm:overflow-visible sm:p-0 sm:items-center">
           {!editar && <SoLeitura />}
           {children}
         </div>
@@ -120,7 +122,6 @@ export function CartaoMetrica({
   alturaEsqueleto?: number;
   anel?: boolean;
 }) {
-  const sobe = (variacao ?? 0) >= 0;
   const temPeriodo = !!(periodo && aoMudarPeriodo);
   const temTipo = !!(tipo && aoMudarTipo);
   const temMenu = true;
@@ -198,10 +199,7 @@ export function CartaoMetrica({
               <NumeroEmRoda valor={valor} className="text-2xl font-semibold tabular-nums tracking-tight text-kumo-default" />
               {variacao !== null && variacao !== undefined && Number.isFinite(variacao) && (
                 <Dica conteudo={variacaoDica ? <CorpoDica texto={variacaoDica} /> : null}>
-                  <span className={`inline-flex items-center gap-0.5 text-[13px] font-medium ${sobe ? "text-kumo-success" : "text-kumo-danger"}`}>
-                    <Ic nome={sobe ? "subida" : "descida"} tamanho={13} />
-                    {Math.abs(variacao).toLocaleString("pt-PT", { maximumFractionDigits: 1 })} %
-                  </span>
+                  <IndicadorDeVariacao variacao={variacao} />
                 </Dica>
               )}
             </div>
@@ -213,12 +211,19 @@ export function CartaoMetrica({
   );
 }
 
-export function Painel({ titulo, children, acoes, className = "" }: { titulo: string; children: ReactNode; acoes?: ReactNode; className?: string }) {
+export function Painel({ titulo, children, acoes, className = "", dados }: { titulo: string; children: ReactNode; acoes?: ReactNode; className?: string; /** Os dados do painel, em tabela: dão-lhe «Exportar» e «Copiar» no menu. */ dados?: DadosExportaveis }) {
+  const pagina = usePathname() ?? "";
+  const idDaCor = idDoGrafico(pagina, titulo);
+  // um painel com um gráfico tem o menu de três pontinhos dos cartões (cor de cada elemento, nota, IA); um painel só com texto ou listas fica como estava
+  const temGrafico = useTemGrafico(idDaCor);
   return (
     <LayerCard className={`pleno min-w-0 ${className}`}>
       <LayerCard.Secondary className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-medium">{titulo}</h3>
-        {acoes}
+        <span className="flex shrink-0 items-center gap-1">
+          {acoes}
+          {(temGrafico || dados) && <MenuDoKpi titulo={titulo} dados={dados} tipo="cartao" idDaCor={temGrafico ? idDaCor : undefined} />}
+        </span>
       </LayerCard.Secondary>
       <LayerCard.Primary className="p-4">
         <IdDoGraficoProvider titulo={titulo}>{children}</IdDoGraficoProvider>
@@ -241,8 +246,6 @@ export function CartaoEstatistica({ titulo, valor, variacao: variacaoDada, pior 
   const [cor] = useCorDoGrafico(idDaCor);
   const calculada = variacaoDada === undefined ? variacaoDeSerie(valores) : null;
   const variacao = variacaoDada !== undefined ? variacaoDada : (calculada?.variacao ?? null);
-  const sobe = (variacao ?? 0) >= 0;
-  const bom = pior ? !sobe : sobe;
   // sem série para desenhar o cartão fica só com o número, sem um vazio por baixo
   const comGrafico = carregando || valores.length >= 2;
   return (
@@ -274,10 +277,7 @@ export function CartaoEstatistica({ titulo, valor, variacao: variacaoDada, pior 
             <NumeroEmRoda valor={valor} className="text-2xl font-semibold leading-tight tabular-nums text-kumo-default" />
             {variacao !== null && Number.isFinite(variacao) && (
               <Dica conteudo={calculada ? `Variação: a média dos últimos ${calculada.n} valores face à dos ${calculada.n} anteriores.` : "Variação face ao período anterior com a mesma duração."}>
-                <span className={`inline-flex items-center gap-0.5 text-sm font-medium ${bom ? "text-kumo-success" : "text-kumo-danger"}`}>
-                  <Ic nome={sobe ? "subida" : "descida"} tamanho={13} />
-                  <NumeroEmRoda valor={`${Math.abs(variacao).toLocaleString("pt-PT", { maximumFractionDigits: 1 })} %`} />
-                </span>
+                <IndicadorDeVariacao variacao={variacao} pior={pior} tamanho="text-sm" valor={(texto) => <NumeroEmRoda valor={texto} />} />
               </Dica>
             )}
           </div>

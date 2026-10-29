@@ -226,7 +226,7 @@ export function PersonalizarAparencia() {
           <span aria-hidden className={`size-2 rounded-full ${sujo ? "bg-kumo-warning" : "bg-kumo-success"}`} />
           {sujo ? "Alterações por guardar" : "Tudo guardado"}
         </span>
-        <div className="sem-barra flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto [&>*]:shrink-0 [&>*:first-child]:ml-auto">
+        <div className="sem-barra -m-1 flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto p-1 [&>*]:shrink-0 [&>*:first-child]:ml-auto">
           <Button variant="ghost" disabled={!guardado} onClick={() => { mudar({ aparencia: undefined }, "Aparência reposta"); setRascunho({}); }}>
             Repor o original
           </Button>

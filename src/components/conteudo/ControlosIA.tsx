@@ -39,7 +39,7 @@ function Comportamento() {
       </Cartao>
       <Cartao titulo="Instruções e limites" dica="O que o assistente deve fazer sempre e o que nunca deve tratar.">
         <div className="flex flex-col gap-4 p-4">
-          <InputArea label="Instruções" description="Escreva como a um colega novo: o que deve fazer, o que deve evitar, como tratar os clientes." value={atual.instrucoes} onValueChange={(v) => mudar({ instrucoes: v })} minRows={5} autoResize placeholder="Por exemplo: confirma sempre o número do pedido antes de explicar um estado." />
+          <InputArea label="Instruções" description="Orientações do assistente: tarefas, limites e tom de tratamento." value={atual.instrucoes} onValueChange={(v) => mudar({ instrucoes: v })} minRows={5} autoResize placeholder="Por exemplo: confirma sempre o número do pedido antes de explicar um estado." />
           <InputArea label="Temas que não trata" description="Um por linha." value={atual.temasProibidos} onValueChange={(v) => mudar({ temasProibidos: v })} minRows={3} autoResize placeholder={"política\nsalários de outras pessoas"} />
         </div>
         <Linha titulo="Responder só com a memória" dica="Se a resposta não estiver nos documentos, o assistente diz que não sabe em vez de tentar adivinhar.">
@@ -51,7 +51,7 @@ function Comportamento() {
           <span aria-hidden className={`size-2 rounded-full ${sujo ? "bg-kumo-warning" : "bg-kumo-success"}`} />
           {sujo ? "Alterações por guardar" : "Tudo guardado"}
         </span>
-        <div className="sem-barra flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto [&>*]:shrink-0 [&>*:first-child]:ml-auto">
+        <div className="sem-barra -m-1 flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto p-1 [&>*]:shrink-0 [&>*:first-child]:ml-auto">
           <Button variant="ghost" disabled={JSON.stringify(atual) === JSON.stringify(CONTROLOS_DE_ORIGEM)} onClick={() => (guardarControlos(CONTROLOS_DE_ORIGEM), setC(CONTROLOS_DE_ORIGEM), setMexeu(false))}>
             Repor o original
           </Button>
