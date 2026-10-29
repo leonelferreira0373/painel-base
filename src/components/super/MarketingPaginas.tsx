@@ -28,6 +28,8 @@ export function MarketingVisao() {
   const cliques = useApi<{ itens: Clique[] }>("/v1/marketing/cliques", () => ({ itens: gerarCliques() }));
   const r = resumo.dados;
   const serie = r?.porDia.map((d) => d.visitas) ?? [];
+  // os outros cartões usam o mesmo número de cada dia, se o servidor o disser
+  const doDia = (campo: "visitantes" | "paginasPorVisita" | "rejeicao" | "conversoes", escala = 1) => (r && r.porDia.length > 1 && r.porDia.every((d) => d[campo] !== undefined) ? r.porDia.map((d) => (d[campo] as number) * escala) : undefined);
   const porFonte = useMemo(() => {
     const m = new Map<string, number>();
     for (const o of origens.dados?.itens ?? []) m.set(o.fonte, (m.get(o.fonte) ?? 0) + o.visitas);
@@ -49,10 +51,10 @@ export function MarketingVisao() {
             className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
             itens={[
               { id: "visitas", conteudo: <CartaoEstatistica titulo="Visitas" valor={inteiro(r.visitas)} variacao={null} valores={serie} dica="Cada vez que alguém abre o site conta uma visita (uma sessão)." /> },
-              { id: "visitantes", conteudo: <Estatistica titulo="Visitantes" valor={inteiro(r.visitantes)} dica="Pessoas diferentes (o mesmo aparelho só conta uma vez)." numero={r.visitantes} /> },
-              { id: "paginas", conteudo: <Estatistica titulo="Páginas por visita" valor={r.paginasPorVisita.toLocaleString("pt-PT", { maximumFractionDigits: 1 })} dica="Quantas páginas se veem, em média, em cada visita." numero={r.paginasPorVisita} /> },
-              { id: "rejeicao", conteudo: <Estatistica titulo="Taxa de rejeição" valor={percentagem(r.rejeicao)} pior dica="Visitas que saíram sem ver mais nenhuma página." numero={r.rejeicao * 100} /> },
-              { id: "conversoes", conteudo: <Estatistica titulo="Conversões" valor={inteiro(r.conversoes)} dica="Pedidos de proposta, contactos e outros objetivos cumpridos." numero={r.conversoes} /> },
+              { id: "visitantes", conteudo: <Estatistica titulo="Visitantes" valor={inteiro(r.visitantes)} dica="Pessoas diferentes (o mesmo aparelho só conta uma vez)." numero={r.visitantes} serie={doDia("visitantes")} /> },
+              { id: "paginas", conteudo: <Estatistica titulo="Páginas por visita" valor={r.paginasPorVisita.toLocaleString("pt-PT", { maximumFractionDigits: 1 })} dica="Quantas páginas se veem, em média, em cada visita." numero={r.paginasPorVisita} serie={doDia("paginasPorVisita")} /> },
+              { id: "rejeicao", conteudo: <Estatistica titulo="Taxa de rejeição" valor={percentagem(r.rejeicao)} pior dica="Visitas que saíram sem ver mais nenhuma página." numero={r.rejeicao * 100} serie={doDia("rejeicao", 100)} /> },
+              { id: "conversoes", conteudo: <Estatistica titulo="Conversões" valor={inteiro(r.conversoes)} dica="Pedidos de proposta, contactos e outros objetivos cumpridos." numero={r.conversoes} serie={doDia("conversoes")} /> },
             ]}
           />
           <div className="grid gap-4 lg:grid-cols-3">

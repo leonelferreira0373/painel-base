@@ -12,6 +12,7 @@ import { formatarTamanho } from "@/lib/biblioteca";
 import { DESTINOS, emailValido, erroDoAlvo, erroDoDestino, linhasApagadas, type TipoDeDestino } from "@/lib/dev";
 import { useApp } from "@/lib/estado";
 import { useEditar } from "@/lib/permissao";
+import { acumular, agrupar, contarPorIntervalo, instante, intervalosPara, razao, somarPorIntervalo } from "@/lib/serie";
 import { CampoSenha } from "../auth/CampoSenha";
 import { useAcessoDeIp } from "./AcessoDeIp";
 import { BotaoCopiar, Cartao, Confirmar, descarregar, Interruptor, Linha, LinhaCampo } from "../conta/Pecas";
@@ -50,6 +51,7 @@ export function Backups() {
   const mudou = JSON.stringify(rascunho) !== JSON.stringify(config);
   const copias = useMemo(() => [...colecao.itens].sort((a, b) => b.quando.localeCompare(a.quando)), [colecao.itens]);
   const concluidas = copias.filter((c) => c.estado === "Concluído");
+  const baldes = useMemo(() => agrupar(copias, (c) => instante(c.quando), intervalosPara(copias.length)), [copias]);
 
   const guardar = async () => {
     if (ligacao.modo === "ligado") await chamar(ligacao, "PUT", "/v1/dev/backups/destino", { ...rascunho, retencao: Number(rascunho.retencao) });
@@ -118,10 +120,10 @@ export function Backups() {
       </Titulo>
       <AvisoDeApi erro={colecao.erro} aoTentar={colecao.recarregar} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Estatistica titulo="Cópias guardadas" valor={inteiro(concluidas.length)} numero={concluidas.length} />
+        <Estatistica titulo="Cópias guardadas" valor={inteiro(concluidas.length)} numero={concluidas.length} serie={acumular(contarPorIntervalo(baldes, (c) => c.estado === "Concluído"))} />
         <Estatistica titulo="Última com sucesso" valor={concluidas[0] ? dataHora(concluidas[0].quando) : "—"} />
-        <Estatistica titulo="Espaço ocupado" valor={formatarTamanho(concluidas.reduce((t, c) => t + c.bytes, 0))} numero={concluidas.reduce((t, c) => t + c.bytes, 0)} />
-        <Estatistica titulo="Falhadas" valor={inteiro(copias.filter((c) => c.estado === "Falhou").length)} pior numero={copias.filter((c) => c.estado === "Falhou").length} />
+        <Estatistica titulo="Espaço ocupado" valor={formatarTamanho(concluidas.reduce((t, c) => t + c.bytes, 0))} numero={concluidas.reduce((t, c) => t + c.bytes, 0)} serie={acumular(somarPorIntervalo(baldes, (c) => c.bytes, (c) => c.estado === "Concluído"))} />
+        <Estatistica titulo="Falhadas" valor={inteiro(copias.filter((c) => c.estado === "Falhou").length)} pior numero={copias.filter((c) => c.estado === "Falhou").length} serie={contarPorIntervalo(baldes, (c) => c.estado === "Falhou")} />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <Cartao titulo="Para onde vão as cópias" dica="O destino das cópias de segurança. Em modo ligado o servidor é que faz a cópia e envia para aqui.">
@@ -155,7 +157,7 @@ export function Backups() {
       <Cartao titulo={`Cópias (${copias.length})`}>
         <TabelaSimples colunas={colunas} linhas={copias} chave={(c) => c.id} vazio="Ainda não há cópias." />
       </Cartao>
-      <Confirmar aberto={!!restaurar} aoMudar={(v) => !v && setRestaurar(null)} titulo="Restaurar a cópia" texto={restaurar ? `Os dados voltam ao estado de ${dataHora(restaurar.quando)}. O que foi feito depois disso perde-se.` : ""} rotuloAcao="Restaurar" perigo escrever="RESTAURAR" aoConfirmar={async () => {
+      <Confirmar aberto={!!restaurar} aoMudar={(v) => !v && setRestaurar(null)} titulo="Restaurar a cópia" texto={restaurar ? `Os dados voltam ao estado de ${dataHora(restaurar.quando)}. O que foi feito depois disso perde-se.` : ""} rotuloAcao="Restaurar" perigo escrever={restaurar ? `RESTAURAR ${dataHora(restaurar.quando)}` : "RESTAURAR"} aoConfirmar={async () => {
         if (!restaurar) return;
         if (ligacao.modo === "ligado") await chamar(ligacao, "POST", "/v1/dev/backups/{id}/restaurar", {}, { id: restaurar.id }).catch(() => undefined);
         avisar("Restauro iniciado");
@@ -243,7 +245,7 @@ export function Firewall() {
         <TabelaSimples colunas={colunasBloqueios} linhas={bloqueios.dados?.itens ?? []} chave={(b) => b.id} vazio={estado.ativo ? "Nada bloqueado neste momento." : "O firewall está desligado."} />
       </Cartao>
       {acesso.dialogo}
-      <Confirmar aberto={desligar} aoMudar={setDesligar} titulo="Desligar o firewall" texto="Sem firewall, nenhuma regra nem o limite de pedidos se aplica. O servidor fica exposto a abusos até o ligar de novo." rotuloAcao="Desligar" perigo escrever="DESLIGAR" aoConfirmar={() => void mudar({ ativo: false })} />
+      <Confirmar aberto={desligar} aoMudar={setDesligar} titulo="Desligar o firewall" texto="Sem firewall, nenhuma regra nem o limite de pedidos se aplica. O servidor fica exposto a abusos até o ligar de novo." rotuloAcao="Desligar" perigo escrever="DESLIGAR firewall" aoConfirmar={() => void mudar({ ativo: false })} />
       <Confirmar aberto={!!remover} aoMudar={(v) => !v && setRemover(null)} titulo="Apagar a regra" texto={remover ? `A regra para ${remover.alvo} deixa de existir.` : ""} rotuloAcao="Apagar" perigo aoConfirmar={() => remover && void regras.remover(remover.id)} />
       <Confirmar
         aberto={nova}
@@ -384,9 +386,10 @@ export function EnviosDeEmail() {
   const visiveis = useMemo(() => emails.filter((e) => filtro === "todos" || e.estado === filtro).sort((a, b) => b.quando.localeCompare(a.quando)), [emails, filtro]);
   const entregues = emails.filter((e) => e.estado === "Entregue" || e.estado === "Enviado").length;
   const mau = emails.filter((e) => e.estado === "Rejeitado" || e.estado === "Falhou").length;
+  const baldesDeEmails = useMemo(() => agrupar(emails, (e) => instante(e.quando), intervalosPara(emails.length)), [emails]);
   const erroServidor = config.servidor && !/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/i.test(config.servidor) ? "Escreva só o nome do servidor, sem http://." : null;
   const enderecoRemetente = /<([^>]+)>/.exec(config.remetente)?.[1] ?? config.remetente;
-  const erroRemetente = config.remetente && !emailValido(enderecoRemetente) ? "Use «Nome <endereco@dominio.pt>» ou só o endereço." : null;
+  const erroRemetente = config.remetente && !emailValido(enderecoRemetente) ? "Use Nome <endereco@dominio.pt> ou só o endereço." : null;
   const mudou = JSON.stringify(config) !== JSON.stringify(guardada);
 
   const seguir = (e: EmailEnviado, depois: EmailEnviado["estado"][]) => {
@@ -436,10 +439,10 @@ export function EnviosDeEmail() {
       </Titulo>
       <AvisoDeApi erro={lista.erro ?? dns.erro} aoTentar={() => (lista.recarregar(), dns.recarregar())} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Estatistica titulo="Registados" valor={inteiro(emails.length)} numero={emails.length} />
-        <Estatistica titulo="Taxa de entrega" valor={percentagem(emails.length ? entregues / emails.length : 0, 1)} numero={emails.length ? (entregues / emails.length) * 100 : 0} />
-        <Estatistica titulo="Rejeitados ou falhados" valor={inteiro(mau)} pior numero={mau} />
-        <Estatistica titulo="Na fila" valor={inteiro(emails.filter((e) => e.estado === "Fila").length)} pior numero={emails.filter((e) => e.estado === "Fila").length} />
+        <Estatistica titulo="Registados" valor={inteiro(emails.length)} numero={emails.length} serie={contarPorIntervalo(baldesDeEmails)} />
+        <Estatistica titulo="Taxa de entrega" valor={percentagem(emails.length ? entregues / emails.length : 0, 1)} numero={emails.length ? (entregues / emails.length) * 100 : 0} serie={razao(contarPorIntervalo(baldesDeEmails, (e) => e.estado === "Entregue" || e.estado === "Enviado"), contarPorIntervalo(baldesDeEmails))} />
+        <Estatistica titulo="Rejeitados ou falhados" valor={inteiro(mau)} pior numero={mau} serie={contarPorIntervalo(baldesDeEmails, (e) => e.estado === "Rejeitado" || e.estado === "Falhou")} />
+        <Estatistica titulo="Na fila" valor={inteiro(emails.filter((e) => e.estado === "Fila").length)} pior numero={emails.filter((e) => e.estado === "Fila").length} serie={contarPorIntervalo(baldesDeEmails, (e) => e.estado === "Fila")} />
       </div>
       <Cartao titulo="Autenticação do domínio" dica="O SPF, o DKIM e o DMARC dizem aos outros servidores que os e-mails vêm mesmo de si. Sem eles, vão parar ao lixo ou são rejeitados.">
         {(dns.dados?.itens ?? []).map((v) => (
@@ -486,7 +489,7 @@ export function ApiLigacoes() {
   const editar = useEditar();
   const [rascunho, setRascunho] = useState<LigacaoApi>(atual);
   const [teste, setTeste] = useState<{ ok: boolean; texto: string } | "a-testar" | null>(null);
-  const [area, setArea] = useState<"pagamentos" | "marketing" | "dev">("pagamentos");
+  const [area, setArea] = useState<"pagamentos" | "marketing" | "dev" | "painel">("pagamentos");
   useEffect(() => setRascunho(atual), [atual]);
   const erro = rascunho.modo === "ligado" ? (rascunho.base ? erroDoEndereco(rascunho.base) : "Escreva o endereço do servidor.") : null;
   const mudou = JSON.stringify(rascunho) !== JSON.stringify(atual);
@@ -543,6 +546,7 @@ export function ApiLigacoes() {
               { value: "pagamentos", label: "Pagamentos" },
               { value: "marketing", label: "Marketing" },
               { value: "dev", label: "Developer tools" },
+              { value: "painel", label: "Painel" },
             ]}
           />
         </div>
@@ -635,7 +639,7 @@ export function Limpeza() {
         texto={alvo ? `${alvo.texto} Vão ser apagados cerca de ${inteiro(apagados(alvo))} itens${alvo.comIdade ? ` com mais de ${dias} dias` : ""}.` : ""}
         rotuloAcao="Apagar"
         perigo
-        escrever="APAGAR"
+        escrever={alvo ? `APAGAR ${alvo.titulo.toLowerCase()}` : "APAGAR"}
         aoConfirmar={async () => {
           if (!alvo) return;
           const n = apagados(alvo);

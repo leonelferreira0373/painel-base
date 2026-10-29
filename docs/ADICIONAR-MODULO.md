@@ -108,6 +108,8 @@ Para o que não é uma tabela de registos.
 
 ## 3. Uma área nova no menu
 
+> Uma área nova também tem de entrar nos **pacotes** (`dados/pacotes.ts`) que a querem; o Master Admin liga e desliga áreas e módulos em «Painel» (ver DESIGN-SYSTEM, 5n).
+
 1. **`src/dados/estrutura.ts`:** novo objeto em `AREAS` com `id`, `rotulo`, `icone`, `secao` e `modulos`. `secao` é o título do grupo da barra lateral («Dados», «Operação», «Plataforma»…); áreas com o mesmo valor ficam juntas, pela ordem do ficheiro.
 2. **`src/dados/rbac.ts`:** acrescente o `id` da área em `areas` de cada função que a deve ver (`VER` ou `TUDO`). Sem isso ninguém a vê.
 3. Os módulos da área seguem a receita 1 ou 2. O ícone tem de existir em `Icones.tsx` (receita 7).

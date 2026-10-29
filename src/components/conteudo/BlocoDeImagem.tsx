@@ -52,7 +52,7 @@ export function BlocoDeImagem({ local, ids, aoMudar, varias = false, vazio = "Se
         <>
           <div className={`relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-xl bg-kumo-tint ring transition-colors ${aArrastar ? "ring-kumo-brand" : "ring-kumo-line"}`}>
             {item && urls.get(item.id) ? (
-              <img src={urls.get(item.id)} alt={item.alt ?? item.nome} className="size-full object-cover" />
+              <img src={urls.get(item.id)} alt={item.alt ?? item.nome} className="size-full object-contain" />
             ) : (
               <button type="button" onClick={abrir} className="flex size-full flex-col items-center justify-center gap-2 text-sm text-kumo-subtle" aria-label="Enviar imagens">
                 <Ic nome="imagem" tamanho={32} />

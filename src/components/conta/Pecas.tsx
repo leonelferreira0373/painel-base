@@ -5,7 +5,7 @@ import { Button, Dialog, Input, LayerCard, Switch } from "@cloudflare/kumo";
 import { useEffect, useState, type ReactNode } from "react";
 import { Dica, DicaInfo } from "../Dica";
 import { ICONES } from "../Icones";
-import { Pilula } from "../Frase";
+import { Frase, Pilula } from "../Frase";
 
 export function Cartao({ titulo, dica, acoes, children, perigo = false }: { titulo: string; dica?: string; acoes?: ReactNode; children: ReactNode; perigo?: boolean }) {
   return (
@@ -28,10 +28,10 @@ export function Linha({ titulo, dica, estado, children }: { titulo: ReactNode; d
     <div className="flex flex-col gap-2 border-t border-kumo-hairline px-4 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
       <div className="min-w-0">
         <div className="inline-flex items-center gap-1.5 text-sm font-medium text-kumo-default">
-          {titulo}
+          {typeof titulo === "string" ? <Frase>{titulo}</Frase> : titulo}
           {dica && <DicaInfo texto={dica} />}
         </div>
-        {estado && <div className="mt-0.5 text-[13px] text-kumo-subtle">{estado}</div>}
+        {estado && <div className="mt-0.5 text-[13px] text-kumo-subtle">{typeof estado === "string" ? <Frase>{estado}</Frase> : estado}</div>}
       </div>
       {children && <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">{children}</div>}
     </div>
@@ -48,6 +48,9 @@ export function Interruptor({ marcado, aoMudar, rotulo, desativado }: { marcado:
 }
 
 /** A janela modal das ações do painel: confirmar algo que muda ou apaga, ou pedir um valor (`children` é o campo; `desativado` segura o botão de ação até o valor servir). */
+/** Para comparar a frase escrita: sem maiúsculas e com os espaços repetidos reduzidos a um. */
+const normalizar = (t: string) => t.trim().replace(/\s+/g, " ").toUpperCase();
+
 export function Confirmar({
   aberto,
   aoMudar,
@@ -67,7 +70,7 @@ export function Confirmar({
   rotuloAcao: string;
   perigo?: boolean;
   aoConfirmar: () => void;
-  /** Palavra que a pessoa tem de escrever para confirmar. */
+  /** A frase que a pessoa tem de escrever para confirmar: o verbo e o nome do que muda («APAGAR eventos de marketing»). Não distingue maiúsculas de minúsculas. */
   escrever?: string;
   /** Conteúdo próprio entre o texto e os botões (por exemplo, um campo). */
   children?: ReactNode;
@@ -75,7 +78,7 @@ export function Confirmar({
   desativado?: boolean;
 }) {
   const [digitado, setDigitado] = useState("");
-  const pode = !escrever || digitado.trim().toUpperCase() === escrever.toUpperCase();
+  const pode = !escrever || normalizar(digitado) === normalizar(escrever);
   return (
     <Dialog.Root
       open={aberto}
@@ -89,12 +92,14 @@ export function Confirmar({
           <Dialog.Title className="text-lg font-semibold">{titulo}</Dialog.Title>
           <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
         </div>
-        <div className="text-sm text-kumo-default">{texto}</div>
+        <div className="text-sm text-kumo-default">{typeof texto === "string" ? <Frase>{texto}</Frase> : texto}</div>
         {children && <div className="mt-4">{children}</div>}
         {escrever && (
           <label className="mt-4 flex flex-col gap-1.5 text-xs text-kumo-subtle">
-            Escreva <Pilula>{escrever}</Pilula> para confirmar
-            <Input aria-label="Palavra de confirmação" value={digitado} onChange={(e) => setDigitado(e.target.value)} autoComplete="off" />
+            <span className="leading-6">
+              Escreva <Pilula>{escrever}</Pilula> para confirmar
+            </span>
+            <Input aria-label="Frase de confirmação" value={digitado} onChange={(e) => setDigitado(e.target.value)} autoComplete="off" />
           </label>
         )}
         <div className="mt-6 flex justify-end gap-2">

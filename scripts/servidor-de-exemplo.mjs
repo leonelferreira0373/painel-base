@@ -12,6 +12,10 @@ const origem = process.env.ORIGEM ?? "*";
 // ---------- estado em memória ----------
 
 const agora = () => new Date().toISOString();
+const p2 = (n) => String(n).padStart(2, "0");
+function versaoDe(d) {
+  return `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}`;
+}
 const id = (p) => `${p}-${randomBytes(3).toString("hex")}`;
 const estado = {
   pagamentos: [],
@@ -28,6 +32,19 @@ const estado = {
   paginas: [],
   emails: [],
   emailConfig: {},
+  painel: { pacote: "personalizado", ligados: {} },
+  implementacoes: [{ id: "imp-1", versao: versaoDe(new Date()), ramo: "main", commit: "8e0b231", mensagem: "Versão inicial", autor: "Equipa", quando: new Date().toISOString(), estado: "Ativa", trafego: 100 }],
+  divisao: { a: "imp-1", b: null, percentagemB: 0 },
+  historico: [{ quando: new Date().toISOString(), texto: "Versão inicial em produção" }],
+  github: { repositorio: "empresa-exemplo/painel", ramo: "main" },
+  conectores: [
+    { id: "github", rotulo: "GitHub", ligado: true, detalhe: "empresa-exemplo/painel" },
+    { id: "cloudflare", rotulo: "Cloudflare", ligado: false, detalhe: "Cache e DNS" },
+    { id: "imagens", rotulo: "Registo de imagens", ligado: true, detalhe: "ghcr.io" },
+    { id: "avisos", rotulo: "Avisos por e-mail", ligado: false, detalhe: "Falhas e implementações" },
+  ],
+  mensagens: [],
+  campanhasEmail: [],
   tabelas: [
     { nome: "pagamentos", linhas: 0, bytes: 0, rls: true, politicas: [] },
     { nome: "eventos", linhas: 0, bytes: 0, rls: false, politicas: [] },
@@ -116,6 +133,50 @@ function origemDe(e) {
   } catch {
     return { fonte: "direto", meio: "nenhum", campanha: "" };
   }
+}
+
+// ---------- implementações ----------
+
+function reverterPara(alvo) {
+  for (const v of estado.implementacoes) {
+    if (v.id === alvo.id) Object.assign(v, { estado: "Ativa", trafego: 100 });
+    else if (v.id === estado.divisao.a) Object.assign(v, { estado: "Anterior", trafego: 0 });
+    else if (v.estado === "Em teste") Object.assign(v, { estado: "Pronta", trafego: 0 });
+  }
+  estado.divisao = { a: alvo.id, b: null, percentagemB: 0 };
+  estado.historico.unshift({ quando: agora(), texto: `Versão ${alvo.versao} em produção` });
+}
+
+// ---------- e-mails e campanhas do Marketing ----------
+
+const PESSOAS = { todos: 1240, ativos: 860, novos: 140, inativos: 215, newsletter: 2310 };
+function pseudo(texto, n) {
+  let h = 2166136261 ^ n;
+  for (let i = 0; i < texto.length; i++) h = Math.imul(h ^ texto.charCodeAt(i), 16777619);
+  return ((h >>> 0) % 10_000) / 10_000;
+}
+// Este servidor não envia nada: devolve números simulados, sempre os mesmos para a mesma campanha. Um servidor a sério envia e conta.
+function enviarCampanha(c, quando) {
+  const destinatarios = PESSOAS[c.audiencia] ?? 100;
+  const entregues = Math.round(destinatarios * (0.965 + pseudo(c.id, 1) * 0.03));
+  const abertos = Math.round(entregues * (0.3 + pseudo(c.id, 2) * 0.22));
+  const cliques = Math.round(abertos * (0.1 + pseudo(c.id, 3) * 0.2));
+  Object.assign(c, { estado: "Enviada", enviadaEm: quando, agendadaPara: undefined, destinatarios, entregues, abertos, cliques, falhas: destinatarios - entregues, atualizada: agora() });
+}
+// A fila anda de 20 em 20 segundos: o que estava agendado e já passou de hora sai.
+setInterval(() => {
+  const t = Date.now();
+  for (const m of estado.mensagens) if (m.pasta === "agendados" && new Date(m.data).getTime() <= t) Object.assign(m, { pasta: "enviados", estado: "Entregue", lido: true });
+  for (const c of estado.campanhasEmail) if (c.estado === "Agendada" && c.agendadaPara && new Date(c.agendadaPara).getTime() <= t) enviarCampanha(c, c.agendadaPara);
+}, 20_000).unref();
+
+function guardarEm(lista, id, corpo, aoGuardar) {
+  const item = { ...corpo, id };
+  aoGuardar?.(item);
+  const i = lista.findIndex((x) => x.id === id);
+  if (i >= 0) lista[i] = item;
+  else lista.push(item);
+  return item;
 }
 
 // ---------- rotas ----------
@@ -288,6 +349,113 @@ async function tratar(req, res, url, corpo) {
     return json(res, 200, { id: novo.id, estado: novo.estado });
   }
   if (p === "/v1/dev/emails/dns" && m === "GET") return json(res, 200, { itens: ["SPF", "DKIM", "DMARC", "PTR"].map((nome) => ({ nome, estado: "aviso", detalhe: "O servidor de exemplo não consulta o DNS: implemente esta verificação no seu servidor." })) });
+  // configuração do painel (os módulos ligados e desligados)
+  if (p === "/v1/painel/configuracao" && m === "GET") return json(res, 200, estado.painel);
+  if (p === "/v1/painel/configuracao" && m === "PUT") {
+    if (typeof corpo.pacote !== "string" || !corpo.pacote) return json(res, 400, { erro: "Falta o pacote." });
+    estado.painel = { pacote: corpo.pacote, ligados: corpo.ligados && typeof corpo.ligados === "object" ? corpo.ligados : {}, predefinicao: corpo.predefinicao, aparencia: corpo.aparencia };
+    return json(res, 200, estado.painel);
+  }
+  // implementações: versões, teste A/B e rollback
+  if (p === "/v1/dev/implementacoes" && m === "GET") return json(res, 200, { itens: estado.implementacoes, ...estado.divisao, historico: estado.historico.slice(0, 50) });
+  if (p === "/v1/dev/implementacoes" && m === "POST") {
+    if (!corpo.ramo || !corpo.commit) return json(res, 400, { erro: "Faltam o ramo e o commit." });
+    const nova = { id: id("imp"), versao: versaoDe(new Date()), ramo: corpo.ramo, commit: corpo.commit, mensagem: corpo.mensagem ?? "", autor: corpo.autor ?? "Equipa", quando: agora(), estado: "Pronta", trafego: 0 };
+    estado.implementacoes.unshift(nova);
+    estado.historico.unshift({ quando: agora(), texto: `Versão ${nova.versao} lançada do commit ${nova.commit}` });
+    return json(res, 200, nova);
+  }
+  if (p === "/v1/dev/implementacoes/divisao" && m === "PUT") {
+    const a = estado.implementacoes.find((v) => v.id === estado.divisao.a);
+    if (!corpo.b) {
+      for (const v of estado.implementacoes) if (v.estado === "Em teste") Object.assign(v, { estado: "Pronta", trafego: 0 });
+      if (a) a.trafego = 100;
+      estado.divisao = { a: estado.divisao.a, b: null, percentagemB: 0 };
+      estado.historico.unshift({ quando: agora(), texto: "Teste A/B terminado" });
+      return json(res, 200, estado.divisao);
+    }
+    const b = estado.implementacoes.find((v) => v.id === corpo.b);
+    const pct = Math.round(Number(corpo.percentagemB));
+    if (!b || b.id === estado.divisao.a) return json(res, 400, { erro: "Escolha uma versão B diferente da A." });
+    if (!(pct >= 1 && pct <= 99)) return json(res, 400, { erro: "A percentagem da B vai de 1 a 99." });
+    for (const v of estado.implementacoes) if (v.estado === "Em teste" && v.id !== b.id) Object.assign(v, { estado: "Pronta", trafego: 0 });
+    Object.assign(b, { estado: "Em teste", trafego: pct });
+    if (a) a.trafego = 100 - pct;
+    estado.divisao = { a: estado.divisao.a, b: b.id, percentagemB: pct };
+    estado.historico.unshift({ quando: agora(), texto: `Teste A/B: a versão ${b.versao} recebe ${pct} % do tráfego` });
+    return json(res, 200, estado.divisao);
+  }
+  if (p === "/v1/dev/implementacoes/promover" && m === "POST") {
+    const b = estado.implementacoes.find((v) => v.id === estado.divisao.b);
+    if (!b) return json(res, 400, { erro: "Não há nenhum teste A/B a decorrer." });
+    reverterPara(b);
+    return json(res, 200, estado.divisao);
+  }
+  if (e(/^\/v1\/dev\/implementacoes\/([^/]+)\/reverter$/) && m === "POST") {
+    const alvo = estado.implementacoes.find((v) => v.id === r[1]);
+    if (!alvo) return json(res, 404, { erro: "Não existe." });
+    reverterPara(alvo);
+    return json(res, 200, estado.divisao);
+  }
+  // GitHub e conectores (este servidor não fala com o GitHub: os commits são de exemplo)
+  if (p === "/v1/dev/github" && m === "GET") return json(res, 200, { ...estado.github, ramos: ["main", "desenvolvimento"] });
+  if (p === "/v1/dev/github" && m === "PUT") {
+    if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(String(corpo.repositorio ?? ""))) return json(res, 400, { erro: "Use o formato dono/nome." });
+    estado.github = { repositorio: corpo.repositorio, ramo: corpo.ramo ?? "main" };
+    return json(res, 200, estado.github);
+  }
+  if (p === "/v1/dev/github/commits" && m === "GET") {
+    const ramo = corpo.ramo ?? estado.github.ramo;
+    const itens = ["Ajusta o seletor de contas", "Corrige o filtro dos pedidos", "Acrescenta a exportação em PDF", "Atualiza as dependências", "Melhora o carregamento", "Primeira versão"].map((mensagem, i) => ({
+      sha: (pseudo(`${ramo}${i}`, 7).toString(16) + "0000000").slice(2, 9),
+      mensagem,
+      autor: "Equipa",
+      quando: new Date(Date.now() - (i + 1) * 6 * 3_600_000).toISOString(),
+      ramo,
+      testes: i === 3 ? "Falharam" : i === 0 ? "A correr" : "Passaram",
+    }));
+    return json(res, 200, { itens });
+  }
+  if (p === "/v1/dev/conectores" && m === "GET") return json(res, 200, { itens: estado.conectores });
+  if (e(/^\/v1\/dev\/conectores\/([^/]+)$/) && m === "PUT") {
+    const c = estado.conectores.find((x) => x.id === r[1]);
+    if (!c) return json(res, 404, { erro: "Não existe." });
+    Object.assign(c, { ligado: !!corpo.ligado });
+    return json(res, 200, c);
+  }
+  if (e(/^\/v1\/dev\/conectores\/([^/]+)\/testar$/) && m === "POST") {
+    const c = estado.conectores.find((x) => x.id === r[1]);
+    if (!c) return json(res, 404, { erro: "Não existe." });
+    return json(res, 200, c.ligado ? { ok: true, mensagem: `Respondeu em ${90 + (c.id.length * 17) % 80} ms` } : { ok: false, mensagem: "Está desligado, ligue-o primeiro." });
+  }
+  // e-mails do Marketing: as mensagens de todas as pastas e as campanhas (este servidor não envia nada: marca como entregue)
+  if (p === "/v1/marketing/emails" && m === "GET") return json(res, 200, { itens: estado.mensagens });
+  if (e(/^\/v1\/marketing\/emails\/([^/]+)$/)) {
+    if (m === "PUT") {
+      const item = guardarEm(estado.mensagens, r[1], corpo, (x) => {
+        if (x.pasta === "enviados" && !["Entregue", "Aberto", "Falhou", "Devolvido"].includes(x.estado)) x.estado = "Entregue";
+        if (x.pasta === "agendados") x.estado = "Agendado";
+      });
+      return json(res, 200, item);
+    }
+    if (m === "DELETE") {
+      estado.mensagens = estado.mensagens.filter((x) => x.id !== r[1]);
+      return json(res, 200, { removida: true });
+    }
+  }
+  if (p === "/v1/marketing/campanhas-email" && m === "GET") return json(res, 200, { itens: estado.campanhasEmail });
+  if (e(/^\/v1\/marketing\/campanhas-email\/([^/]+)$/)) {
+    if (m === "PUT") {
+      const item = guardarEm(estado.campanhasEmail, r[1], corpo, (c) => {
+        if (c.estado === "A enviar") enviarCampanha(c, agora());
+      });
+      return json(res, 200, item);
+    }
+    if (m === "DELETE") {
+      estado.campanhasEmail = estado.campanhasEmail.filter((x) => x.id !== r[1]);
+      return json(res, 200, { removida: true });
+    }
+  }
   // limpeza
   if (p === "/v1/dev/limpeza" && m === "POST") {
     const antes = new Date(Date.now() - Number(corpo.dias ?? 90) * 86_400_000).toISOString();

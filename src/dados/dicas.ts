@@ -1,5 +1,6 @@
 // Textos das dicas (tooltips) do painel: o que cada estado significa em cada módulo, o que cada campo pede, o que cada tipo e estatística quer dizer.
 // Ficam aqui, arrumados por assunto, para que nenhum componente tenha português escrito no código.
+import { SIGNIFICADO_NEGOCIOS } from "./modulos-negocios";
 import { SIGNIFICADO_SUPER } from "./modulos-super";
 
 /** Significado de cada estado, por módulo; «*» serve a todos os módulos que não o definem. */
@@ -47,6 +48,7 @@ const SIGNIFICADO_PROPRIO: Record<string, Record<string, string>> = {
 export const SIGNIFICADO_ESTADO: Record<string, Record<string, string>> = {
   ...SIGNIFICADO_PROPRIO,
   ...SIGNIFICADO_SUPER,
+  ...SIGNIFICADO_NEGOCIOS,
   "*": { ...SIGNIFICADO_PROPRIO["*"], ...SIGNIFICADO_SUPER["*"] },
 };
 

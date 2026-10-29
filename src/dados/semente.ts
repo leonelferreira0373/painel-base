@@ -43,11 +43,17 @@ export class Sorteio {
   nome(): string {
     return `${this.de(NOMES)} ${this.de(APELIDOS)}`;
   }
+  /** Matrícula fictícia, como «LD-32-71-AB». */
+  matricula(): string {
+    return `LD-${String(this.entre(10, 99))}-${String(this.entre(10, 99))}-${this.de(LETRAS)}${this.de(LETRAS)}`;
+  }
   /** Código de processo com prefixo, como «EN-02607». */
   processo(prefixo: string, n: number): string {
     return `${prefixo}-${String(2600 + n).padStart(5, "0")}`;
   }
 }
+
+const LETRAS = "ABCDEFGHJKLMNPRSTUVXZ".split("");
 
 export const NOMES = ["Ana", "Bruno", "Carla", "Diogo", "Eduarda", "Fábio", "Graça", "Hugo", "Inês", "João", "Kátia", "Luís", "Mariana", "Nuno", "Olívia", "Paulo", "Rita", "Rui", "Sara", "Tomás", "Vera", "Xavier"] as const;
 export const APELIDOS = ["Silva", "Costa", "Ferreira", "Pereira", "Santos", "Oliveira", "Rodrigues", "Martins", "Gomes", "Lopes", "Carvalho", "Almeida", "Ribeiro", "Mendes", "Teixeira", "Moreira"] as const;

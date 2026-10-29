@@ -10,7 +10,7 @@ O painel traz o assistente [`ai-chat`](https://github.com/ferreirakorp/ai-chat) 
 | Compilação | `transpilePackages: ["ai-chat"]` em `next.config.ts` (o módulo vem em TypeScript) |
 | Componente | `src/components/AssistentePainel.tsx`, montado no `Shell` |
 | Botão | «Perguntar à IA» no cabeçalho; envia o evento `painel:assistente` |
-| Conteúdo | `src/dados/assistente.ts` (nome, convites, perguntas e respostas prontas, instruções da IA) |
+| Conteúdo | `src/dados/assistente.ts` (nome, convites, perguntas e respostas prontas, instruções da IA) e, por cima, as **perguntas frequentes** do editor de FAQ (Conteúdo → Editor de FAQ): as publicadas entram primeiro e valem como respostas oficiais |
 | Cores | `src/styles/assistente.css`: as variáveis `--aia-*` apontadas aos tokens do tema; o botão redondo do módulo fica escondido |
 
 ## Sem servidor

@@ -32,7 +32,8 @@ export const TAMANHOS: Record<ControlosIA["tamanho"], string> = { curta: "Curtas
 export interface DocumentoDeMemoria {
   id: string;
   nome: string;
-  origem: "pdf" | "nota";
+  /** «faq» são as perguntas frequentes do editor de FAQ, que entram na memória sem serem guardadas aqui. */
+  origem: "pdf" | "nota" | "faq";
   tamanho: number;
   paginas?: number;
   criado: string;
@@ -78,7 +79,8 @@ export function procurar(docs: DocumentoDeMemoria[], pergunta: string, n = 3): P
   if (quer.size === 0) return [];
   const todas: Passagem[] = [];
   for (const d of docs.filter((x) => x.ativo)) {
-    for (const p of pedacos(d.texto)) {
+    // uma pergunta frequente é uma só passagem: a pergunta e a resposta nunca se separam
+    for (const p of d.origem === "faq" ? [d.texto] : pedacos(d.texto)) {
       const tem = new Set(palavrasDe(p));
       let pontos = 0;
       for (const q of quer) if (tem.has(q)) pontos += 1;
@@ -89,7 +91,7 @@ export function procurar(docs: DocumentoDeMemoria[], pergunta: string, n = 3): P
 }
 
 /** As instruções que o modelo recebe: o que a pessoa escreveu, o tom, o tamanho, os limites e a lista da memória ativa. */
-export function instrucoesFinais(c: ControlosIA, docs: DocumentoDeMemoria[]): string {
+export function instrucoesFinais(c: ControlosIA, docs: DocumentoDeMemoria[], perguntasFrequentes = 0): string {
   const linhas = [`És «${c.nome}», o assistente do painel. Responde sempre em português de Portugal.`];
   linhas.push(`Tom: ${c.tom === "formal" ? "formal, tratando a pessoa por «o senhor» ou «a senhora»" : c.tom === "proximo" ? "próximo e simpático, sem ser informal demais" : "neutro e claro"}.`);
   linhas.push(`Respostas ${c.tamanho === "curta" ? "curtas (uma a três frases)" : c.tamanho === "detalhada" ? "detalhadas, com os passos numerados quando houver" : "de tamanho médio (um parágrafo)"}.`);
@@ -99,7 +101,8 @@ export function instrucoesFinais(c: ControlosIA, docs: DocumentoDeMemoria[]): st
   const ativos = docs.filter((d) => d.ativo);
   if (c.soMemoria) linhas.push("Responde só com o que está na memória abaixo. Se não estiver lá, diz que não sabes e sugere falar com a equipa.");
   if (ativos.length) linhas.push(`Memória (${ativos.length} ${ativos.length === 1 ? "documento" : "documentos"}): ${ativos.map((d) => d.nome).join("; ")}.`);
-  else if (c.soMemoria) linhas.push("A memória está vazia: diz que ainda não tens informação.");
+  if (perguntasFrequentes > 0) linhas.push(`${perguntasFrequentes} ${perguntasFrequentes === 1 ? "pergunta frequente publicada" : "perguntas frequentes publicadas"}: são as respostas oficiais da equipa, usa-as tal como estão quando a pergunta coincidir.`);
+  if (!ativos.length && !perguntasFrequentes && c.soMemoria) linhas.push("A memória está vazia: diz que ainda não tens informação.");
   return linhas.join("\n");
 }
 

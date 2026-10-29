@@ -15,6 +15,7 @@ import { useApp } from "@/lib/estado";
 import { bancoDoCorpo } from "@/lib/bancos";
 import { corpoDoIban, erroDoCorpo, formatarIban, ibanDoCorpo, limparIban, MOEDAS } from "@/lib/iban";
 import { calcularMetricas, type MetricasDePagamentos } from "@/lib/pagamentos";
+import { agrupar, contarPorIntervalo, instante, intervalosPara, razao, somarPorIntervalo } from "@/lib/serie";
 import { useEditar } from "@/lib/permissao";
 import { Cartao, Confirmar, Interruptor, Linha } from "../conta/Pecas";
 import { BotaoCopiar } from "../Copiar";
@@ -62,6 +63,25 @@ export function PagamentosVisao() {
   const m = api.modo === "ligado" ? api.dados : local;
   const { itens } = useComprovativos();
   const porValidar = itens.filter((i) => i.pasta === PASTA_DE_COMPROVATIVOS && i.meta?.estado === "Por validar").length;
+  // as séries dos cartões vêm dos próprios pagamentos e comprovativos, repartidos por intervalos de tempo
+  const lista = useMemo(() => (registos.pagamentos ?? []) as unknown as Pagamento[], [registos.pagamentos]);
+  const series = useMemo(() => {
+    const baldes = agrupar(lista, (p) => instante(p.data), intervalosPara(lista.length));
+    const confirmados = contarPorIntervalo(baldes, (p) => p.estado === "Confirmado");
+    const recusados = contarPorIntervalo(baldes, (p) => p.estado === "Recusado");
+    const recebidos = itens.filter((i) => i.pasta === PASTA_DE_COMPROVATIVOS && i.meta?.recebido);
+    return {
+      numero: contarPorIntervalo(baldes),
+      ticket: baldes.map((b) => {
+        const c = b.filter((p) => p.estado === "Confirmado");
+        return c.length ? c.reduce((s, p) => s + p.valor, 0) / c.length : 0;
+      }),
+      sucesso: razao(confirmados, confirmados.map((c, i) => c + recusados[i])),
+      pendentes: contarPorIntervalo(baldes, (p) => p.estado === "Pendente"),
+      reembolsado: somarPorIntervalo(baldes, (p) => p.valor, (p) => p.estado === "Reembolsado"),
+      porValidar: contarPorIntervalo(agrupar(recebidos, (i) => instante(i.meta?.recebido ?? ""), intervalosPara(recebidos.length)), (i) => i.meta?.estado === "Por validar"),
+    };
+  }, [lista, itens]);
   const dias = m?.porDia.slice(-14) ?? [];
   const serie = dias.map((d) => d.valor);
   const maximo = Math.max(1, ...(m?.porMetodo.map((x) => x.valor) ?? [1]));
@@ -76,12 +96,12 @@ export function PagamentosVisao() {
             className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
             itens={[
               { id: "volume", conteudo: <CartaoEstatistica titulo="Volume confirmado" valor={dinheiro(m.volume)} variacao={null} valores={serie} dica="A soma dos pagamentos confirmados." /> },
-              { id: "numero", conteudo: <Estatistica titulo="Pagamentos" valor={inteiro(m.numero)} dica="Todos os pagamentos registados, em qualquer estado." numero={m.numero} /> },
-              { id: "ticket", conteudo: <Estatistica titulo="Ticket médio" valor={dinheiro(m.ticketMedio)} dica="O volume confirmado a dividir pelo número de pagamentos confirmados." numero={m.ticketMedio} /> },
-              { id: "sucesso", conteudo: <Estatistica titulo="Taxa de sucesso" valor={percentagem(m.taxaDeSucesso)} dica="Confirmados sobre confirmados mais recusados." numero={m.taxaDeSucesso * 100} /> },
-              { id: "pendentes", conteudo: <Estatistica titulo="Pagamentos pendentes" valor={inteiro(m.pendentes)} pior dica={`${dinheiro(m.valorPendente)} à espera de confirmação.`} numero={m.pendentes} /> },
-              { id: "por-validar", conteudo: <Estatistica titulo="Comprovativos por validar" valor={inteiro(porValidar)} pior dica="Os que já chegaram e ninguém conferiu. Estão em Pagamentos, «Comprovativos»." numero={porValidar} /> },
-              { id: "reembolsado", conteudo: <Estatistica titulo="Reembolsado" valor={dinheiro(m.reembolsado)} pior dica="O valor devolvido aos clientes no período." numero={m.reembolsado} /> },
+              { id: "numero", conteudo: <Estatistica titulo="Pagamentos" valor={inteiro(m.numero)} dica="Todos os pagamentos registados, em qualquer estado." numero={m.numero} serie={series.numero} /> },
+              { id: "ticket", conteudo: <Estatistica titulo="Ticket médio" valor={dinheiro(m.ticketMedio)} dica="O volume confirmado a dividir pelo número de pagamentos confirmados." numero={m.ticketMedio} serie={series.ticket} /> },
+              { id: "sucesso", conteudo: <Estatistica titulo="Taxa de sucesso" valor={percentagem(m.taxaDeSucesso)} dica="Confirmados sobre confirmados mais recusados." numero={m.taxaDeSucesso * 100} serie={series.sucesso} /> },
+              { id: "pendentes", conteudo: <Estatistica titulo="Pagamentos pendentes" valor={inteiro(m.pendentes)} pior dica={`${dinheiro(m.valorPendente)} à espera de confirmação.`} numero={m.pendentes} serie={series.pendentes} /> },
+              { id: "por-validar", conteudo: <Estatistica titulo="Comprovativos por validar" valor={inteiro(porValidar)} pior dica="Os que já chegaram e ninguém conferiu. Estão em Pagamentos, «Comprovativos»." numero={porValidar} serie={series.porValidar} /> },
+              { id: "reembolsado", conteudo: <Estatistica titulo="Reembolsado" valor={dinheiro(m.reembolsado)} pior dica="O valor devolvido aos clientes no período." numero={m.reembolsado} serie={series.reembolsado} /> },
             ]}
           />
           <div className="grid gap-4 lg:grid-cols-3">

@@ -171,3 +171,11 @@ export function planoDeAcesso(ip: string, pais: string | undefined, regras: Regr
   if (exata && !ipBloqueado(ip, restantes, pais)) return { guardar: null, remover: exata.id };
   return { guardar: exata ? { ...exata, acao: "permitir", ativa: true } : { id: novoId, acao: "permitir", alvo: ip.trim(), nota: nota || "Desbloqueado à mão", ativa: true }, remover: null };
 }
+
+/** Mensagem de erro para o repositório do GitHub («dono/nome»), ou null se serve. */
+export function erroDoRepositorio(texto: string): string | null {
+  const t = texto.trim();
+  if (!t) return "Escreva o repositório, no formato dono/nome.";
+  if (/^https?:\/\//i.test(t) || t.includes("github.com")) return "Escreva só dono/nome, sem o endereço do site.";
+  return /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/.test(t) ? null : "Use o formato dono/nome (letras, números, hífen, ponto e sublinhado).";
+}

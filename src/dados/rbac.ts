@@ -21,7 +21,14 @@ export const FUNCOES: Funcao[] = [
     id: "administrador",
     rotulo: "Administrador",
     pessoa: "Ana Costa",
-    areas: { inicio: TUDO, analise: TUDO, vendas: TUDO, clientes: TUDO, conteudo: TUDO, ia: TUDO, pagamentos: TUDO, marketing: TUDO, dev: TUDO, admin: TUDO },
+    areas: { inicio: TUDO, analise: TUDO, vendas: TUDO, clientes: TUDO, conteudo: TUDO, ia: TUDO, pagamentos: TUDO, marketing: TUDO, dev: TUDO, hotel: TUDO, taxi: TUDO, loja: TUDO, admin: TUDO },
+  },
+  {
+    id: "master",
+    rotulo: "Master Admin",
+    pessoa: "Ricardo Matos",
+    // a única função que vê o painel de módulos e predefinições: decide o que os outros têm ligado
+    areas: { inicio: TUDO, analise: TUDO, vendas: TUDO, clientes: TUDO, conteudo: TUDO, ia: TUDO, pagamentos: TUDO, marketing: TUDO, dev: TUDO, hotel: TUDO, taxi: TUDO, loja: TUDO, admin: TUDO, painel: TUDO },
   },
   {
     id: "gestor",
@@ -33,7 +40,7 @@ export const FUNCOES: Funcao[] = [
     id: "analista",
     rotulo: "Analista de dados",
     pessoa: "Carla Pereira",
-    areas: { inicio: VER, analise: TUDO, vendas: VER, clientes: VER, conteudo: TUDO, ia: TUDO, pagamentos: VER, marketing: TUDO, dev: VER },
+    areas: { inicio: VER, analise: TUDO, vendas: VER, clientes: VER, conteudo: TUDO, ia: TUDO, pagamentos: VER, marketing: TUDO, dev: VER, hotel: VER, taxi: VER, loja: VER },
   },
   {
     id: "apoio",

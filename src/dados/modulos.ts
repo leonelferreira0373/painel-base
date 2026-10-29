@@ -1,5 +1,6 @@
 // Definição dos módulos de registos: colunas, formulário de novo registo, fluxo de estados, gráficos e dados fictícios de partida.
 // Para acrescentar um módulo, copie um destes blocos, mude o `id` e acrescente-o a `REGISTOS` no fim do ficheiro (ver docs/ADICIONAR-MODULO.md).
+import { REGISTOS_NEGOCIOS } from "./modulos-negocios";
 import { REGISTOS_SUPER } from "./modulos-super";
 import { FUNCOES } from "./rbac";
 import { CATEGORIAS, CLIENTES, PRODUTOS, SETORES, Sorteio } from "./semente";
@@ -267,4 +268,4 @@ const atividade: DefRegistos = {
   },
 };
 
-export const REGISTOS: Record<string, DefRegistos> = Object.fromEntries([encomendas, devolucoes, produtos, carteira, notificacoes, utilizadores, equipas, atividade, ...REGISTOS_SUPER].map((d) => [d.id, d]));
+export const REGISTOS: Record<string, DefRegistos> = Object.fromEntries([encomendas, devolucoes, produtos, carteira, notificacoes, utilizadores, equipas, atividade, ...REGISTOS_SUPER, ...REGISTOS_NEGOCIOS].map((d) => [d.id, d]));

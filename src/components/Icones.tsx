@@ -11,6 +11,7 @@ import {
   PulseIcon,
   FireIcon,
   PackageIcon,
+  LayoutIcon,
   CaretDownIcon,
   CaretUpIcon,
   FolderIcon,
@@ -205,7 +206,7 @@ const BASE = {
   pulso: PulseIcon,
   fogo: FireIcon,
   produto: PackageIcon,
-  local: MapPinIcon,
+  local: LayoutIcon,
 } satisfies Record<string, IconeFosforo>;
 
 /** Todos os ícones saem com traço grosso («bold»), para terem peso visual no painel. Nunca «duotone»: pinta um retângulo cinzento por trás do desenho. */

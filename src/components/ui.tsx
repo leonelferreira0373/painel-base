@@ -218,8 +218,10 @@ export function Painel({ titulo, children, acoes, className = "" }: { titulo: st
 export function CartaoEstatistica({ titulo, valor, variacao, pior = false, dica, valores, carregando = false }: { titulo: string; valor: string; variacao: number | null; pior?: boolean; dica?: string; valores: number[]; carregando?: boolean }) {
   const sobe = (variacao ?? 0) >= 0;
   const bom = pior ? !sobe : sobe;
+  // sem série para desenhar o cartão fica só com o número, sem um vazio por baixo
+  const comGrafico = carregando || valores.length >= 2;
   return (
-    <div className="pleno relative flex h-32 min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-kumo-base ring ring-kumo-line transition-colors hover:ring-kumo-fill">
+    <div className={`pleno relative flex ${comGrafico ? "h-32" : "h-auto pb-3"} min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-kumo-base ring ring-kumo-line transition-colors hover:ring-kumo-fill`}>
       <div className="flex items-start gap-3 px-4 pb-0.5 pt-3">
         <span className="inline-flex min-w-0 items-center gap-1.5 truncate text-xs font-medium text-kumo-subtle">
           {titulo}
@@ -243,9 +245,11 @@ export function CartaoEstatistica({ titulo, valor, variacao, pior = false, dica,
               </Dica>
             )}
           </div>
-          <div className="-mx-4 mt-1.5 min-h-10 flex-1">
-            <AreaMini valores={valores} altura={60} />
-          </div>
+          {valores.length >= 2 && (
+            <div className="-mx-4 mt-1.5 min-h-10 flex-1">
+              <AreaMini valores={valores} altura={60} />
+            </div>
+          )}
         </div>
       )}
     </div>

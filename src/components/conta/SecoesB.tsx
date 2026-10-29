@@ -405,7 +405,7 @@ export function SecaoDados() {
 
       <Confirmar aberto={limpar} aoMudar={setLimpar} titulo="Apagar a memória do menu" texto="As páginas recentes, as fixadas e os cartões que ocultou na página inicial voltam ao início." rotuloAcao="Apagar" aoConfirmar={limparLocais} />
       <Confirmar aberto={reposicao} aoMudar={setReposicao} titulo="Repor as definições" texto="As notificações, os lembretes, a fotografia e as preferências desta conta voltam ao início." rotuloAcao="Repor" perigo aoConfirmar={() => (repor(), avisar("Definições repostas"))} />
-      <Confirmar aberto={eliminar} aoMudar={setEliminar} titulo="Eliminar a conta" perigo escrever="ELIMINAR" texto="A conta fica em espera durante 14 dias e depois é apagada, com os lembretes, as chaves e a atividade. Pode cancelar neste período." rotuloAcao="Pedir eliminação" aoConfirmar={() => mudar({ eliminacao: new Date(Date.now() + 14 * 86_400_000).toISOString() }, "Eliminação da conta pedida")} />
+      <Confirmar aberto={eliminar} aoMudar={setEliminar} titulo="Eliminar a conta" perigo escrever={`ELIMINAR ${conta.nome}`} texto="A conta fica em espera durante 14 dias e depois é apagada, com os lembretes, as chaves e a atividade. Pode cancelar neste período." rotuloAcao="Pedir eliminação" aoConfirmar={() => mudar({ eliminacao: new Date(Date.now() + 14 * 86_400_000).toISOString() }, "Eliminação da conta pedida")} />
       <Confirmar aberto={cancelar} aoMudar={setCancelar} titulo="Cancelar a eliminação" texto="A conta continua como está." rotuloAcao="Cancelar eliminação" aoConfirmar={() => mudar({ eliminacao: undefined }, "Eliminação da conta cancelada")} />
     </>
   );

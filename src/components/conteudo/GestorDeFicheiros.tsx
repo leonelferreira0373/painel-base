@@ -50,7 +50,11 @@ export function PreVisualizar({ item, aoFechar }: { item: ItemDaBiblioteca | nul
               <Dialog.Title className="min-w-0 truncate text-lg font-semibold">{item.nome}</Dialog.Title>
               <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
             </div>
-            {eImagem(item) && url && <img src={url} alt={item.alt ?? item.nome} className="max-h-[60vh] w-full rounded-lg object-contain" />}
+            {eImagem(item) && url && (
+              <div className="h-[min(55dvh,26rem)] overflow-hidden rounded-lg bg-kumo-tint">
+                <img src={url} alt={item.alt ?? item.nome} className="size-full object-contain" />
+              </div>
+            )}
             {item.tipo === "application/pdf" && url && <iframe src={url} title={item.nome} className="h-[60vh] w-full rounded-lg ring ring-kumo-line" />}
             {texto !== null && <pre className="max-h-[60vh] overflow-auto rounded-lg bg-kumo-tint p-3 text-xs">{texto}</pre>}
             {!eImagem(item) && item.tipo !== "application/pdf" && texto === null && <Vazio icone={iconeDe(item)} titulo="Sem pré-visualização" texto="Este tipo de ficheiro abre-se na aplicação certa depois de transferido." />}

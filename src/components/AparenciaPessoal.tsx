@@ -4,6 +4,7 @@
 import { useEffect } from "react";
 import { variaveisDoTema } from "@/lib/aparencia";
 import { useConta } from "@/lib/conta";
+import { useApp } from "@/lib/estado";
 import { useTema } from "@/lib/tema";
 import { registarFonte } from "@/lib/fontes";
 
@@ -16,7 +17,10 @@ export function AparenciaPessoal() {
     (conta.fontes ?? []).forEach((f) => void registarFonte(f));
   }, [conta.fontes]);
   const { efetivo } = useTema();
-  const aparencia = conta.aparencia;
+  const { painel } = useApp();
+  // quem escolheu as suas cores e letras (Definições da conta) mantém-nas; senão vale a aparência que o Master Admin deu a todo o painel
+  const propria = conta.aparencia && (Object.keys(conta.aparencia.claro ?? {}).length > 0 || Object.keys(conta.aparencia.escuro ?? {}).length > 0 || Object.keys(conta.aparencia.letras ?? {}).length > 0);
+  const aparencia = propria ? conta.aparencia : painel.config.aparencia;
   useEffect(() => {
     const modo = efetivo === "escuro" ? "escuro" : "claro";
     const variaveis = variaveisDoTema(modo, aparencia);

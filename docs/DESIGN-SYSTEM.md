@@ -189,10 +189,10 @@ Usa-se sempre o componente do Kumo; **nunca** um `<button>`, `<input>` ou `<sele
 ## 5l. O super painel: pagamentos, marketing e developer tools
 
 - **Dados vindos de um contrato**: nenhum ecrã inventa dados. Lê com `useApi` / `useColecao` (`src/lib/api/`): em modo simulado vem o gerador local (`dados/super-dados.ts`), em modo ligado vem do servidor, e o ecrã é o mesmo. O modo diz-se com **uma só etiqueta** (`AvisoDeApi`): «Dados de demonstração» ou «Ligado ao servidor», com a explicação na dica e, se falhar, o aviso com «Tentar de novo». Nunca um parágrafo por baixo do título.
-- **Cartão de estatística** (`Estatistica`, `super/SuperPecas.tsx`): o `CartaoEstatistica` com o gráfico do que **se observou** enquanto o ecrã esteve aberto (`useSerie`). Sem números inventados: um valor que não mexeu mostra só o valor.
+- **Cartão de estatística** (`Estatistica`, `super/SuperPecas.tsx`): o `CartaoEstatistica` com o gráfico da **série dos registos do ecrã** (`serie`, repartidos por intervalos de tempo com `lib/serie.ts`: `agrupar`, `contarPorIntervalo`, `somarPorIntervalo`, `mediaPorIntervalo`). Sem série, o gráfico é o que **se observou** do número enquanto o ecrã esteve aberto (`useSerie`); sem nenhum dos dois, o cartão fica só com o valor (`h-auto`). Todo o cartão com números tem de ter gráfico quando há de onde o tirar; sem números inventados.
 - **Tabela de uma linha por linha** (`TabelaSimples`): desliza na horizontal, as palavras nunca se quebram nem se empilham.
 - **Estados** com `Estado`; quando o estado não é uma palavra do fluxo (códigos HTTP, regras de firewall) passa-se `variante` (`success`, `error`, `warning`, `neutral`). Os significados vão em `SIGNIFICADO_SUPER` (`dados/modulos-super.ts`).
-- **Ações que mudam ou apagam coisas** usam sempre `Confirmar`; o que não se desfaz (apagar linhas, restaurar uma cópia, desligar o firewall) pede que se escreva a palavra (`escrever="APAGAR"`).
+- **Ações que mudam ou apagam coisas** usam sempre `Confirmar`; o que não se desfaz (apagar linhas, restaurar uma cópia, desligar o firewall, remover uma campanha) pede que se escreva o verbo **e o nome do que muda** (`escrever={`APAGAR ${nome}`}`: «APAGAR cópias de segurança»), nunca só o verbo. A frase aparece num pill e a comparação ignora maiúsculas e espaços repetidos.
 - **Opções com valor livre** (ritmo, dias, limite por minuto, porta SMTP, frequência e retenção das cópias) usam `SeletorPersonalizavel` com a sua especificação em `dados/personalizados.ts`.
 - **Número, data e hora** nunca são campos nativos: `SeletorDeData`, `SeletorDeHora` e texto com `inputMode="decimal"`.
 - **Só ver**: `Modulo.tsx` envolve cada ecrã próprio num `PermissaoProvider` com `podeEditar(funcao, área, módulo)` e o ecrã lê `useEditar()` (`lib/permissao.tsx`). Quem só vê encontra a marca «Só leitura» no título (`Titulo` mostra-a sozinho) e nenhum botão que crie, grave, apague ou reinicie: esses desaparecem (os interruptores ficam desativados e os campos de configuração ficam só para ler). Os campos de segredo (palavra-passe SMTP, token) e o descarregar de cópias de segurança também desaparecem. Um ecrã novo com ações faz o mesmo; os módulos de registos já o fazem por si.
@@ -202,10 +202,35 @@ Usa-se sempre o componente do Kumo; **nunca** um `<button>`, `<input>` ou `<sele
 
 ## 5m. Imagens e locais
 
-- **Um local por campo com imagens**: cada campo do painel que aceita imagens (a capa do blog, as imagens de um produto…) é um local, registado em `dados/locais.ts` (`id`, `grupo`, `rotulo`). A galeria mostra um botão por local na imagem aberta («Onde aparece»), um filtro «Local» com contagens e um selo nas miniaturas; a imagem guarda os seus locais em `locais` (`lib/locais.ts`).
+- **Um local por campo com imagens**: cada campo do painel que aceita imagens (a capa do blog, as imagens de um produto…) é um local, registado em `dados/locais.ts` (`id`, `grupo`, `rotulo`). A galeria mostra, na imagem aberta, a linha «Onde aparece» com **um menu** (`DropdownMenu` com `CheckboxItem`, agrupado por local, que não fecha ao marcar) e os locais escolhidos em pills; tem também um filtro «Local» com contagens e um selo nas miniaturas. A imagem guarda os seus locais em `locais` (`lib/locais.ts`). **A imagem nunca manda no tamanho**: vive numa caixa de tamanho fixo (`h-[min(50dvh,22rem)] overflow-hidden`) com `object-contain`, para trocar de imagem não deslocar nada.
 - **Um só bloco de imagem**: o campo desenha-se sempre com `BlocoDeImagem local="…"` (`components/conteudo/BlocoDeImagem.tsx`): a imagem grande ou a zona onde se largam ficheiros, as miniaturas, «Enviar» (guarda na galeria já ligado ao local), «Da galeria» (`EscolherImagem`, com as imagens do local primeiro), «Tornar principal» e «Tirar». Nenhum ecrã desenha o seu próprio campo de imagem.
 - **Campo novo com imagens**: acrescente o local a `dados/locais.ts` e use `BlocoDeImagem`; a galeria ganha o botão sozinha.
 - **Editor de produtos** (`conteudo/Produtos.tsx`): no telemóvel a zona das imagens vem em cima e os campos por baixo; no PC as imagens ficam fixas à esquerda (`lg:sticky`) e só os campos da direita rolam. Os produtos ficam no navegador (`useProdutos`, chave `painel.produtos`) e cada produto guarda só os identificadores das imagens.
+
+## 5n. O painel modular: pacotes, módulos e predefinições
+
+Uma só base serve vários negócios (hotel, táxi, loja, vendas…): o que cada um vê liga-se e desliga-se, sem mudar código.
+
+- **Pacote**: um conjunto de áreas ligadas (`dados/pacotes.ts`). `PACOTE_DE_ORIGEM` é o que o painel traz antes de alguém escolher («Personalizado» liga tudo o que existe). Um negócio com o seu próprio painel declara o seu pacote.
+- **Exceções**: por cima do pacote, o Master Admin liga ou desliga uma área («hotel») ou um módulo («dev/firewall») à mão. A configuração é `{ pacote, ligados, predefinicao?, aparencia? }` (`lib/modulos.ts`, guardada por `lib/painel-config.ts`: no navegador em modo simulado, em `/v1/painel/configuracao` em modo ligado).
+- **Como se aplica**: `aplicarModulos(funcao, config)` tira da função as áreas desligadas e acrescenta os módulos desligados a `fechados`; todas as verificações `podeVer` e `podeEditar` ficam certas sem mais nada. As áreas `inicio` e `painel` nunca se desligam (senão ninguém voltava a ligar). Um módulo desligado a que se chega por endereço mostra a página «Módulo desligado» (`ModuloDesligado`, em `Modulo.tsx`), com o botão para o ligar só para o Master Admin.
+- **Predefinições** (`dados/predefinicoes.ts`): um clique escolhe um pacote, acrescenta exceções e dá ao painel uma aparência (acento e letras dos títulos, aplicada em `AparenciaPessoal` a quem não tem a sua).
+- **Só o Master Admin**: a área `painel` (módulos e predefinições) só existe para a função `master` (`dados/rbac.ts`).
+- **Área nova de um negócio**: acrescente-a a `dados/estrutura.ts` (com `secao`), dê-lhe `TUDO` ou `VER` em `dados/rbac.ts` e ponha-a nos pacotes que a querem. Os registos próprios vão num ficheiro como `dados/modulos-negocios.ts`, ligado em `dados/modulos.ts` (os identificadores dos módulos são únicos em todo o painel).
+
+## 5o. Implementações e GitHub (Developer tools)
+
+- **Implementações** (`super/Implementacoes.tsx`, regras puras em `lib/implementacoes.ts`): as versões publicadas (`Ativa`, `Em teste`, `Pronta`, `Anterior`), o **teste A/B** (a versão B recebe de 1 a 99 % do tráfego, com a barra de tráfego), **promover** a B e **voltar a uma versão anterior** (rollback), que pede a frase `REVERTER <versão>`. O histórico regista cada passo.
+- **GitHub e conectores** (`super/GitHub.tsx`): o repositório (`dono/nome`) e o ramo, os últimos commits com o resultado dos testes, «Lançar» (cria uma versão `Pronta` em Implementações, só de commits cujos testes passaram) e os conectores com interruptor e «Testar».
+- Em modo simulado vive no navegador; em modo ligado cada ação chama o contrato (`/v1/dev/implementacoes`, `/v1/dev/github`, `/v1/dev/conectores`).
+
+## 5p. E-mails do Marketing e FAQ
+
+- **E-mails** (grupo «E-mail» do Marketing): **Campanhas de e-mail**, **Agendados**, **Recebidos** e **Enviados** (`super/EmailCampanhas.tsx`, `super/EmailCaixa.tsx`, partilham `super/EmailPecas.tsx`). A lógica pura (validar, agendar, enviar, responder, pesquisar, números das campanhas) está em `lib/email.ts`.
+- **Campanha**: lista com os números das enviadas (cartões com gráfico por campanha) e editor com a mensagem, a audiência, o remetente e **quando sai** (rascunho, já ou agendada, com o seletor de data e hora), mais a pré-visualização. Enviar já pede confirmação com o número de pessoas.
+- **Agendados**: a fila por dia (campanhas e mensagens), com «Enviar agora», «Mudar a hora» e cancelar. Em modo simulado a fila anda sozinha (`useFilaSimulada`: o que passou de hora sai, à hora marcada); em modo ligado é do servidor.
+- **Caixas**: a lista à esquerda e a mensagem à direita; no telemóvel alternam. Responder e reencaminhar abrem a janela de escrever (`Compor`), que envia já ou agenda. As estatísticas das campanhas enviadas em modo simulado são simuladas e sempre as mesmas para a mesma campanha (`estatisticasSimuladas`).
+- **FAQ** (`conteudo/Faq.tsx`, `lib/faq.ts`): o editor das perguntas e respostas, com publicar/esconder e ordem. **Vale também para o assistente de IA**: as perguntas publicadas entram primeiro nas perguntas prontas do `ai-chat` (que as trata como respostas oficiais) e na pesquisa do ecrã «Testar» do assistente. Ficam no navegador (`painel.faq`) e todos os ecrãs veem a alteração no momento (`useFaq`).
 
 ## 6. Gráficos
 
@@ -220,6 +245,7 @@ Usa-se sempre o componente do Kumo; **nunca** um `<button>`, `<input>` ou `<sele
 ## 7. Telemóvel
 
 - Largura mínima suportada: 375 px. A página nunca tem scroll horizontal; só tabelas e filas de separadores deslizam, dentro do seu bloco.
+- **CSS que anula o `translate` do Tailwind** (a pesquisa rápida): escreva só `translate: 0 0 !important;`. O LightningCSS junta `transform: none` e `translate: none` e perde o segundo, o que só se vê na versão publicada; `src/app/globals.test.ts` guarda isto.
 - **Cartões a sangrar:** a classe `pleno` (em `globals.css`) faz o cartão ocupar a largura toda do ecrã abaixo de 640 px (margem negativa de 16 px, sem cantos redondos, só linha fina em cima e em baixo). Todo o cartão de nível de página (`Surface`, `LayerCard`, `CartaoMetrica`, `Painel`, `Banner`) leva `pleno`. As peças do Kumo que já trazem `w-full` (como o `Banner`) precisam também de `max-sm:w-[calc(100%+2rem)]`, senão ficam 32 px mais curtas. Os títulos mantêm a margem de 16 px.
 - A barra lateral abre como gaveta; o botão de menu está no cabeçalho.
 - Alvos de toque: botões e linhas de lista com pelo menos 36 px de altura (44 px nas linhas de lista).

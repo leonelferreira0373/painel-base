@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { gerarPedido, gerarSaude, gerarTabelas, percentil, REGRAS_DE_ORIGEM, type PedidoWeb, type RegraFirewall, type Saude, type TabelaBd } from "@/dados/super-dados";
 import { chamar, useApi, useLigacao } from "@/lib/api/cliente";
 import { useColecao } from "@/lib/api/colecao";
+import { agrupar, contarPorIntervalo, instante, razao } from "@/lib/serie";
 import { formatarTamanho } from "@/lib/biblioteca";
 import { correrConsulta, linhasApagadas } from "@/lib/dev";
 import { useEditar } from "@/lib/permissao";
@@ -33,7 +34,11 @@ export function SaudeVps() {
   const [parados, setParados] = useState<Record<string, number>>({});
   const [reiniciar, setReiniciar] = useState<string | null>(null);
   useEffect(() => {
-    if (s) setHistorico((h) => [...h.slice(-29), { cpu: s.cpu, memoria: s.memoria, disco: s.disco, saida: s.redeSaida / 1000 }]);
+    if (!s) return;
+    // em modo simulado a história começa já com os 58 s anteriores (o gerador é uma função do tempo); em modo ligado vai-se juntando o que o servidor diz
+    const passado = (h: typeof historico) => (h.length === 0 && ligacao.modo !== "ligado" ? Array.from({ length: 29 }, (_, k) => gerarSaude(Math.max(0, t - (29 - k) * 2))).map((x) => ({ cpu: x.cpu, memoria: x.memoria, disco: x.disco, saida: x.redeSaida / 1000 })) : h);
+    setHistorico((h) => [...passado(h).slice(-29), { cpu: s.cpu, memoria: s.memoria, disco: s.disco, saida: s.redeSaida / 1000 }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s]);
   const ligacao = useLigacao();
   const editar = useEditar();
@@ -132,6 +137,8 @@ export function PedidosEmTempoReal() {
   );
   const ultimoMinuto = todos.filter((p) => Date.now() - new Date(p.quando).getTime() < 60_000);
   const erros = ultimoMinuto.filter((p) => p.estado >= 500).length;
+  // o último minuto repartido em 12 intervalos, para o gráfico de cada cartão
+  const baldes = agrupar(ultimoMinuto, (p) => instante(p.quando), 12);
   const cor = (e: number) => (e >= 500 ? "error" : e >= 400 ? "warning" : "success") as "error" | "warning" | "success";
   const colunas: ColunaSimples<PedidoWeb>[] = [
     { rotulo: "Hora", render: (p) => <span className="tabular-nums">{horaCompleta(p.quando)}</span> },
@@ -174,10 +181,10 @@ export function PedidosEmTempoReal() {
       </Titulo>
       <AvisoDeApi erro={api.erro ?? regras.erro} aoTentar={() => (api.recarregar(), regras.recarregar())} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Estatistica titulo="Pedidos no último minuto" valor={inteiro(ultimoMinuto.length)} numero={ultimoMinuto.length} />
-        <Estatistica titulo="Erros 5xx" valor={percentagem(ultimoMinuto.length ? erros / ultimoMinuto.length : 0, 1)} pior numero={ultimoMinuto.length ? (erros / ultimoMinuto.length) * 100 : 0} />
-        <Estatistica titulo="Tempo (mediana)" valor={`${percentil(ultimoMinuto.map((p) => p.ms), 0.5)} ms`} pior numero={percentil(ultimoMinuto.map((p) => p.ms), 0.5)} />
-        <Estatistica titulo="Tempo (percentil 95)" valor={`${percentil(ultimoMinuto.map((p) => p.ms), 0.95)} ms`} pior numero={percentil(ultimoMinuto.map((p) => p.ms), 0.95)} />
+        <Estatistica titulo="Pedidos no último minuto" valor={inteiro(ultimoMinuto.length)} numero={ultimoMinuto.length} serie={contarPorIntervalo(baldes)} />
+        <Estatistica titulo="Erros 5xx" valor={percentagem(ultimoMinuto.length ? erros / ultimoMinuto.length : 0, 1)} pior numero={ultimoMinuto.length ? (erros / ultimoMinuto.length) * 100 : 0} serie={razao(contarPorIntervalo(baldes, (p) => p.estado >= 500), contarPorIntervalo(baldes))} />
+        <Estatistica titulo="Tempo (mediana)" valor={`${percentil(ultimoMinuto.map((p) => p.ms), 0.5)} ms`} pior numero={percentil(ultimoMinuto.map((p) => p.ms), 0.5)} serie={baldes.map((b) => percentil(b.map((p) => p.ms), 0.5))} />
+        <Estatistica titulo="Tempo (percentil 95)" valor={`${percentil(ultimoMinuto.map((p) => p.ms), 0.95)} ms`} pior numero={percentil(ultimoMinuto.map((p) => p.ms), 0.95)} serie={baldes.map((b) => percentil(b.map((p) => p.ms), 0.95))} />
       </div>
       <Cartao
         titulo={`Pedidos (${visiveis.length})`}
@@ -336,7 +343,7 @@ export function BaseDeDados() {
         texto={apagar ? `Apaga as linhas de «${apagar.nome}» com mais de ${dias} dias. Não se pode desfazer.` : ""}
         rotuloAcao="Apagar"
         perigo
-        escrever="APAGAR"
+        escrever={apagar ? `APAGAR ${apagar.nome}` : "APAGAR"}
         aoConfirmar={async () => {
           if (!apagar) return;
           const n = linhasApagadas(apagar.linhas, Number(dias));

@@ -1,7 +1,7 @@
 // A galeria de imagens do painel: carregar várias imagens de uma vez (também a arrastar), ver em grelha, abrir uma a grande com setas, escrever o texto alternativo, dizer em que locais ela aparece (um botão por campo do painel que aceita imagens: a capa do blog, os produtos…), transferir e remover (uma ou várias). Usa a mesma biblioteca do gestor de ficheiros: as imagens que se carregam aqui aparecem lá, na pasta «Galeria».
 "use client";
 
-import { Button, Checkbox, Dialog, Input, Select } from "@cloudflare/kumo";
+import { Button, Checkbox, Dialog, DropdownMenu, Input, Select, Tooltip } from "@cloudflare/kumo";
 import { useEffect, useMemo, useState } from "react";
 import { LOCAIS_DE_IMAGEM } from "@/dados/locais";
 import { eImagem, formatarTamanho, nomeUnico, type ItemDaBiblioteca } from "@/lib/biblioteca";
@@ -9,6 +9,8 @@ import { comLocal, contagemPorLocal, locaisDe } from "@/lib/locais";
 import { useArmazem } from "@/lib/armazem";
 import { identificador } from "@/lib/conta";
 import { Confirmar } from "../conta/Pecas";
+import { Pilula } from "../Frase";
+import { MenuCartao } from "../Flutuantes";
 import { Dica } from "../Dica";
 import { Ic, ICONES } from "../Icones";
 import { Pagina, Titulo } from "../ui";
@@ -143,7 +145,8 @@ export function Galeria() {
                 <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
               </div>
               <div className="relative">
-                {urls.get(atual.id) && <img src={urls.get(atual.id)} alt={atual.alt ?? atual.nome} className="max-h-[55vh] w-full rounded-lg object-contain" />}
+                {/* a caixa tem sempre o mesmo tamanho: a imagem fica lá dentro com a sua proporção e nunca desloca o resto da janela */}
+                <div className="h-[min(50dvh,22rem)] overflow-hidden rounded-lg bg-kumo-tint">{urls.get(atual.id) && <img src={urls.get(atual.id)} alt={atual.alt ?? atual.nome} className="size-full object-contain" />}</div>
                 {posicao > 0 && (
                   <Button variant="secondary" shape="square" icon={ICONES.anterior} aria-label="Imagem anterior" className="absolute left-2 top-1/2 -translate-y-1/2" onClick={() => setAberta(visiveis[posicao - 1].id)} />
                 )}
@@ -153,22 +156,36 @@ export function Galeria() {
               </div>
               <Input label="Texto alternativo" description="Descreve a imagem para quem não a vê (leitores de ecrã) e para o blog." value={alt} onChange={(e) => setAlt(e.target.value)} onBlur={() => alt !== (atual.alt ?? "") && guardar({ ...atual, alt })} />
               <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-kumo-default">Onde aparece</span>
-                {GRUPOS_DE_LOCAIS.map(({ grupo, locais }) => (
-                  <div key={grupo} className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
-                    <span className="shrink-0 text-xs text-kumo-subtle sm:w-20">{grupo}</span>
-                    <span className="flex flex-wrap gap-2">
-                    {locais.map((l) => {
-                      const ligado = locaisDe(atual).includes(l.id);
-                      return (
-                        <Button key={l.id} variant={ligado ? "primary" : "secondary"} size="sm" aria-pressed={ligado} icon={<Ic nome="local" />} onClick={() => guardar(comLocal(atual, l.id, !ligado))}>
-                          {l.rotulo}
-                        </Button>
-                      );
-                    })}
-                    </span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-kumo-default">Onde aparece</span>
+                  <DropdownMenu>
+                    <Tooltip
+                      content="Escolher os locais onde esta imagem aparece"
+                      render={<DropdownMenu.Trigger render={<Button variant="secondary" icon={<Ic nome="local" />} aria-label="Escolher os locais onde esta imagem aparece" />} />}
+                    >
+                      {locaisDe(atual).length === 0 ? "Escolher locais" : `${locaisDe(atual).length} ${locaisDe(atual).length === 1 ? "local" : "locais"}`}
+                    </Tooltip>
+                    <MenuCartao>
+                      {GRUPOS_DE_LOCAIS.map(({ grupo, locais }) => (
+                        <DropdownMenu.Group key={grupo}>
+                          <DropdownMenu.Label>{grupo}</DropdownMenu.Label>
+                          {locais.map((l) => (
+                            <DropdownMenu.CheckboxItem key={l.id} checked={locaisDe(atual).includes(l.id)} onCheckedChange={(v) => guardar(comLocal(atual, l.id, v))} closeOnClick={false}>
+                              {l.rotulo}
+                            </DropdownMenu.CheckboxItem>
+                          ))}
+                        </DropdownMenu.Group>
+                      ))}
+                    </MenuCartao>
+                  </DropdownMenu>
+                </div>
+                {locaisDe(atual).length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {locaisDe(atual).map((id) => (
+                      <Pilula key={id}>{LOCAIS_DE_IMAGEM.find((l) => l.id === id)?.rotulo ?? id}</Pilula>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-kumo-subtle">
                 <span>

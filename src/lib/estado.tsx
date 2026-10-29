@@ -5,6 +5,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { REGISTOS } from "@/dados/modulos";
 import { criarNotificacao, MODULO_NOTIFICACOES } from "@/dados/notificacoes";
 import { FUNCOES, funcaoPorId, type Funcao } from "@/dados/rbac";
+import { aplicarModulos } from "@/lib/modulos";
+import { useConfigDoPainel, type PainelConfig } from "@/lib/painel-config";
 import type { DefRegistos, DefTransicao, Linha } from "@/dados/tipos";
 import { chamar, lerLigacao, useLigacao } from "@/lib/api/cliente";
 import { extrairFicheiro } from "@/lib/extract";
@@ -12,10 +14,14 @@ import { analisar } from "@/lib/analysis/perfil";
 import type { Sugestao } from "@/lib/analysis/sugestoes";
 import type { Extraido, Perfil, Tabela } from "@/lib/tipos";
 import { guardar, ler } from "@/lib/persistencia";
+import { Frase } from "@/components/Frase";
 import { toasts } from "@/lib/toasts";
 
 interface Api {
+  /** A função ativa, já sem as áreas e os módulos que o Master Admin desligou. */
   funcao: Funcao;
+  /** Os módulos ligados e desligados (e como mudá-los). */
+  painel: PainelConfig;
   mudarFuncao: (id: string) => void;
   registos: Record<string, Linha[]>;
   pendentes: Set<string>;
@@ -52,6 +58,7 @@ const inicial = () => Object.fromEntries(Object.values(REGISTOS).map((d) => [d.i
 
 export function Provider({ children }: { children: ReactNode }) {
   const [funcaoId, setFuncaoId] = useState(FUNCOES[0].id);
+  const painel = useConfigDoPainel();
   const [registos, setRegistos] = useState<Record<string, Linha[]>>(inicial);
   const [pendentes, setPendentes] = useState<Set<string>>(new Set());
   const [ficheiros, setFicheiros] = useState<Extraido[]>([]);
@@ -63,7 +70,7 @@ export function Provider({ children }: { children: ReactNode }) {
   const contador = useRef(1000);
 
   const avisar = useCallback((texto: string) => {
-    toasts.add({ title: texto, timeout: 4200 });
+    toasts.add({ title: <Frase>{texto}</Frase>, timeout: 4200 });
   }, []);
 
   // Com o painel ligado a um servidor, os módulos que declaram `api` leem as linhas dele; ao desligar, voltam aos dados de demonstração.
@@ -271,8 +278,11 @@ export function Provider({ children }: { children: ReactNode }) {
   }, []);
   const perfil = useMemo(() => (tabelaAtiva ? perfilDe(tabelaAtiva) : null), [tabelaAtiva, perfilDe]);
 
+  const funcaoDaPessoa = useMemo(() => aplicarModulos(funcaoPorId(funcaoId), painel.config), [funcaoId, painel.config]);
+
   const api: Api = {
-    funcao: funcaoPorId(funcaoId),
+    funcao: funcaoDaPessoa,
+    painel,
     mudarFuncao,
     registos,
     pendentes,

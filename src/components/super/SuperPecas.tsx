@@ -8,6 +8,7 @@ import { Esbatido } from "../Estados";
 import { Ic } from "../Icones";
 import { CartaoEstatistica } from "../ui";
 import { useLigacao } from "@/lib/api/cliente";
+import { serieValida } from "@/lib/serie";
 
 export { useGuardado } from "@/lib/guardado";
 
@@ -29,10 +30,14 @@ export function useSerie(valor: number, n = 24): number[] {
   return serie;
 }
 
-/** O cartão de estatística dos ecrãs do super painel: o valor e, se mudou enquanto olhava, o gráfico do que se observou. Sem `numero`, só o valor. */
-export function Estatistica({ titulo, valor, numero, pior, dica }: { titulo: string; valor: string; numero?: number; pior?: boolean; dica?: string }) {
-  const serie = useSerie(numero ?? 0);
-  return <CartaoEstatistica titulo={titulo} valor={valor} variacao={null} pior={pior} dica={dica} valores={numero !== undefined && serie.length > 2 ? serie : []} />;
+/**
+ * O cartão de estatística dos ecrãs do super painel: o valor e o gráfico. O gráfico é a `serie` dos registos do ecrã (repartidos por intervalos de tempo, ver `lib/serie.ts`); sem série,
+ * é o que se observou do `numero` enquanto o ecrã esteve aberto (só aparece se mudou); sem nenhum dos dois, o cartão fica só com o valor.
+ */
+export function Estatistica({ titulo, valor, numero, serie, pior, dica }: { titulo: string; valor: string; numero?: number; serie?: number[]; pior?: boolean; dica?: string }) {
+  const observada = useSerie(numero ?? 0);
+  const real = serieValida(serie);
+  return <CartaoEstatistica titulo={titulo} valor={valor} variacao={null} pior={pior} dica={dica} valores={real.length ? real : numero !== undefined && observada.length > 2 ? observada : []} />;
 }
 
 export const dinheiro = (valor: number, moeda = "AOA") => new Intl.NumberFormat("pt-PT", { style: "currency", currency: moeda, maximumFractionDigits: 0 }).format(valor);

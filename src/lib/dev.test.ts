@@ -1,6 +1,6 @@
 // Testes das funções de developer tools: alvo do firewall, destino das cópias, consulta SQL só de leitura e apagar por dias.
 import { describe, expect, it } from "vitest";
-import { alvoApanhaIp, correrConsulta, emailValido, erroDoAlvo, erroDoDestino, ipBloqueado, linhasApagadas, planoDeAcesso, regraQueApanha } from "./dev";
+import { alvoApanhaIp, correrConsulta, emailValido, erroDoAlvo, erroDoDestino, erroDoRepositorio, ipBloqueado, linhasApagadas, planoDeAcesso, regraQueApanha } from "./dev";
 
 describe("developer tools", () => {
   it("valida o alvo de uma regra do firewall", () => {
@@ -103,5 +103,16 @@ describe("bloquear e desbloquear um IP", () => {
     const regras = [regra("a", "bloquear", "203.0.113.0/24"), regra("b", "bloquear", "203.0.113.7")];
     const plano = planoDeAcesso("203.0.113.7", undefined, regras, "permitir", "fw-z");
     expect(plano).toEqual({ guardar: { id: "b", acao: "permitir", alvo: "203.0.113.7", nota: "", ativa: true }, remover: null });
+  });
+});
+
+describe("repositório do GitHub", () => {
+  it("aceita dono/nome e recusa o resto, com a razão", () => {
+    expect(erroDoRepositorio("empresa-exemplo/painel")).toBeNull();
+    expect(erroDoRepositorio("a/b.c_d-e")).toBeNull();
+    expect(erroDoRepositorio("")).toContain("Escreva");
+    expect(erroDoRepositorio("https://github.com/a/b")).toContain("sem o endereço");
+    expect(erroDoRepositorio("github.com/a/b")).toContain("sem o endereço");
+    for (const mau of ["painel", "a/", "/b", "a b/c", "-a/b", "a/b/c"]) expect(erroDoRepositorio(mau), mau).toContain("dono/nome");
   });
 });

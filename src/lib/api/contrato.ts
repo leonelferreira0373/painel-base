@@ -5,7 +5,7 @@ export type Metodo = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export interface Endpoint {
   /** Identificador estável (usado nos testes e na documentação). */
   id: string;
-  area: "pagamentos" | "marketing" | "dev";
+  area: "pagamentos" | "marketing" | "dev" | "painel";
   metodo: Metodo;
   /** O caminho, com «{id}» onde vai um identificador. */
   caminho: string;
@@ -15,6 +15,8 @@ export interface Endpoint {
 }
 
 const PAGAMENTO = { id: "pg-2601", referencia: "PG-02601", cliente: "Cliente Exemplo", metodo: "Transferência", valor: 125000, moeda: "AOA", data: "2026-10-28", estado: "Confirmado", conta: "AO06 0040 0000 1234 5678 1014 2" };
+const EMAIL = { id: "em-1", pasta: "enviados", de: "Equipa <geral@painel.exemplo.com>", para: "cliente@empresa.pt", assunto: "Confirmação de pagamento", corpo: "Bom dia,\n\nRecebemos o comprovativo.", data: "2026-10-29T09:30:00Z", lido: true, estrela: false, estado: "Entregue" };
+const CAMPANHA_EMAIL = { id: "ca-1", nome: "Newsletter de outubro", assunto: "As novidades de outubro", remetente: "Novidades <novidades@painel.exemplo.com>", audiencia: "newsletter", corpo: "Olá,\n\nEste mês…", estado: "Enviada", enviadaEm: "2026-10-17T09:00:00Z", destinatarios: 2310, entregues: 2268, abertos: 790, cliques: 112, falhas: 42, criada: "2026-10-10T10:00:00Z", atualizada: "2026-10-17T09:00:00Z" };
 const ERRO = { id: "er-1", nivel: "erro", mensagem: "TypeError: x is undefined", origem: "/api/pedidos", ocorrencias: 14, ultimo: "2026-10-29T03:12:00Z", estado: "Novo" };
 
 export const ENDPOINTS: Endpoint[] = [
@@ -35,6 +37,12 @@ export const ENDPOINTS: Endpoint[] = [
   { id: "marketing-origens", area: "marketing", metodo: "GET", caminho: "/v1/marketing/origens", descricao: "De onde vêm os visitantes: fonte, meio e campanha.", exemplo: { itens: [{ fonte: "google", meio: "organico", campanha: "", visitas: 3100, visitantes: 2200, conversoes: 90 }] } },
   { id: "marketing-paginas", area: "marketing", metodo: "GET", caminho: "/v1/marketing/paginas", descricao: "As páginas mais vistas (as «quentes»), com tempo médio e rejeição.", exemplo: { itens: [{ pagina: "/precos", visitas: 1800, tempoMedio: 74, rejeicao: 0.32, conversoes: 41 }] } },
   { id: "marketing-cliques", area: "marketing", metodo: "GET", caminho: "/v1/marketing/cliques", descricao: "Os botões e ligações mais clicados, por página.", exemplo: { itens: [{ elemento: "Pedir proposta", pagina: "/precos", cliques: 640, visitantes: 520 }] } },
+  { id: "marketing-emails-listar", area: "marketing", metodo: "GET", caminho: "/v1/marketing/emails", descricao: "As mensagens de e-mail de todas as pastas (recebidos, enviados e agendados); cada uma diz a que pasta pertence.", exemplo: { itens: [EMAIL] } },
+  { id: "marketing-emails-guardar", area: "marketing", metodo: "PUT", caminho: "/v1/marketing/emails/{id}", descricao: "Cria ou altera uma mensagem. Com pasta «enviados» o servidor envia-a agora; com «agendados» e a hora em `data`, fica na fila e sai à hora marcada; serve também para marcar como lida ou com estrela.", exemplo: EMAIL },
+  { id: "marketing-emails-remover", area: "marketing", metodo: "DELETE", caminho: "/v1/marketing/emails/{id}", descricao: "Remove uma mensagem; se estava agendada, cancela o envio.", exemplo: { removida: true } },
+  { id: "campanhas-email-listar", area: "marketing", metodo: "GET", caminho: "/v1/marketing/campanhas-email", descricao: "As campanhas de e-mail, com os números das enviadas.", exemplo: { itens: [CAMPANHA_EMAIL] } },
+  { id: "campanhas-email-guardar", area: "marketing", metodo: "PUT", caminho: "/v1/marketing/campanhas-email/{id}", descricao: "Cria ou altera uma campanha. Com estado «A enviar» o servidor envia-a agora a toda a audiência; com «Agendada» e a hora em `agendadaPara`, sai à hora marcada. Os números (entregues, abertos, cliques, falhas) só o servidor os escreve.", exemplo: CAMPANHA_EMAIL },
+  { id: "campanhas-email-remover", area: "marketing", metodo: "DELETE", caminho: "/v1/marketing/campanhas-email/{id}", descricao: "Remove uma campanha e os seus resultados.", exemplo: { removida: true } },
   // Developer tools
   { id: "saude", area: "dev", metodo: "GET", caminho: "/v1/dev/saude", descricao: "Saúde do servidor: CPU, memória, disco, rede, carga, tempo ligado e serviços (contentores).", exemplo: { cpu: 0.23, memoria: 0.58, disco: 0.41, redeEntrada: 120000, redeSaida: 340000, carga: [0.4, 0.5, 0.6], tempoLigado: 1209600, servicos: [{ nome: "web", estado: "saudavel", cpu: 0.02, memoria: 120000000 }] } },
   { id: "pedidos", area: "dev", metodo: "GET", caminho: "/v1/dev/pedidos", descricao: "Os pedidos web mais recentes (filtro «desde» para receber só os novos; chamar de segundo a segundo dá o tempo real).", exemplo: { itens: [{ id: "rq-1", quando: "2026-10-29T03:12:00.120Z", metodo: "GET", caminho: "/precos", estado: 200, ms: 38, ip: "102.67.1.4", pais: "AO", agente: "Chrome 141" }] } },
@@ -61,6 +69,19 @@ export const ENDPOINTS: Endpoint[] = [
   { id: "emails-configuracao", area: "dev", metodo: "PUT", caminho: "/v1/dev/emails/configuracao", descricao: "Define o fornecedor de e-mail (SMTP) e o remetente.", exemplo: { servidor: "smtp.exemplo.pt", porta: 587, utilizador: "envios", remetente: "Painel <nao-responder@exemplo.pt>" } },
   { id: "emails-teste", area: "dev", metodo: "POST", caminho: "/v1/dev/emails/teste", descricao: "Envia um e-mail de teste e devolve o resultado do envio.", exemplo: { para: "eu@exemplo.pt" } },
   { id: "limpeza", area: "dev", metodo: "POST", caminho: "/v1/dev/limpeza", descricao: "Apaga dados de manutenção: cache, logs antigos, ficheiros temporários, dados de teste.", exemplo: { alvo: "logs", antes: "2026-09-29" } },
+  { id: "painel-configuracao-ler", area: "painel", metodo: "GET", caminho: "/v1/painel/configuracao", descricao: "A configuração dos módulos: o pacote do negócio, as exceções ligadas ou desligadas e a predefinição ativa.", exemplo: { pacote: "hotel", ligados: { marketing: false, "dev/firewall": true }, predefinicao: "hotel" } },
+  { id: "painel-configuracao-guardar", area: "painel", metodo: "PUT", caminho: "/v1/painel/configuracao", descricao: "Guarda a configuração dos módulos (só o Master Admin).", exemplo: { pacote: "hotel", ligados: { marketing: false }, predefinicao: "hotel" } },
+  { id: "implementacoes-listar", area: "dev", metodo: "GET", caminho: "/v1/dev/implementacoes", descricao: "As versões publicadas, a versão A, a B do teste, a parte da B e o histórico.", exemplo: { itens: [{ id: "imp-1", versao: "20261029-0953", ramo: "main", commit: "8e0b231", mensagem: "Seletor de contas", autor: "Ana Costa", quando: "2026-10-29T08:53:00.000Z", estado: "Ativa", trafego: 100 }], a: "imp-1", b: null, percentagemB: 0, historico: [{ quando: "2026-10-29T08:53:00.000Z", texto: "Versão 20261029-0953 em produção" }] } },
+  { id: "implementacoes-divisao", area: "dev", metodo: "PUT", caminho: "/v1/dev/implementacoes/divisao", descricao: "Começa ou muda o teste A/B: a versão B recebe a percentagem dita do tráfego (1 a 99). Sem `b`, acaba o teste.", exemplo: { b: "imp-2", percentagemB: 10 } },
+  { id: "implementacoes-promover", area: "dev", metodo: "POST", caminho: "/v1/dev/implementacoes/promover", descricao: "A versão B passa a receber todo o tráfego.", exemplo: {} },
+  { id: "implementacoes-reverter", area: "dev", metodo: "POST", caminho: "/v1/dev/implementacoes/{id}/reverter", descricao: "Rollback: a versão escolhida passa a receber todo o tráfego.", exemplo: {} },
+  { id: "implementacoes-lancar", area: "dev", metodo: "POST", caminho: "/v1/dev/implementacoes", descricao: "Constrói uma versão nova a partir de um commit de um ramo; fica pronta, sem tráfego.", exemplo: { ramo: "main", commit: "8e0b231" } },
+  { id: "github-ligacao", area: "dev", metodo: "GET", caminho: "/v1/dev/github", descricao: "O repositório e o ramo ligados, e os ramos que existem.", exemplo: { repositorio: "empresa-exemplo/painel", ramo: "main", ramos: ["main", "desenvolvimento"] } },
+  { id: "github-guardar", area: "dev", metodo: "PUT", caminho: "/v1/dev/github", descricao: "Muda o repositório (dono/nome) e o ramo.", exemplo: { repositorio: "empresa-exemplo/painel", ramo: "main" } },
+  { id: "github-commits", area: "dev", metodo: "GET", caminho: "/v1/dev/github/commits", descricao: "Os últimos commits de um ramo (`?ramo=main`), com o resultado dos testes.", exemplo: { itens: [{ sha: "8e0b231", mensagem: "Seletor de contas", autor: "Ana Costa", quando: "2026-10-29T08:00:00.000Z", ramo: "main", testes: "Passaram" }] } },
+  { id: "conectores-listar", area: "dev", metodo: "GET", caminho: "/v1/dev/conectores", descricao: "Os conectores (GitHub, Cloudflare, registo de imagens, avisos) e se estão ligados.", exemplo: { itens: [{ id: "github", rotulo: "GitHub", ligado: true, detalhe: "empresa-exemplo/painel" }] } },
+  { id: "conectores-guardar", area: "dev", metodo: "PUT", caminho: "/v1/dev/conectores/{id}", descricao: "Liga ou desliga um conector.", exemplo: { id: "github", rotulo: "GitHub", ligado: true, detalhe: "empresa-exemplo/painel" } },
+  { id: "conectores-testar", area: "dev", metodo: "POST", caminho: "/v1/dev/conectores/{id}/testar", descricao: "Testa a ligação de um conector e diz se respondeu.", exemplo: { ok: true, mensagem: "Respondeu em 120 ms" } },
 ];
 
 /** O endpoint com este identificador. */

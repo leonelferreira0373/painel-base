@@ -4,6 +4,7 @@
 import { Empty } from "@cloudflare/kumo";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ItemDaBiblioteca } from "@/lib/biblioteca";
+import { Frase } from "../Frase";
 import { Ic, type Icone } from "../Icones";
 
 /** Uma zona que aceita ficheiros largados e um botão para os escolher: `abrir` abre o seletor de ficheiros do navegador (o campo escondido é a única forma de o fazer). */
@@ -57,5 +58,21 @@ export function useUrlsDeImagens(itens: ItemDaBiblioteca[]): Map<string, string>
 }
 
 export function Vazio({ icone, titulo, texto, acao }: { icone: Icone; titulo: string; texto?: string; acao?: ReactNode }) {
-  return <Empty size="sm" icon={<Ic nome={icone} tamanho={32} />} title={titulo} description={texto} contents={acao} />;
+  return (
+    <Empty
+      size="sm"
+      icon={<Ic nome={icone} tamanho={32} />}
+      title={titulo}
+      contents={
+        <>
+          {texto && (
+            <p className="max-w-sm text-balance text-center text-sm text-kumo-subtle">
+              <Frase>{texto}</Frase>
+            </p>
+          )}
+          {acao}
+        </>
+      }
+    />
+  );
 }

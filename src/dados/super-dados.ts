@@ -131,14 +131,26 @@ export interface ResumoMarketing {
   paginasPorVisita: number;
   rejeicao: number;
   conversoes: number;
-  porDia: { data: string; visitas: number }[];
+  /** Os números de cada dia; um servidor que só diga as visitas continua a servir (os outros cartões ficam só com o número). */
+  porDia: { data: string; visitas: number; visitantes?: number; paginasPorVisita?: number; rejeicao?: number; conversoes?: number }[];
 }
 
 export function gerarResumoMarketing(dias = 14): ResumoMarketing {
   const s = new Sorteio(324);
-  const porDia = Array.from({ length: dias }, (_, i) => ({ data: dia(i - dias + 1).slice(0, 10), visitas: s.entre(520, 1380) + (i % 7 === 5 || i % 7 === 6 ? -180 : 0) }));
+  const porDia = Array.from({ length: dias }, (_, i) => {
+    const visitas = s.entre(520, 1380) + (i % 7 === 5 || i % 7 === 6 ? -180 : 0);
+    return {
+      data: dia(i - dias + 1).slice(0, 10),
+      visitas,
+      visitantes: Math.round(visitas * (0.52 + s.entre(0, 10) / 100)),
+      paginasPorVisita: 2.3 + s.entre(0, 10) / 10,
+      rejeicao: 0.35 + s.entre(0, 12) / 100,
+      conversoes: Math.round(visitas * (0.016 + s.entre(0, 14) / 1000)),
+    };
+  });
   const visitas = porDia.reduce((t, d) => t + d.visitas, 0);
-  return { visitas, visitantes: Math.round(visitas * 0.57), paginasPorVisita: 2.8, rejeicao: 0.41, conversoes: Math.round(visitas * 0.023), porDia };
+  const media = (campo: "paginasPorVisita" | "rejeicao") => porDia.reduce((t, d) => t + d[campo] * d.visitas, 0) / Math.max(1, visitas);
+  return { visitas, visitantes: porDia.reduce((t, d) => t + d.visitantes, 0), paginasPorVisita: Math.round(media("paginasPorVisita") * 10) / 10, rejeicao: Math.round(media("rejeicao") * 100) / 100, conversoes: porDia.reduce((t, d) => t + d.conversoes, 0), porDia };
 }
 
 // ---------- developer tools ----------

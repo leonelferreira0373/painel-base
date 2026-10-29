@@ -113,8 +113,8 @@ svg:has(> path.fill-kumo-arrow-edge) {
     max-width: none !important;
     height: auto !important;
     max-height: calc(100dvh - max(72px, 14dvh) - 16px);
-    transform: none !important;
-    translate: none !important;
+    /* Só o translate, sem «transform: none» ao lado: o minificador do CSS junta os dois num «transform: translate(0)» e deixa cair o «translate: none», e em produção a pesquisa ficava deslocada 50 % para a esquerda (vê-se em globals.test.ts). */
+    translate: 0 0 !important;
     border-radius: 20px !important;
   }
   [role="dialog"][class*="max-w-2xl"] > div {

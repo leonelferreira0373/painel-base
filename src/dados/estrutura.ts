@@ -69,6 +69,38 @@ export const AREAS: Area[] = [
     ],
   },
   {
+    id: "hotel",
+    secao: "Operação",
+    rotulo: "Hotel",
+    icone: "casa",
+    modulos: [
+      { id: "reservas", descricao: "Receber, confirmar e acompanhar as reservas, do check-in ao check-out.", rotulo: "Reservas", icone: "calendario", tipo: "registos" },
+      { id: "quartos", descricao: "O estado de cada quarto: livre, ocupado, limpeza ou manutenção.", rotulo: "Quartos", icone: "casa", tipo: "registos" },
+      { id: "financeiro-hotel", descricao: "Receita, ocupação, diária média e receita por quarto disponível.", rotulo: "Financeiro", icone: "moeda", tipo: "pagina" },
+    ],
+  },
+  {
+    id: "taxi",
+    secao: "Operação",
+    rotulo: "Táxi",
+    icone: "carro",
+    modulos: [
+      { id: "corridas", descricao: "Pedir, atribuir um motorista e acompanhar cada corrida.", rotulo: "Corridas", icone: "carro", tipo: "registos" },
+      { id: "motoristas", descricao: "Os motoristas, a zona onde estão e se podem receber corridas.", rotulo: "Motoristas", icone: "pessoas", tipo: "registos" },
+      { id: "mapa-taxi", descricao: "A frota e os pedidos num mapa por zonas, em direto.", rotulo: "Mapa em direto", icone: "pino", tipo: "pagina" },
+    ],
+  },
+  {
+    id: "loja",
+    secao: "Operação",
+    rotulo: "Loja",
+    icone: "produto",
+    modulos: [
+      { id: "encomendas-loja", descricao: "Preparar, enviar e entregar as encomendas dos clientes.", rotulo: "Encomendas", icone: "lista", tipo: "registos" },
+      { id: "stock", descricao: "A quantidade de cada produto e o que convém repor.", rotulo: "Stock", icone: "produto", tipo: "registos" },
+    ],
+  },
+  {
     id: "pagamentos",
     secao: "Negócio",
     rotulo: "Pagamentos",
@@ -92,6 +124,10 @@ export const AREAS: Area[] = [
       { id: "cliques", descricao: "Os botões e ligações mais clicados.", grupo: "Audiência", rotulo: "Botões mais clicados", icone: "clique", tipo: "registos" },
       { id: "campanhas", descricao: "Montar ligações com UTM para saber que campanha trouxe cada visitante.", grupo: "Campanhas", rotulo: "Campanhas e UTM", icone: "link", tipo: "pagina" },
       { id: "rastreio", descricao: "O script para pôr no site, os eventos que recebe e um teste.", grupo: "Campanhas", rotulo: "Rastreio no site", icone: "codigo", tipo: "pagina" },
+      { id: "campanhas-email", descricao: "Escrever uma campanha, escolher a audiência e enviar já ou agendar, com os resultados de cada uma.", grupo: "E-mail", rotulo: "Campanhas de e-mail", icone: "correio", tipo: "pagina" },
+      { id: "agendados-email", descricao: "O que vai sair: campanhas e mensagens por dia, com enviar já, mudar a hora e cancelar.", grupo: "E-mail", rotulo: "Agendados", icone: "relogio", tipo: "pagina" },
+      { id: "recebidos", descricao: "As mensagens que chegaram: ler, responder, reencaminhar e marcar com estrela.", grupo: "E-mail", rotulo: "Recebidos", icone: "transferir", tipo: "pagina" },
+      { id: "enviados", descricao: "As mensagens enviadas e se chegaram, foram abertas ou falharam.", grupo: "E-mail", rotulo: "Enviados", icone: "enviar", tipo: "pagina" },
     ],
   },
   {
@@ -104,6 +140,7 @@ export const AREAS: Area[] = [
       { id: "galeria", descricao: "Carregar imagens e vê-las em grelha, com texto alternativo.", rotulo: "Galeria de imagens", icone: "galeria", tipo: "pagina" },
       { id: "blog", descricao: "Escrever, publicar e exportar artigos.", rotulo: "Editor de blog", icone: "artigo", tipo: "pagina" },
       { id: "editor-produtos", descricao: "Criar e editar produtos, com as imagens da galeria.", rotulo: "Editor de produtos", icone: "produto", tipo: "pagina" },
+      { id: "faq", descricao: "Escrever as perguntas frequentes e as respostas: valem para o site e para o assistente de IA.", rotulo: "Editor de FAQ", icone: "ajuda", tipo: "pagina" },
     ],
   },
   {
@@ -126,6 +163,8 @@ export const AREAS: Area[] = [
       { id: "saude", descricao: "CPU, memória, disco, rede e serviços do servidor, em tempo real.", grupo: "Servidor", rotulo: "Saúde do servidor", icone: "servidor", tipo: "pagina" },
       { id: "pedidos-web", descricao: "Os pedidos web a chegar agora, com estado, tempo e origem.", grupo: "Servidor", rotulo: "Pedidos em tempo real", icone: "pulso", tipo: "pagina" },
       { id: "erros", descricao: "Os erros agrupados, com o número de ocorrências e o estado.", grupo: "Servidor", rotulo: "Registo de erros", icone: "aviso", tipo: "registos" },
+      { id: "implementacoes", descricao: "As versões publicadas, o teste A/B entre duas e o rollback para uma anterior.", grupo: "Versões", rotulo: "Implementações", icone: "atualizar", tipo: "pagina" },
+      { id: "github", descricao: "O repositório do GitHub, os commits, lançar uma versão e os conectores.", grupo: "Versões", rotulo: "GitHub e conectores", icone: "codigo", tipo: "pagina" },
       { id: "bd", descricao: "Tabelas, segurança por linha, consola de leitura e apagar linhas.", grupo: "Dados", rotulo: "Base de dados", icone: "base", tipo: "pagina" },
       { id: "backups", descricao: "Cópias de segurança: destino, agenda, criar, restaurar e apagar.", grupo: "Dados", rotulo: "Cópias de segurança", icone: "guardar", tipo: "pagina" },
       { id: "limpeza", descricao: "Apagar cache, registos antigos, temporários e dados de teste.", grupo: "Dados", rotulo: "Limpeza", icone: "lixo", tipo: "pagina" },
@@ -146,6 +185,16 @@ export const AREAS: Area[] = [
       { id: "erp", descricao: "Ligação ao sistema de gestão: clientes, artigos e stock.", grupo: "Ligações", rotulo: "Ligação ao ERP", icone: "ligacao", tipo: "painel" },
       { id: "faturacao", descricao: "Ligação à faturação: documentos de venda e contas correntes.", grupo: "Ligações", rotulo: "Ligação à faturação", icone: "ligacao", tipo: "painel" },
       { id: "atividade", descricao: "Registo de tudo o que os utilizadores fazem no painel.", rotulo: "Registo de atividade", icone: "relogio", tipo: "registos" },
+    ],
+  },
+  {
+    id: "painel",
+    secao: "Plataforma",
+    rotulo: "Painel",
+    icone: "paleta",
+    modulos: [
+      { id: "modulos", descricao: "Escolher o pacote do negócio e ligar ou desligar cada área e módulo.", rotulo: "Módulos e pacotes", icone: "campos", tipo: "pagina" },
+      { id: "predefinicoes", descricao: "Mudar de uma vez o aspeto do painel e as áreas ligadas.", rotulo: "Predefinições", icone: "paleta", tipo: "pagina" },
     ],
   },
 ];

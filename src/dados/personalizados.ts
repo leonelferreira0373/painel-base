@@ -121,3 +121,8 @@ export const CATEGORIA_DE_PRODUTO = {
   opcoes: { servicos: "Serviços", equipamento: "Equipamento", consumiveis: "Consumíveis", pecas: "Peças" } as Record<string, string>,
   personalizado: { chave: "categoriaDeProduto", omissao: "servicos", rotulo: "Nome da categoria", tipo: "texto", exemplo: "Embalagens", mostrar: (v: string) => v } satisfies EspecificacaoPersonalizada,
 };
+
+export const TRAFEGO_PARA_B = {
+  opcoes: { "5": "5 %", "10": "10 %", "25": "25 %", "50": "50 %" } as Record<string, string>,
+  personalizado: { chave: "trafegoParaB", omissao: "10", rotulo: "Percentagem do tráfego", tipo: "numero", unidade: "%", min: 1, max: 99, exemplo: "15", mostrar: (v: string) => `${v} %` } satisfies EspecificacaoPersonalizada,
+};

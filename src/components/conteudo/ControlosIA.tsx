@@ -6,9 +6,11 @@ import { useMemo, useState } from "react";
 import { caracteresAtivos, CONTROLOS_DE_ORIGEM, guardarControlos, instrucoesFinais, LIMITE_DE_MEMORIA, procurar, TAMANHOS, TONS, useControlosIA, type ControlosIA, type DocumentoDeMemoria, type Passagem } from "@/lib/ia-controlos";
 import { textoDoPdf } from "@/lib/ia-pdf";
 import { useArmazem } from "@/lib/armazem";
+import { faqAtivas, faqComoDocumentos, useFaq } from "@/lib/faq";
 import { identificador } from "@/lib/conta";
 import { Cartao, Confirmar, Interruptor, Linha } from "../conta/Pecas";
 import { BotaoCopiar } from "../Copiar";
+import { Frase } from "../Frase";
 import { ICONES } from "../Icones";
 import { Pagina, Titulo } from "../ui";
 import { Vazio, ZonaDeUpload } from "./ConteudoPecas";
@@ -127,7 +129,11 @@ function Memoria() {
             {usados.toLocaleString("pt-PT")} de {LIMITE_DE_MEMORIA.toLocaleString("pt-PT")} caracteres ativos{usados > LIMITE_DE_MEMORIA ? ": desligue alguns documentos, o assistente não consegue ler tudo." : "."}
           </span>
           {lendo && <span className="text-sm text-kumo-default">A ler {lendo}…</span>}
-          {erro && <span className="text-sm text-kumo-danger">{erro}</span>}
+          {erro && (
+            <span className="text-sm text-kumo-danger">
+              <Frase>{erro}</Frase>
+            </span>
+          )}
         </div>
         {!pronto ? (
           <div className="p-6 text-sm text-kumo-subtle">A abrir a memória…</div>
@@ -184,16 +190,19 @@ function Memoria() {
 function Testar() {
   const { itens } = useArmazem<DocumentoDeMemoria>("memoria");
   const controlos = useControlosIA();
+  const { faq } = useFaq();
   const [pergunta, setPergunta] = useState("");
   const [achados, setAchados] = useState<Passagem[] | null>(null);
-  const instrucoes = useMemo(() => instrucoesFinais(controlos, itens), [controlos, itens]);
+  // as perguntas frequentes publicadas são parte do que o assistente sabe
+  const conhecido = useMemo(() => [...faqComoDocumentos(faq), ...itens], [faq, itens]);
+  const instrucoes = useMemo(() => instrucoesFinais(controlos, itens, faqAtivas(faq).length), [controlos, itens, faq]);
   return (
     <div className="flex flex-col gap-4">
-      <Cartao titulo="Testar a memória" dica="Escreva uma pergunta e veja que passagens dos documentos ativos o assistente encontraria.">
+      <Cartao titulo="Testar a memória" dica="Escreva uma pergunta e veja que passagens dos documentos ativos e das perguntas frequentes publicadas o assistente encontraria.">
         <div className="flex flex-col gap-4 p-4">
           <div className="flex items-end gap-2">
-            <Input label="Pergunta" value={pergunta} onChange={(e) => setPergunta(e.target.value)} onKeyDown={(e) => e.key === "Enter" && pergunta.trim() && setAchados(procurar(itens, pergunta))} placeholder="Como peço férias?" className="w-full" />
-            <Button variant="primary" disabled={!pergunta.trim()} onClick={() => setAchados(procurar(itens, pergunta))}>
+            <Input label="Pergunta" value={pergunta} onChange={(e) => setPergunta(e.target.value)} onKeyDown={(e) => e.key === "Enter" && pergunta.trim() && setAchados(procurar(conhecido, pergunta))} placeholder="Como peço férias?" className="w-full" />
+            <Button variant="primary" disabled={!pergunta.trim()} onClick={() => setAchados(procurar(conhecido, pergunta))}>
               Procurar
             </Button>
           </div>
