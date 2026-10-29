@@ -8,6 +8,7 @@ import { chamar, useApi, useLigacao } from "@/lib/api/cliente";
 import { endpointPorId } from "@/lib/api/contrato";
 import { identificador } from "@/lib/conta";
 import { erroDoUtm, montarUrlUtm, origemDoVisitante, taxaDeConversao, type ParametrosUtm } from "@/lib/marketing";
+import { useEditar } from "@/lib/permissao";
 import { Cartao, Confirmar, Linha } from "../conta/Pecas";
 import { BotaoCopiar } from "../Copiar";
 import { Grafico } from "../graficos/Graficos";
@@ -107,6 +108,7 @@ export function Campanhas() {
   const [lista, setLista] = useGuardado<Campanha[]>("campanhas-utm", []);
   const [p, setP] = useState<ParametrosUtm>(CAMPANHA_VAZIA);
   const [apagar, setApagar] = useState<Campanha | null>(null);
+  const editar = useEditar();
   const erro = erroDoUtm(p);
   const mostrarErro = p.fonte !== "" || p.meio !== "" || p.campanha !== "" || p.url !== "https://";
   const ligacao = erro ? null : montarUrlUtm(p);
@@ -132,9 +134,11 @@ export function Campanhas() {
             </div>
             <div className="flex flex-wrap gap-2">
               {ligacao && <BotaoCopiar texto={ligacao} rotulo="Copiar a ligação" dica="Copiar a ligação" />}
-              <Button variant="primary" icon={ICONES.guardar} disabled={!!erro} onClick={() => (setLista((l) => [{ ...p, id: identificador(), criada: new Date().toISOString() }, ...l]), setP(CAMPANHA_VAZIA))}>
-                Guardar na lista
-              </Button>
+              {editar && (
+                <Button variant="primary" icon={ICONES.guardar} disabled={!!erro} onClick={() => (setLista((l) => [{ ...p, id: identificador(), criada: new Date().toISOString() }, ...l]), setP(CAMPANHA_VAZIA))}>
+                  Guardar na lista
+                </Button>
+              )}
             </div>
           </div>
         </Cartao>
@@ -146,7 +150,7 @@ export function Campanhas() {
               <Linha key={c.id} titulo={<span className="truncate font-medium">{c.campanha}</span>} estado={`${c.fonte} / ${c.meio} · ${c.url.replace(/^https?:\/\//, "")}`}>
                 <div className="flex items-center gap-1">
                   <BotaoCopiar texto={montarUrlUtm(c)} tamanho="sm" variante="ghost" quadrado dica="Copiar a ligação" />
-                  <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Remover ${c.campanha}`} onClick={() => setApagar(c)} />
+                  {editar && <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Remover ${c.campanha}`} onClick={() => setApagar(c)} />}
                 </div>
               </Linha>
             ))
@@ -164,6 +168,7 @@ const SCRIPT = (endpoint: string) => `<script defer src="${typeof window !== "un
 
 export function Rastreio() {
   const ligacao = useLigacao();
+  const editar = useEditar();
   const e = endpointPorId("eventos-registar")!;
   const [enviados, setEnviados] = useState<{ quando: string; tipo: string; origem: string; json: string }[]>([]);
   const [resultado, setResultado] = useState<string | null>(null);
@@ -192,6 +197,7 @@ export function Rastreio() {
           </div>
         </div>
       </Cartao>
+      {editar && (
       <Cartao titulo="Enviar um evento de teste" dica={`Um visitante vindo do Google fica classificado como ${exemploDeOrigem.fonte} / ${exemploDeOrigem.meio}. Envie um evento para ver o pedido que o servidor recebe.`}>
         <div className="flex flex-col gap-3 p-4">
           <div className="flex flex-wrap gap-2">
@@ -223,6 +229,7 @@ export function Rastreio() {
           )}
         </div>
       </Cartao>
+      )}
       <Cartao titulo="O contrato do evento" dica="O mesmo que está em Developer tools, «API e ligações».">
         <div className="flex flex-col gap-2 p-4 text-sm">
           <span>

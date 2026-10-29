@@ -13,16 +13,34 @@ import { mesmoPeriodo, PERIODOS, type Periodo } from "./Periodo";
 import { GatilhoDoMenu, ItensDeExportar } from "./MenuDeDados";
 import { useResultadoTemporario } from "./Copiar";
 import type { DadosExportaveis } from "@/lib/exportar-dados";
+import { useEditar } from "@/lib/permissao";
+import { T } from "@/dados/textos";
 
 export function Pagina({ children, largo = false }: { children: ReactNode; largo?: boolean }) {
   return <div className={`mx-auto flex w-full flex-col gap-6 px-4 py-6 sm:px-6 ${largo ? "max-w-[1440px]" : "max-w-[1220px]"}`}>{children}</div>;
 }
 
+/** A marca de um ecrã em que a função ativa só pode ver. */
+export function SoLeitura() {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm text-kumo-subtle">
+      <Ic nome="cadeado" tamanho={14} />
+      {T.acesso.somenteLeitura}
+    </span>
+  );
+}
+
 export function Titulo({ titulo, children }: { titulo: string; children?: ReactNode }) {
+  const editar = useEditar();
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <h1 className="text-2xl font-semibold tracking-tight text-kumo-default">{titulo}</h1>
-      {children && <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:items-center">{children}</div>}
+      {(children || !editar) && (
+        <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:items-center">
+          {!editar && <SoLeitura />}
+          {children}
+        </div>
+      )}
     </div>
   );
 }

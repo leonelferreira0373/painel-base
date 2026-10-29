@@ -195,6 +195,7 @@ Usa-se sempre o componente do Kumo; **nunca** um `<button>`, `<input>` ou `<sele
 - **Ações que mudam ou apagam coisas** usam sempre `Confirmar`; o que não se desfaz (apagar linhas, restaurar uma cópia, desligar o firewall) pede que se escreva a palavra (`escrever="APAGAR"`).
 - **Opções com valor livre** (ritmo, dias, limite por minuto, porta SMTP, frequência e retenção das cópias) usam `SeletorPersonalizavel` com a sua especificação em `dados/personalizados.ts`.
 - **Número, data e hora** nunca são campos nativos: `SeletorDeData`, `SeletorDeHora` e texto com `inputMode="decimal"`.
+- **Só ver**: `Modulo.tsx` envolve cada ecrã próprio num `PermissaoProvider` com `podeEditar(funcao, área, módulo)` e o ecrã lê `useEditar()` (`lib/permissao.tsx`). Quem só vê encontra a marca «Só leitura» no título (`Titulo` mostra-a sozinho) e nenhum botão que crie, grave, apague ou reinicie: esses desaparecem (os interruptores ficam desativados e os campos de configuração ficam só para ler). Os campos de segredo (palavra-passe SMTP, token) e o descarregar de cópias de segurança também desaparecem. Um ecrã novo com ações faz o mesmo; os módulos de registos já o fazem por si.
 
 ## 6. Gráficos
 
@@ -226,6 +227,7 @@ Usa-se sempre o componente do Kumo; **nunca** um `<button>`, `<input>` ou `<sele
 | Tabela sem linhas | A própria grelha mostra «Sem dados» |
 | Página sem conteúdo | `Empty` do Kumo |
 | Sem permissão | `SemAcesso` (em `Modulo.tsx`); um botão desativado por falta de permissão explica o motivo na sua dica |
+| Só pode ver | A marca «Só leitura» no `Titulo` (via `PermissaoProvider` / `useEditar`); as ações que alteram não aparecem (5l) |
 | Erro de uma ação | `toasts.add({ title: "Não foi possível …" })` com a causa em português |
 
 Os esqueletos têm brilho que passa (`.esq`) e respeitam «reduzir movimento».

@@ -4,9 +4,10 @@
 import { Button, Empty } from "@cloudflare/kumo";
 import { moduloPorIds } from "@/dados/estrutura";
 import { REGISTOS } from "@/dados/modulos";
-import { FUNCOES, podeVer } from "@/dados/rbac";
+import { FUNCOES, podeEditar, podeVer } from "@/dados/rbac";
 import { T } from "@/dados/textos";
 import { useApp } from "@/lib/estado";
+import { PermissaoProvider } from "@/lib/permissao";
 import { ControlosDaIA } from "./conteudo/ControlosIA";
 import { Blog } from "./conteudo/Blog";
 import { Galeria } from "./conteudo/Galeria";
@@ -71,7 +72,12 @@ export function Modulo({ areaId, moduloId }: { areaId: string; moduloId: string 
   }
   if (areaId === "ia") return <ControlosDaIA aba={moduloId as "comportamento" | "memoria" | "testar"} />;
   const Ecra = ECRAS[areaId]?.[moduloId];
-  if (Ecra) return <Ecra />;
+  if (Ecra)
+    return (
+      <PermissaoProvider editar={podeEditar(funcao, areaId, moduloId)}>
+        <Ecra />
+      </PermissaoProvider>
+    );
   const Painel = PAINEIS[moduloId];
   if (Painel) return <Painel />;
   if (REGISTOS[moduloId]) return <Registos moduloId={moduloId} />;

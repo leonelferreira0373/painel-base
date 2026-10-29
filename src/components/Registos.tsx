@@ -14,6 +14,7 @@ import type { DefGrafico, DefRegistos, Linha } from "@/dados/tipos";
 import { porCategoria, serieTemporal } from "@/lib/analysis/series";
 import { granularidadeAuto } from "@/lib/analysis/sugestoes";
 import { useApp } from "@/lib/estado";
+import { PermissaoProvider } from "@/lib/permissao";
 import type { Tabela } from "@/lib/tipos";
 import { Estado } from "./Estado";
 import { Grafico, type GraficoSpec } from "./graficos/Graficos";
@@ -136,14 +137,9 @@ export function Registos({ moduloId, filtro, titulo }: { moduloId: string; filtr
   );
 
   return (
+    <PermissaoProvider editar={editar}>
     <Pagina>
       <Titulo titulo={titulo ?? def.titulo}>
-        {!editar && (
-          <span className="inline-flex items-center gap-1.5 text-sm text-kumo-subtle">
-            <Ic nome="cadeado" tamanho={14} />
-            {T.acesso.somenteLeitura}
-          </span>
-        )}
         {editar && def.campos.length > 0 && (
           <Tooltip content="Criar um registo novo neste módulo" render={<Button variant="primary" icon={ICONES.mais} onClick={() => setNovo(true)} />}>
             {T.geral.novo}
@@ -162,5 +158,6 @@ export function Registos({ moduloId, filtro, titulo }: { moduloId: string; filtr
       <GrelhaRegistos colunas={def.colunas.map((c) => ({ rotulo: c.rotulo, numerica: c.tipo === "numero" }))} linhas={grelha} />
       {editar && def.campos.length > 0 && <NovoRegisto def={def} aberto={novo} aoMudar={setNovo} iniciais={filtro ? { [filtro.chave]: filtro.valor } : undefined} />}
     </Pagina>
+    </PermissaoProvider>
   );
 }

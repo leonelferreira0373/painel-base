@@ -11,6 +11,7 @@ import { comoCurl, ENDPOINTS, paraOpenApi } from "@/lib/api/contrato";
 import { formatarTamanho } from "@/lib/biblioteca";
 import { DESTINOS, emailValido, erroDoAlvo, erroDoDestino, linhasApagadas, type TipoDeDestino } from "@/lib/dev";
 import { useApp } from "@/lib/estado";
+import { useEditar } from "@/lib/permissao";
 import { CampoSenha } from "../auth/CampoSenha";
 import { BotaoCopiar, Cartao, Confirmar, descarregar, Interruptor, Linha, LinhaCampo } from "../conta/Pecas";
 import { Estado } from "../Estado";
@@ -36,6 +37,7 @@ const COPIAS_DE_ORIGEM: ConfigDeCopias = { tipo: "s3", endereco: "s3://copias/pa
 export function Backups() {
   const ligacao = useLigacao();
   const { avisar } = useApp();
+  const editar = useEditar();
   const colecao = useColecao<Backup>("/v1/dev/backups", "backups", gerarBackups());
   const [config, setConfig] = useGuardado<ConfigDeCopias>("backups-config", COPIAS_DE_ORIGEM);
   const [rascunho, setRascunho] = useState(config);
@@ -83,29 +85,35 @@ export function Backups() {
     { rotulo: "Tamanho", direita: true, render: (c) => (c.bytes ? formatarTamanho(c.bytes) : "—") },
     { rotulo: "Estado", render: (c) => <Estado valor={c.estado} /> },
     { rotulo: "Destino", render: (c) => <span className="text-kumo-subtle">{c.destino}</span> },
-    {
-      rotulo: "",
-      direita: true,
-      render: (c) => (
-        <span className="inline-flex items-center gap-1">
-          <Button variant="ghost" size="sm" disabled={c.estado !== "Concluído"} onClick={() => descarregar(`copia-${c.id}.json`, JSON.stringify(c, null, 2), "application/json")}>
-            Descarregar
-          </Button>
-          <Button variant="ghost" size="sm" disabled={c.estado !== "Concluído"} onClick={() => setRestaurar(c)}>
-            Restaurar
-          </Button>
-          <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Apagar a cópia de ${dataHora(c.quando)}`} onClick={() => setApagar(c)} />
-        </span>
-      ),
-    },
+    ...(editar
+      ? [
+          {
+            rotulo: "",
+            direita: true,
+            render: (c: Backup) => (
+              <span className="inline-flex items-center gap-1">
+                <Button variant="ghost" size="sm" disabled={c.estado !== "Concluído"} onClick={() => descarregar(`copia-${c.id}.json`, JSON.stringify(c, null, 2), "application/json")}>
+                  Descarregar
+                </Button>
+                <Button variant="ghost" size="sm" disabled={c.estado !== "Concluído"} onClick={() => setRestaurar(c)}>
+                  Restaurar
+                </Button>
+                <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Apagar a cópia de ${dataHora(c.quando)}`} onClick={() => setApagar(c)} />
+              </span>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
     <Pagina>
       <Titulo titulo="Cópias de segurança">
-        <Button variant="primary" onClick={() => void criar()}>
-          Criar cópia agora
-        </Button>
+        {editar && (
+          <Button variant="primary" onClick={() => void criar()}>
+            Criar cópia agora
+          </Button>
+        )}
       </Titulo>
       <AvisoDeApi erro={colecao.erro} aoTentar={colecao.recarregar} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -117,27 +125,29 @@ export function Backups() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Cartao titulo="Para onde vão as cópias" dica="O destino das cópias de segurança. Em modo ligado o servidor é que faz a cópia e envia para aqui.">
           <div className="flex flex-col gap-4 p-4">
-            <Select label="Destino" value={rascunho.tipo} onValueChange={(v) => setRascunho({ ...rascunho, tipo: String(v) as TipoDeDestino })} items={DESTINOS} />
-            <Input label="Endereço" value={rascunho.endereco} onChange={(e) => setRascunho({ ...rascunho, endereco: e.target.value })} error={rascunho.endereco ? (erro ?? undefined) : undefined} placeholder={rascunho.tipo === "s3" ? "s3://nome-do-balde/pasta" : rascunho.tipo === "sftp" ? "sftp://servidor/pasta" : rascunho.tipo === "local" ? "/var/copias" : "Identificador da pasta"} />
+            <Select label="Destino" value={rascunho.tipo} onValueChange={(v) => setRascunho({ ...rascunho, tipo: String(v) as TipoDeDestino })} items={DESTINOS} disabled={!editar} />
+            <Input label="Endereço" value={rascunho.endereco} disabled={!editar} onChange={(e) => setRascunho({ ...rascunho, endereco: e.target.value })} error={rascunho.endereco ? (erro ?? undefined) : undefined} placeholder={rascunho.tipo === "s3" ? "s3://nome-do-balde/pasta" : rascunho.tipo === "sftp" ? "sftp://servidor/pasta" : rascunho.tipo === "local" ? "/var/copias" : "Identificador da pasta"} />
             {teste && teste !== "a-testar" && <span className={`text-sm ${teste.ok ? "text-kumo-default" : "text-kumo-danger"}`}>{teste.texto}</span>}
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" disabled={teste === "a-testar"} onClick={() => void testar()}>
-                {teste === "a-testar" ? "A testar…" : "Testar a ligação"}
-              </Button>
-              <Button variant="primary" disabled={!mudou || !!erro} onClick={() => void guardar()}>
-                Guardar
-              </Button>
-            </div>
+            {editar && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" disabled={teste === "a-testar"} onClick={() => void testar()}>
+                  {teste === "a-testar" ? "A testar…" : "Testar a ligação"}
+                </Button>
+                <Button variant="primary" disabled={!mudou || !!erro} onClick={() => void guardar()}>
+                  Guardar
+                </Button>
+              </div>
+            )}
           </div>
         </Cartao>
         <Cartao titulo="Agenda">
           <Linha titulo="Cópia automática" estado="Faz uma cópia sozinha, sem ninguém ter de se lembrar.">
-            <Interruptor marcado={rascunho.automatico} aoMudar={(v) => setRascunho({ ...rascunho, automatico: v })} rotulo="Cópia automática" />
+            <Interruptor marcado={rascunho.automatico} aoMudar={(v) => setRascunho({ ...rascunho, automatico: v })} rotulo="Cópia automática" desativado={!editar} />
           </Linha>
           <LinhaCampo>
-            <SeletorPersonalizavel label="Frequência" valor={rascunho.frequencia} opcoes={FREQUENCIA_DE_COPIA.opcoes} personalizado={FREQUENCIA_DE_COPIA.personalizado} aoMudar={(v) => setRascunho({ ...rascunho, frequencia: v })} disabled={!rascunho.automatico} />
-            <SeletorDeHora label="Hora" valor={rascunho.hora} aoMudar={(v) => setRascunho({ ...rascunho, hora: v })} disabled={!rascunho.automatico} />
-            <SeletorPersonalizavel label="Guardar durante" valor={rascunho.retencao} opcoes={RETENCAO_DE_COPIAS.opcoes} personalizado={RETENCAO_DE_COPIAS.personalizado} aoMudar={(v) => setRascunho({ ...rascunho, retencao: v })} />
+            <SeletorPersonalizavel label="Frequência" valor={rascunho.frequencia} opcoes={FREQUENCIA_DE_COPIA.opcoes} personalizado={FREQUENCIA_DE_COPIA.personalizado} aoMudar={(v) => setRascunho({ ...rascunho, frequencia: v })} disabled={!editar || !rascunho.automatico} />
+            <SeletorDeHora label="Hora" valor={rascunho.hora} aoMudar={(v) => setRascunho({ ...rascunho, hora: v })} disabled={!editar || !rascunho.automatico} />
+            <SeletorPersonalizavel label="Guardar durante" valor={rascunho.retencao} opcoes={RETENCAO_DE_COPIAS.opcoes} personalizado={RETENCAO_DE_COPIAS.personalizado} aoMudar={(v) => setRascunho({ ...rascunho, retencao: v })} disabled={!editar} />
           </LinhaCampo>
         </Cartao>
       </div>
@@ -166,6 +176,7 @@ const ACOES_FIREWALL = { bloquear: "Bloquear", permitir: "Permitir" };
 export function Firewall() {
   const ligacao = useLigacao();
   const { avisar } = useApp();
+  const editar = useEditar();
   const t = useTick(3000) * 3;
   const [local, setLocal] = useGuardado<EstadoFirewall>("firewall", { ativo: true, limitePorMinuto: 120 });
   const api = useApi<EstadoFirewall>("/v1/dev/firewall", () => local);
@@ -189,8 +200,8 @@ export function Firewall() {
     { rotulo: "Ação", render: (r) => <Estado valor={r.acao === "bloquear" ? "Bloqueado" : "Permitido"} variante={r.acao === "bloquear" ? "error" : "success"} /> },
     { rotulo: "Alvo", render: (r) => <span className="font-medium tabular-nums">{r.alvo}</span> },
     { rotulo: "Nota", render: (r) => <span className="text-kumo-subtle">{r.nota || "—"}</span> },
-    { rotulo: "Ativa", render: (r) => <Interruptor marcado={r.ativa} aoMudar={(v) => void regras.guardar({ ...r, ativa: v })} rotulo={`Regra ${r.alvo} ativa`} /> },
-    { rotulo: "", direita: true, render: (r) => <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Apagar a regra ${r.alvo}`} onClick={() => setRemover(r)} /> },
+    { rotulo: "Ativa", render: (r) => <Interruptor marcado={r.ativa} aoMudar={(v) => void regras.guardar({ ...r, ativa: v })} rotulo={`Regra ${r.alvo} ativa`} desativado={!editar} /> },
+    ...(editar ? [{ rotulo: "", direita: true, render: (r: RegraFirewall) => <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Apagar a regra ${r.alvo}`} onClick={() => setRemover(r)} /> }] : []),
   ];
   const colunasBloqueios: ColunaSimples<Bloqueio>[] = [
     { rotulo: "Hora", render: (b) => <span className="tabular-nums">{horaCompleta(b.quando)}</span> },
@@ -201,9 +212,11 @@ export function Firewall() {
   return (
     <Pagina>
       <Titulo titulo="Firewall">
-        <Button variant="primary" onClick={() => setNova(true)}>
-          Nova regra
-        </Button>
+        {editar && (
+          <Button variant="primary" onClick={() => setNova(true)}>
+            Nova regra
+          </Button>
+        )}
       </Titulo>
       <AvisoDeApi erro={api.erro ?? regras.erro} aoTentar={() => (api.recarregar(), regras.recarregar())} />
       <div className="grid gap-3 sm:grid-cols-2">
@@ -212,10 +225,10 @@ export function Firewall() {
       </div>
       <Cartao titulo="Proteção">
         <Linha titulo="Firewall" estado={estado.ativo ? "Os pedidos passam pelas regras e pelo limite." : "Desligado: nenhum pedido é bloqueado."}>
-          <Interruptor marcado={estado.ativo} aoMudar={(v) => (v ? void mudar({ ativo: true }) : setDesligar(true))} rotulo="Firewall" />
+          <Interruptor marcado={estado.ativo} aoMudar={(v) => (v ? void mudar({ ativo: true }) : setDesligar(true))} rotulo="Firewall" desativado={!editar} />
         </Linha>
         <Linha titulo="Limite de pedidos" dica="Quantos pedidos cada visitante pode fazer num minuto. Passado o limite, os pedidos seguintes são bloqueados até o minuto acabar." estado="Por visitante (IP)">
-          <SeletorPersonalizavel rotulo="Limite de pedidos" valor={String(estado.limitePorMinuto)} opcoes={LIMITE_POR_MINUTO.opcoes} personalizado={LIMITE_POR_MINUTO.personalizado} aoMudar={(v) => void mudar({ limitePorMinuto: Number(v) })} className="w-44" disabled={!estado.ativo} />
+          <SeletorPersonalizavel rotulo="Limite de pedidos" valor={String(estado.limitePorMinuto)} opcoes={LIMITE_POR_MINUTO.opcoes} personalizado={LIMITE_POR_MINUTO.personalizado} aoMudar={(v) => void mudar({ limitePorMinuto: Number(v) })} className="w-44" disabled={!editar || !estado.ativo} />
         </Linha>
       </Cartao>
       <Cartao titulo={`Regras (${regras.itens.length})`}>
@@ -257,6 +270,7 @@ const NOME_DE_ESTADO = (e: PaginaSite["estado"]) => ESTADOS_DE_PAGINA[e];
 export function PaginasDoSite() {
   const ligacao = useLigacao();
   const { avisar } = useApp();
+  const editar = useEditar();
   const [local, setLocal] = useGuardado<PaginaSite[]>("paginas-do-site", PAGINAS_DE_ORIGEM);
   const api = useApi<{ itens: PaginaSite[] }>("/v1/dev/paginas", () => ({ itens: local }));
   const paginas = ligacao.modo === "ligado" ? (api.dados?.itens ?? []) : local;
@@ -281,14 +295,16 @@ export function PaginasDoSite() {
     { rotulo: "Página", render: (p) => <span className="font-medium">{p.caminho}</span> },
     { rotulo: "Estado", render: (p) => <Estado valor={NOME_DE_ESTADO(p.estado)} variante={p.estado === "ativa" ? "success" : p.estado === "manutencao" ? "warning" : "error"} /> },
     { rotulo: "Mensagem aos visitantes", render: (p) => <span className="text-kumo-subtle">{p.mensagem || "—"}</span> },
-    { rotulo: "Mudar para", render: (p) => <Select aria-label={`Estado de ${p.caminho}`} value={p.estado} onValueChange={(v) => escolher(p, String(v) as PaginaSite["estado"])} items={ESTADOS_DE_PAGINA} className="w-44" /> },
+    { rotulo: "Mudar para", render: (p) => <Select aria-label={`Estado de ${p.caminho}`} value={p.estado} onValueChange={(v) => escolher(p, String(v) as PaginaSite["estado"])} items={ESTADOS_DE_PAGINA} className="w-44" disabled={!editar} /> },
   ];
   return (
     <Pagina>
       <Titulo titulo="Páginas do site">
-        <Button variant="primary" onClick={() => setNova(true)}>
-          Acrescentar página
-        </Button>
+        {editar && (
+          <Button variant="primary" onClick={() => setNova(true)}>
+            Acrescentar página
+          </Button>
+        )}
       </Titulo>
       <AvisoDeApi erro={api.erro} aoTentar={api.recarregar} />
       <div className="grid gap-3 sm:grid-cols-3">
@@ -348,6 +364,7 @@ const FILTRO_DE_EMAIL: Record<string, string> = { todos: "Todos", Entregue: "Ent
 export function EnviosDeEmail() {
   const ligacao = useLigacao();
   const { avisar } = useApp();
+  const editar = useEditar();
   const lista = useColecao<EmailEnviado>("/v1/dev/emails", "emails", gerarEmails());
   const dns = useApi<{ itens: VerificacaoDns[] }>("/v1/dev/emails/dns", () => ({ itens: DNS_DE_ORIGEM }));
   const [guardada, setGuardada] = useGuardado<ConfigDeEmail>("emails-config", EMAIL_DE_ORIGEM);
@@ -400,14 +417,16 @@ export function EnviosDeEmail() {
     { rotulo: "Assunto", render: (e) => e.assunto },
     { rotulo: "Estado", render: (e) => <Estado valor={e.estado} variante={e.estado === "Entregue" || e.estado === "Enviado" ? "success" : e.estado === "Fila" ? "warning" : "error"} /> },
     { rotulo: "Erro", render: (e) => <span className="text-kumo-subtle">{e.erro ?? "—"}</span> },
-    { rotulo: "", direita: true, render: (e) => (e.estado === "Falhou" ? <Button variant="ghost" size="sm" onClick={() => void reenviar(e)}>Reenviar</Button> : null) },
+    ...(editar ? [{ rotulo: "", direita: true, render: (e: EmailEnviado) => (e.estado === "Falhou" ? <Button variant="ghost" size="sm" onClick={() => void reenviar(e)}>Reenviar</Button> : null) }] : []),
   ];
   return (
     <Pagina>
       <Titulo titulo="Envio de e-mails">
-        <Button variant="primary" onClick={() => setTeste(true)}>
-          Enviar e-mail de teste
-        </Button>
+        {editar && (
+          <Button variant="primary" onClick={() => setTeste(true)}>
+            Enviar e-mail de teste
+          </Button>
+        )}
       </Titulo>
       <AvisoDeApi erro={lista.erro ?? dns.erro} aoTentar={() => (lista.recarregar(), dns.recarregar())} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -425,18 +444,20 @@ export function EnviosDeEmail() {
       </Cartao>
       <Cartao titulo="Servidor de envio (SMTP)">
         <div className="grid gap-4 p-4 sm:grid-cols-2">
-          <Input label="Servidor" value={config.servidor} onChange={(e) => setConfig({ ...config, servidor: e.target.value.trim() })} error={erroServidor ?? undefined} placeholder="smtp.exemplo.pt" />
-          <SeletorPersonalizavel label="Porta" valor={config.porta} opcoes={PORTA_SMTP.opcoes} personalizado={PORTA_SMTP.personalizado} aoMudar={(v) => setConfig({ ...config, porta: v })} />
-          <Input label="Utilizador" value={config.utilizador} onChange={(e) => setConfig({ ...config, utilizador: e.target.value })} autoComplete="off" />
-          <CampoSenha label="Palavra-passe" value={config.senha} onValueChange={(v) => setConfig({ ...config, senha: v })} autoComplete="new-password" tamanho="base" />
+          <Input label="Servidor" value={config.servidor} disabled={!editar} onChange={(e) => setConfig({ ...config, servidor: e.target.value.trim() })} error={erroServidor ?? undefined} placeholder="smtp.exemplo.pt" />
+          <SeletorPersonalizavel label="Porta" valor={config.porta} opcoes={PORTA_SMTP.opcoes} personalizado={PORTA_SMTP.personalizado} aoMudar={(v) => setConfig({ ...config, porta: v })} disabled={!editar} />
+          <Input label="Utilizador" value={config.utilizador} disabled={!editar} onChange={(e) => setConfig({ ...config, utilizador: e.target.value })} autoComplete="off" />
+          {editar && <CampoSenha label="Palavra-passe" value={config.senha} onValueChange={(v) => setConfig({ ...config, senha: v })} autoComplete="new-password" tamanho="base" />}
           <div className="sm:col-span-2">
-            <Input label="Remetente" value={config.remetente} onChange={(e) => setConfig({ ...config, remetente: e.target.value })} error={erroRemetente ?? undefined} />
+            <Input label="Remetente" value={config.remetente} disabled={!editar} onChange={(e) => setConfig({ ...config, remetente: e.target.value })} error={erroRemetente ?? undefined} />
           </div>
-          <div className="sm:col-span-2">
-            <Button variant="primary" disabled={!mudou || !!erroServidor || !!erroRemetente || !config.servidor} onClick={() => void guardarConfig()}>
-              Guardar
-            </Button>
-          </div>
+          {editar && (
+            <div className="sm:col-span-2">
+              <Button variant="primary" disabled={!mudou || !!erroServidor || !!erroRemetente || !config.servidor} onClick={() => void guardarConfig()}>
+                Guardar
+              </Button>
+            </div>
+          )}
         </div>
       </Cartao>
       <Cartao titulo={`Registo de envios (${visiveis.length})`} acoes={<Select aria-label="Filtrar por estado" value={filtro} onValueChange={(v) => setFiltro(String(v))} items={FILTRO_DE_EMAIL} className="w-40" />}>
@@ -456,6 +477,7 @@ const MODOS_DE_LIGACAO = { simulado: "Dados de demonstração", ligado: "Ligado 
 export function ApiLigacoes() {
   const atual = useLigacao();
   const { avisar } = useApp();
+  const editar = useEditar();
   const [rascunho, setRascunho] = useState<LigacaoApi>(atual);
   const [teste, setTeste] = useState<{ ok: boolean; texto: string } | "a-testar" | null>(null);
   const [area, setArea] = useState<"pagamentos" | "marketing" | "dev">("pagamentos");
@@ -483,24 +505,26 @@ export function ApiLigacoes() {
       </Titulo>
       <Cartao titulo="Ligação" dica="Em «dados de demonstração» o painel funciona sozinho, sem servidor. Para o usar a sério, ponha aqui o endereço de um servidor que cumpra o contrato abaixo.">
         <div className="flex flex-col gap-4 p-4">
-          <Select label="Origem dos dados" value={rascunho.modo} onValueChange={(v) => setRascunho({ ...rascunho, modo: String(v) as LigacaoApi["modo"] })} items={MODOS_DE_LIGACAO} />
+          <Select label="Origem dos dados" value={rascunho.modo} onValueChange={(v) => setRascunho({ ...rascunho, modo: String(v) as LigacaoApi["modo"] })} items={MODOS_DE_LIGACAO} disabled={!editar} />
           {rascunho.modo === "ligado" && (
             <>
-              <Input label="Endereço do servidor" value={rascunho.base} onChange={(e) => setRascunho({ ...rascunho, base: e.target.value.trim() })} error={rascunho.base ? (erro ?? undefined) : undefined} placeholder="https://api.exemplo.pt" autoComplete="off" />
-              <CampoSenha label="Token de acesso" value={rascunho.token} onValueChange={(v) => setRascunho({ ...rascunho, token: v })} autoComplete="off" tamanho="base" />
+              <Input label="Endereço do servidor" value={rascunho.base} disabled={!editar} onChange={(e) => setRascunho({ ...rascunho, base: e.target.value.trim() })} error={rascunho.base ? (erro ?? undefined) : undefined} placeholder="https://api.exemplo.pt" autoComplete="off" />
+              {editar && <CampoSenha label="Token de acesso" value={rascunho.token} onValueChange={(v) => setRascunho({ ...rascunho, token: v })} autoComplete="off" tamanho="base" />}
             </>
           )}
           {teste && teste !== "a-testar" && <span className={`text-sm ${teste.ok ? "text-kumo-default" : "text-kumo-danger"}`}>{teste.texto}</span>}
-          <div className="flex flex-wrap gap-2">
-            {rascunho.modo === "ligado" && (
-              <Button variant="secondary" disabled={!!erro || teste === "a-testar"} onClick={() => void testar()}>
-                {teste === "a-testar" ? "A testar…" : "Testar a ligação"}
+          {editar && (
+            <div className="flex flex-wrap gap-2">
+              {rascunho.modo === "ligado" && (
+                <Button variant="secondary" disabled={!!erro || teste === "a-testar"} onClick={() => void testar()}>
+                  {teste === "a-testar" ? "A testar…" : "Testar a ligação"}
+                </Button>
+              )}
+              <Button variant="primary" disabled={!mudou || !!erro} onClick={() => (guardarLigacao(rascunho), avisar("Ligação guardada"))}>
+                Guardar
               </Button>
-            )}
-            <Button variant="primary" disabled={!mudou || !!erro} onClick={() => (guardarLigacao(rascunho), avisar("Ligação guardada"))}>
-              Guardar
-            </Button>
-          </div>
+            </div>
+          )}
         </div>
       </Cartao>
       <Cartao titulo={`Contrato das APIs (${ENDPOINTS.length} endereços)`} dica="Tudo o que o painel lê e escreve. Um servidor que responda a estes endereços liga-se ao painel sem mudar nenhum ecrã.">
@@ -523,7 +547,7 @@ export function ApiLigacoes() {
                 <Badge variant="outline">{e.metodo}</Badge>
                 <code className="min-w-0 truncate text-sm">{e.caminho}</code>
               </div>
-              <BotaoCopiar texto={comoCurl(e, base, atual.token)} rotulo="Copiar curl" dica="Copiar como comando curl" tamanho="sm" />
+              <BotaoCopiar texto={comoCurl(e, base, editar ? atual.token : "")} rotulo="Copiar curl" dica="Copiar como comando curl" tamanho="sm" />
             </div>
             <span className="text-[13px] text-kumo-subtle">{e.descricao}</span>
           </div>
@@ -562,6 +586,7 @@ interface EntradaDeHistorico {
 
 export function Limpeza() {
   const ligacao = useLigacao();
+  const editar = useEditar();
   const [dias, setDias] = useState("90");
   const [historico, setHistorico] = useGuardado<EntradaDeHistorico[]>("limpeza-historico", []);
   const [alvo, setAlvo] = useState<AlvoDeLimpeza | null>(null);
@@ -574,17 +599,19 @@ export function Limpeza() {
       <Cartao
         titulo="Apagar dados"
         dica="Cada ação pede que escreva APAGAR e fica registada no histórico. O que se apaga não volta: se tiver dúvidas, faça primeiro uma cópia de segurança."
-        acoes={<SeletorPersonalizavel rotulo="Apagar o que tem mais de" valor={dias} opcoes={DIAS_DE_DADOS.opcoes} personalizado={DIAS_DE_DADOS.personalizado} aoMudar={setDias} className="w-40" />}
+        acoes={editar ? <SeletorPersonalizavel rotulo="Apagar o que tem mais de" valor={dias} opcoes={DIAS_DE_DADOS.opcoes} personalizado={DIAS_DE_DADOS.personalizado} aoMudar={setDias} className="w-40" /> : undefined}
       >
         {ALVOS.map((a) => (
           <Linha key={a.id} titulo={a.titulo} estado={a.texto}>
-            <Button variant="secondary" icon={ICONES.lixo} onClick={() => setAlvo(a)}>
-              Apagar
-            </Button>
+            {editar && (
+              <Button variant="secondary" icon={ICONES.lixo} onClick={() => setAlvo(a)}>
+                Apagar
+              </Button>
+            )}
           </Linha>
         ))}
       </Cartao>
-      <Cartao titulo={`Histórico (${historico.length})`} acoes={historico.length > 0 ? <Button variant="ghost" size="sm" onClick={() => setHistorico([])}>Limpar o histórico</Button> : undefined}>
+      <Cartao titulo={`Histórico (${historico.length})`} acoes={editar && historico.length > 0 ? <Button variant="ghost" size="sm" onClick={() => setHistorico([])}>Limpar o histórico</Button> : undefined}>
         <TabelaSimples
           colunas={[
             { rotulo: "Quando", render: (h: EntradaDeHistorico) => <span className="tabular-nums">{dataHora(h.quando)}</span> },

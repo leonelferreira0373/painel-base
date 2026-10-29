@@ -3,7 +3,7 @@ import { gerarCliques, gerarErros, gerarOrigens, gerarPaginas, gerarPagamentos, 
 import { CLIENTES } from "./semente";
 import type { DefRegistos } from "./tipos";
 
-const FINANCAS = ["administrador", "analista"];
+const FINANCAS = ["administrador"];
 
 const pagamentos: DefRegistos = {
   id: "pagamentos",
@@ -55,8 +55,8 @@ const erros: DefRegistos = {
     { chave: "estado", rotulo: "Estado", tipo: "estado" },
   ],
   transicoes: [
-    { de: ["Novo"], para: "Visto", rotulo: "Marcar como visto", icone: "olho", funcoes: ["administrador", "analista"] },
-    { de: ["Novo", "Visto"], para: "Resolvido", rotulo: "Marcar como resolvido", icone: "certo", funcoes: ["administrador", "analista"] },
+    { de: ["Novo"], para: "Visto", rotulo: "Marcar como visto", icone: "olho", funcoes: ["administrador"] },
+    { de: ["Novo", "Visto"], para: "Resolvido", rotulo: "Marcar como resolvido", icone: "certo", funcoes: ["administrador"] },
   ],
   campos: [],
   graficos: [

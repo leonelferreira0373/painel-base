@@ -14,6 +14,7 @@ import { identificador } from "@/lib/conta";
 import { useApp } from "@/lib/estado";
 import { erroDoIban, formatarIban, limparIban } from "@/lib/iban";
 import { calcularMetricas, type MetricasDePagamentos } from "@/lib/pagamentos";
+import { useEditar } from "@/lib/permissao";
 import { Cartao, Confirmar, Interruptor, Linha } from "../conta/Pecas";
 import { BotaoCopiar } from "../Copiar";
 import { Estado } from "../Estado";
@@ -114,6 +115,7 @@ const FILTROS = [
 export function Comprovativos() {
   const { itens, pronto, guardar, remover } = useComprovativos();
   const { registos, transitar, avisar } = useApp();
+  const editar = useEditar();
   const comprovativos = useMemo(() => itens.filter((i) => i.pasta === PASTA_DE_COMPROVATIVOS && !ePasta(i)).sort((a, b) => (b.meta?.recebido ?? "").localeCompare(a.meta?.recebido ?? "")), [itens]);
   const urls = useUrlsDeImagens(comprovativos);
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number]["id"]>("todos");
@@ -145,13 +147,15 @@ export function Comprovativos() {
   return (
     <Pagina>
       <Titulo titulo="Comprovativos">
-        <ZonaDeUpload aceitar="image/*,application/pdf" aoEscolher={(f) => (setReferencia(pagamentos.find((p) => p.estado === "Pendente")?.referencia ?? ""), setNovo(f))} className="contents">
-          {(abrir) => (
-            <Button variant="primary" icon={ICONES.enviar} onClick={abrir}>
-              Receber comprovativo
-            </Button>
-          )}
-        </ZonaDeUpload>
+        {editar && (
+          <ZonaDeUpload aceitar="image/*,application/pdf" aoEscolher={(f) => (setReferencia(pagamentos.find((p) => p.estado === "Pendente")?.referencia ?? ""), setNovo(f))} className="contents">
+            {(abrir) => (
+              <Button variant="primary" icon={ICONES.enviar} onClick={abrir}>
+                Receber comprovativo
+              </Button>
+            )}
+          </ZonaDeUpload>
+        )}
       </Titulo>
       <Cartao titulo={`Comprovativos recebidos (${comprovativos.length})`} acoes={<Separadores itens={FILTROS.map((f) => ({ id: f.id, rotulo: f.rotulo }))} valor={filtro} aoMudar={(id) => setFiltro(id as typeof filtro)} />}>
         {!pronto ? (
@@ -180,7 +184,7 @@ export function Comprovativos() {
                 <Button variant="ghost" size="sm" onClick={() => setVer(c)}>
                   Ver
                 </Button>
-                {c.meta?.estado === "Por validar" && (
+                {editar && c.meta?.estado === "Por validar" && (
                   <>
                     <Button variant="secondary" size="sm" onClick={() => decidir(c, "Validado")}>
                       Validar
@@ -190,7 +194,7 @@ export function Comprovativos() {
                     </Button>
                   </>
                 )}
-                <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Remover ${c.nome}`} onClick={() => setApagar(c)} />
+                {editar && <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Remover ${c.nome}`} onClick={() => setApagar(c)} />}
               </div>
             </Linha>
           ))
@@ -219,6 +223,7 @@ export function ContasIban() {
   const [metodos, setMetodos] = useGuardado<Record<string, boolean>>("metodos-de-pagamento", Object.fromEntries(METODOS_DE_PAGAMENTO.map((m) => [m, m !== "Numerário"])));
   const [aEditar, setAEditar] = useState<ContaBancaria | null>(null);
   const [apagar, setApagar] = useState<ContaBancaria | null>(null);
+  const editar = useEditar();
   const principal = contas.itens.find((c) => c.principal && c.ativa) ?? contas.itens.find((c) => c.ativa);
   const erro = aEditar ? erroDoIban(aEditar.iban) : null;
   const valida = !!aEditar && !erro && aEditar.banco.trim() !== "" && aEditar.titular.trim() !== "" && !contas.itens.some((c) => c.id !== aEditar.id && limparIban(c.iban) === limparIban(aEditar.iban));
@@ -239,9 +244,11 @@ export function ContasIban() {
   return (
     <Pagina>
       <Titulo titulo="Contas e IBANs">
-        <Button variant="primary" icon={ICONES.mais} onClick={() => setAEditar({ ...VAZIA })}>
-          Adicionar conta
-        </Button>
+        {editar && (
+          <Button variant="primary" icon={ICONES.mais} onClick={() => setAEditar({ ...VAZIA })}>
+            Adicionar conta
+          </Button>
+        )}
       </Titulo>
       <AvisoDeApi erro={contas.erro} aoTentar={contas.recarregar} />
       <Cartao titulo="Contas que recebem pagamentos" dica="O IBAN é validado (país, comprimento e dígitos de controlo). A conta principal é a que se mostra primeiro aos clientes.">
@@ -262,16 +269,20 @@ export function ContasIban() {
             >
               <div className="flex flex-wrap items-center justify-end gap-1">
                 <BotaoCopiar texto={formatarIban(c.iban)} tamanho="sm" variante="ghost" quadrado dica="Copiar o IBAN" />
-                <Interruptor marcado={c.ativa} aoMudar={(v) => contas.guardar({ ...c, ativa: v, principal: v ? c.principal : false })} rotulo={`Conta ${c.banco} ativa`} />
-                {!c.principal && c.ativa && (
+                <Interruptor marcado={c.ativa} aoMudar={(v) => contas.guardar({ ...c, ativa: v, principal: v ? c.principal : false })} rotulo={`Conta ${c.banco} ativa`} desativado={!editar} />
+                {editar && !c.principal && c.ativa && (
                   <Button variant="ghost" size="sm" onClick={() => tornarPrincipal(c)}>
                     Tornar principal
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" onClick={() => setAEditar({ ...c, iban: formatarIban(c.iban) })}>
-                  Editar
-                </Button>
-                <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Remover ${c.banco}`} onClick={() => setApagar(c)} />
+                {editar && (
+                  <>
+                    <Button variant="ghost" size="sm" onClick={() => setAEditar({ ...c, iban: formatarIban(c.iban) })}>
+                      Editar
+                    </Button>
+                    <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Remover ${c.banco}`} onClick={() => setApagar(c)} />
+                  </>
+                )}
               </div>
             </Linha>
           ))
@@ -280,7 +291,7 @@ export function ContasIban() {
       <Cartao titulo="Métodos de pagamento aceites" dica="Os métodos desligados deixam de aparecer ao cliente na altura de pagar.">
         {METODOS_DE_PAGAMENTO.map((m) => (
           <Linha key={m} titulo={m} dica={m === "Transferência" ? "O cliente transfere para uma das contas acima e envia o comprovativo." : undefined}>
-            <Interruptor marcado={!!metodos[m]} aoMudar={(v) => setMetodos((x) => ({ ...x, [m]: v }))} rotulo={`Aceitar ${m}`} />
+            <Interruptor marcado={!!metodos[m]} aoMudar={(v) => setMetodos((x) => ({ ...x, [m]: v }))} rotulo={`Aceitar ${m}`} desativado={!editar} />
           </Linha>
         ))}
       </Cartao>

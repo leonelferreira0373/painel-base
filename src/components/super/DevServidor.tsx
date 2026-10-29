@@ -7,6 +7,7 @@ import { gerarPedido, gerarSaude, gerarTabelas, percentil, type PedidoWeb, type 
 import { chamar, useApi, useLigacao } from "@/lib/api/cliente";
 import { formatarTamanho } from "@/lib/biblioteca";
 import { correrConsulta, linhasApagadas } from "@/lib/dev";
+import { useEditar } from "@/lib/permissao";
 import { DIAS_DE_DADOS, RITMO_DE_PEDIDOS } from "@/dados/personalizados";
 import { Cartao, Confirmar, Interruptor, Linha } from "../conta/Pecas";
 import { Estado } from "../Estado";
@@ -33,13 +34,14 @@ export function SaudeVps() {
     if (s) setHistorico((h) => [...h.slice(-29), { cpu: s.cpu, memoria: s.memoria, disco: s.disco, saida: s.redeSaida / 1000 }]);
   }, [s]);
   const ligacao = useLigacao();
+  const editar = useEditar();
   const servicos = (s?.servicos ?? []).map((x) => (parados[x.nome] && Date.now() - parados[x.nome] < 4000 ? { ...x, estado: "a-arrancar" as const } : x));
   const colunas: ColunaSimples<Saude["servicos"][number]>[] = [
     { rotulo: "Serviço", render: (x) => <span className="font-medium">{x.nome}</span> },
     { rotulo: "Estado", render: (x) => <Estado valor={x.estado === "saudavel" ? "Saudável" : x.estado === "a-arrancar" ? "A arrancar" : "Parado"} /> },
     { rotulo: "CPU", direita: true, render: (x) => percentagem(x.cpu, 1) },
     { rotulo: "Memória", direita: true, render: (x) => mb(x.memoria) },
-    { rotulo: "", direita: true, render: (x) => <Button variant="ghost" size="sm" onClick={() => setReiniciar(x.nome)}>Reiniciar</Button> },
+    ...(editar ? [{ rotulo: "", direita: true, render: (x: Saude["servicos"][number]) => <Button variant="ghost" size="sm" onClick={() => setReiniciar(x.nome)}>Reiniciar</Button> }] : []),
   ];
   return (
     <Pagina>
@@ -197,6 +199,7 @@ export function BaseDeDados() {
   const [resultado, setResultado] = useState(() => correrConsulta("SELECT * FROM pagamentos LIMIT 5"));
   const [novaPolitica, setNovaPolitica] = useState({ nome: "", comando: "SELECT", expressao: "" });
   const [ultimo, setUltimo] = useState<string | null>(null);
+  const editar = useEditar();
   const tabelaAberta = tabelas.find((t) => t.nome === politicas);
 
   const mudar = async (nome: string, parcial: Partial<TabelaBd>) => {
@@ -209,9 +212,9 @@ export function BaseDeDados() {
     { rotulo: "Tabela", render: (t) => <span className="font-medium">{t.nome}</span> },
     { rotulo: "Linhas", direita: true, render: (t) => inteiro(t.linhas) },
     { rotulo: "Tamanho", direita: true, render: (t) => formatarTamanho(t.bytes) },
-    { rotulo: "Segurança por linha", render: (t) => <Interruptor marcado={t.rls} aoMudar={(v) => (v ? mudar(t.nome, { rls: true }) : setRlsOff(t))} rotulo={`Segurança por linha da tabela ${t.nome}`} /> },
+    { rotulo: "Segurança por linha", render: (t) => <Interruptor marcado={t.rls} aoMudar={(v) => (v ? mudar(t.nome, { rls: true }) : setRlsOff(t))} rotulo={`Segurança por linha da tabela ${t.nome}`} desativado={!editar} /> },
     { rotulo: "Políticas", render: (t) => <Button variant="ghost" size="sm" onClick={() => setPoliticas(t.nome)}>{t.politicas.length} {t.politicas.length === 1 ? "política" : "políticas"}</Button> },
-    { rotulo: "", direita: true, render: (t) => <Button variant="ghost" size="sm" icon={ICONES.lixo} onClick={() => setApagar(t)}>Apagar linhas</Button> },
+    ...(editar ? [{ rotulo: "", direita: true, render: (t: TabelaBd) => <Button variant="ghost" size="sm" icon={ICONES.lixo} onClick={() => setApagar(t)}>Apagar linhas</Button> }] : []),
   ];
   return (
     <Pagina>
@@ -225,7 +228,7 @@ export function BaseDeDados() {
       <Cartao
         titulo={`Tabelas (${tabelas.length})`}
         dica="A segurança por linha (RLS) faz com que cada pessoa só veja as linhas que as políticas permitem. Com ela desligada, qualquer pedido autenticado lê a tabela toda."
-        acoes={<SeletorPersonalizavel rotulo="Apagar linhas mais antigas do que" valor={dias} opcoes={DIAS_DE_DADOS.opcoes} personalizado={DIAS_DE_DADOS.personalizado} aoMudar={setDias} className="w-40" />}
+        acoes={editar ? <SeletorPersonalizavel rotulo="Apagar linhas mais antigas do que" valor={dias} opcoes={DIAS_DE_DADOS.opcoes} personalizado={DIAS_DE_DADOS.personalizado} aoMudar={setDias} className="w-40" /> : undefined}
       >
         <TabelaSimples colunas={colunas} linhas={tabelas} chave={(t) => t.nome} />
       </Cartao>
@@ -262,11 +265,13 @@ export function BaseDeDados() {
                           {p.comando} · {p.expressao}
                         </span>
                       </span>
-                      <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Remover a política ${p.nome}`} onClick={() => mudar(tabelaAberta.nome, { politicas: tabelaAberta.politicas.filter((x) => x.nome !== p.nome) })} />
+                      {editar && <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Remover a política ${p.nome}`} onClick={() => mudar(tabelaAberta.nome, { politicas: tabelaAberta.politicas.filter((x) => x.nome !== p.nome) })} />}
                     </li>
                   ))}
                 </ul>
               )}
+              {editar && (
+              <>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Input label="Nome" value={novaPolitica.nome} onChange={(e) => setNovaPolitica({ ...novaPolitica, nome: e.target.value.replace(/\W/g, "_") })} placeholder="ver_da_conta" />
                 <Select label="Comando" value={novaPolitica.comando} onValueChange={(v) => setNovaPolitica({ ...novaPolitica, comando: String(v) })} items={{ SELECT: "SELECT", INSERT: "INSERT", UPDATE: "UPDATE", DELETE: "DELETE", ALL: "Todos" }} />
@@ -281,6 +286,8 @@ export function BaseDeDados() {
                   Acrescentar a política
                 </Button>
               </div>
+              </>
+              )}
             </div>
           )}
         </Dialog>
