@@ -33,7 +33,7 @@ export function Linha({ titulo, dica, estado, children }: { titulo: ReactNode; d
         </div>
         {estado && <div className="mt-0.5 text-[13px] text-kumo-subtle">{typeof estado === "string" ? <Frase>{estado}</Frase> : estado}</div>}
       </div>
-      {children && <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">{children}</div>}
+      {children && <div className="sem-barra flex min-w-0 max-w-full flex-nowrap items-center gap-2 overflow-x-auto p-1 -m-1 [&>*]:shrink-0 sm:m-0 sm:shrink-0 sm:p-0 sm:flex-wrap sm:justify-end sm:overflow-visible">{children}</div>}
     </div>
   );
 }
@@ -88,7 +88,7 @@ export function Confirmar({
       }}
     >
       <Dialog size="base" className="p-6">
-        <div className="mb-3 flex items-start justify-between gap-4">
+        <div className="mb-3 flex items-center justify-between gap-4">
           <Dialog.Title className="text-lg font-semibold">{titulo}</Dialog.Title>
           <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
         </div>

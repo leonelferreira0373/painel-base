@@ -1,0 +1,29 @@
+/* O campo de código de uma só vez (OTP): as caixinhas abanam quando o código está errado. O movimento reduzido é desligado pela regra global do painel (html[data-movimento="reduzido"]). */
+@keyframes otp-abanar {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+.otp-erro {
+  animation: otp-abanar 360ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .otp-erro {
+    animation: none;
+  }
+}

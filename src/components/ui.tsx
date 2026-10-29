@@ -2,6 +2,11 @@
 "use client";
 
 import { Button, DropdownMenu, LayerCard, Surface, Tooltip } from "@cloudflare/kumo";
+import { IdDoGraficoProvider } from "./graficos/CorDoGrafico";
+import { NumeroEmRoda } from "./NumeroEmRoda";
+import { idDoGrafico, useCorDoGrafico } from "@/lib/cores-graficos";
+import { variacaoDeSerie } from "@/lib/serie";
+import { usePathname } from "next/navigation";
 import { MenuCartao, SubMenuCartao, SeparadorDeMenu } from "./Flutuantes";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -10,7 +15,8 @@ import { EsqueletoCartao } from "./Estados";
 import { Ic, ICONES, type Icone } from "./Icones";
 import { AreaMini } from "./graficos/Pequenos";
 import { mesmoPeriodo, PERIODOS, type Periodo } from "./Periodo";
-import { GatilhoDoMenu, ItensDeExportar } from "./MenuDeDados";
+import { GatilhoDoMenu, ItensDeKpi, MenuDoKpi, useJanelaDeCor } from "./MenuDeDados";
+import { IndicadorDeNotas } from "./notas/MotorDeNotas";
 import { useResultadoTemporario } from "./Copiar";
 import type { DadosExportaveis } from "@/lib/exportar-dados";
 import { useEditar } from "@/lib/permissao";
@@ -36,7 +42,7 @@ export function Titulo({ titulo, children }: { titulo: string; children?: ReactN
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <h1 className="text-2xl font-semibold tracking-tight text-kumo-default">{titulo}</h1>
       {(children || !editar) && (
-        <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:items-center">
+        <div className="sem-barra -mx-4 grid auto-cols-[minmax(max-content,1fr)] grid-flow-col gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex sm:overflow-visible sm:px-0 sm:items-center">
           {!editar && <SoLeitura />}
           {children}
         </div>
@@ -117,8 +123,11 @@ export function CartaoMetrica({
   const sobe = (variacao ?? 0) >= 0;
   const temPeriodo = !!(periodo && aoMudarPeriodo);
   const temTipo = !!(tipo && aoMudarTipo);
-  const temMenu = !!(href || aoAtualizar || aoRemover || temPeriodo || temTipo || exportar);
+  const temMenu = true;
   const [copia, definirCopia] = useResultadoTemporario();
+  const paginaDoCartao = usePathname() ?? "";
+  const idDaCor = idDoGrafico(paginaDoCartao, titulo);
+  const cor = useJanelaDeCor(idDaCor);
   const tipoAtual = TIPOS_CARTAO.find((t) => t.id === tipo);
   return (
     <Surface className={`pleno group/cartao flex min-w-0 flex-col gap-1 rounded-xl p-4 ${className}`}>
@@ -127,6 +136,7 @@ export function CartaoMetrica({
           {titulo}
           {dica && <DicaInfo titulo={titulo} texto={dica} />}
         </span>
+        {temMenu && <IndicadorDeNotas alvo={{ tipo: "kpi", chave: idDaCor, rotulo: titulo, pagina: paginaDoCartao }} />}
         {temMenu && (
           <DropdownMenu>
             <GatilhoDoMenu estado={copia} />
@@ -165,7 +175,7 @@ export function CartaoMetrica({
                   </SubMenuCartao>
                 </DropdownMenu.Sub>
               )}
-              {exportar && <ItensDeExportar dados={exportar} aoCopiarImagem={(ok) => definirCopia(ok ? "ok" : "erro")} />}
+              <ItensDeKpi dados={exportar} titulo={titulo} idDaCor={idDaCor} aoOutraCor={cor.abrir} aoResultado={(ok) => definirCopia(ok ? "ok" : "erro")} estruturado={valor !== undefined ? { dados: { indicador: titulo, valor, variacao: variacao ?? null } } : undefined} />
               {aoRemover && (
                 <>
                   <SeparadorDeMenu />
@@ -177,6 +187,7 @@ export function CartaoMetrica({
             </MenuCartao>
           </DropdownMenu>
         )}
+        {cor.janela}
       </div>
       {carregando ? (
         <EsqueletoCartao altura={alturaEsqueleto} anel={anel} />
@@ -184,7 +195,7 @@ export function CartaoMetrica({
         <>
           {valor !== undefined && (
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-semibold tabular-nums tracking-tight text-kumo-default">{valor}</span>
+              <NumeroEmRoda valor={valor} className="text-2xl font-semibold tabular-nums tracking-tight text-kumo-default" />
               {variacao !== null && variacao !== undefined && Number.isFinite(variacao) && (
                 <Dica conteudo={variacaoDica ? <CorpoDica texto={variacaoDica} /> : null}>
                   <span className={`inline-flex items-center gap-0.5 text-[13px] font-medium ${sobe ? "text-kumo-success" : "text-kumo-danger"}`}>
@@ -195,7 +206,7 @@ export function CartaoMetrica({
               )}
             </div>
           )}
-          {children}
+          <IdDoGraficoProvider titulo={titulo}>{children}</IdDoGraficoProvider>
         </>
       )}
     </Surface>
@@ -209,24 +220,49 @@ export function Painel({ titulo, children, acoes, className = "" }: { titulo: st
         <h3 className="text-sm font-medium">{titulo}</h3>
         {acoes}
       </LayerCard.Secondary>
-      <LayerCard.Primary className="p-4">{children}</LayerCard.Primary>
+      <LayerCard.Primary className="p-4">
+        <IdDoGraficoProvider titulo={titulo}>{children}</IdDoGraficoProvider>
+      </LayerCard.Primary>
     </LayerCard>
   );
 }
 
+/** O KPI como tabela para exportar: a série (se há) ou só o valor. */
+function dadosDoKpi(titulo: string, valor: string, variacao: number | null, valores: number[]): DadosExportaveis {
+  const nome = titulo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "kpi";
+  if (valores.length >= 2) return { nome, titulo: `${titulo}: ${valor}`, colunas: ["Posição", "Valor"], linhas: valores.map((v, i) => [i + 1, v]) };
+  return { nome, titulo, colunas: ["Indicador", "Valor", "Variação (%)"], linhas: [[titulo, valor, variacao !== null && Number.isFinite(variacao) ? variacao : ""]] };
+}
+
 /** Cartão de estatística da análise, como os da Cloudflare: título pequeno, número grande, variação face ao período anterior e, por baixo, o gráfico de área de ponta a ponta. A variação mostra-se sem abrir nada; `pior` marca as estatísticas em que subir é mau. */
-export function CartaoEstatistica({ titulo, valor, variacao, pior = false, dica, valores, carregando = false }: { titulo: string; valor: string; variacao: number | null; pior?: boolean; dica?: string; valores: number[]; carregando?: boolean }) {
+export function CartaoEstatistica({ titulo, valor, variacao: variacaoDada, pior = false, dica, valores, carregando = false }: { titulo: string; valor: string; /** Em percentagem; sem ela, calcula-se da própria série (a média dos últimos valores face à dos anteriores); `null` esconde-a. */ variacao?: number | null; pior?: boolean; dica?: string; valores: number[]; carregando?: boolean }) {
+  const pagina = usePathname() ?? "";
+  const idDaCor = idDoGrafico(pagina, titulo);
+  const [cor] = useCorDoGrafico(idDaCor);
+  const calculada = variacaoDada === undefined ? variacaoDeSerie(valores) : null;
+  const variacao = variacaoDada !== undefined ? variacaoDada : (calculada?.variacao ?? null);
   const sobe = (variacao ?? 0) >= 0;
   const bom = pior ? !sobe : sobe;
   // sem série para desenhar o cartão fica só com o número, sem um vazio por baixo
   const comGrafico = carregando || valores.length >= 2;
   return (
-    <div className={`pleno relative flex ${comGrafico ? "h-32" : "h-auto pb-3"} min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-kumo-base ring ring-kumo-line transition-colors hover:ring-kumo-fill`}>
+    <div className={`pleno group/grafico relative flex ${comGrafico ? "h-32" : "h-auto pb-3"} min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-kumo-base ring ring-kumo-line transition-colors hover:ring-kumo-fill`}>
       <div className="flex items-start gap-3 px-4 pb-0.5 pt-3">
-        <span className="inline-flex min-w-0 items-center gap-1.5 truncate text-xs font-medium text-kumo-subtle">
-          {titulo}
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-kumo-subtle">
+          <span className="truncate">{titulo}</span>
           {dica && <DicaInfo titulo={titulo} texto={dica} />}
         </span>
+        {!carregando && (
+          <span className="-mr-2 -mt-1.5 ml-auto flex shrink-0 items-center gap-1">
+            <IndicadorDeNotas alvo={{ tipo: "kpi", chave: idDaCor, rotulo: titulo, pagina }} />
+            <MenuDoKpi
+              titulo={titulo}
+              idDaCor={valores.length >= 2 ? idDaCor : undefined}
+              dados={dadosDoKpi(titulo, valor, variacao, valores)}
+              estruturado={{ dados: { indicador: titulo, valor, variacao: variacao !== null && Number.isFinite(variacao) ? variacao : null, serie: valores } }}
+            />
+          </span>
+        )}
       </div>
       {carregando ? (
         <div className="px-4 pt-1">
@@ -235,19 +271,19 @@ export function CartaoEstatistica({ titulo, valor, variacao, pior = false, dica,
       ) : (
         <div className="flex min-h-0 flex-1 flex-col px-4 pt-0.5">
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-semibold leading-tight tabular-nums text-kumo-default">{valor}</span>
+            <NumeroEmRoda valor={valor} className="text-2xl font-semibold leading-tight tabular-nums text-kumo-default" />
             {variacao !== null && Number.isFinite(variacao) && (
-              <Dica conteudo="Variação face ao período anterior com a mesma duração.">
+              <Dica conteudo={calculada ? `Variação: a média dos últimos ${calculada.n} valores face à dos ${calculada.n} anteriores.` : "Variação face ao período anterior com a mesma duração."}>
                 <span className={`inline-flex items-center gap-0.5 text-sm font-medium ${bom ? "text-kumo-success" : "text-kumo-danger"}`}>
                   <Ic nome={sobe ? "subida" : "descida"} tamanho={13} />
-                  {Math.abs(variacao).toLocaleString("pt-PT", { maximumFractionDigits: 1 })} %
+                  <NumeroEmRoda valor={`${Math.abs(variacao).toLocaleString("pt-PT", { maximumFractionDigits: 1 })} %`} />
                 </span>
               </Dica>
             )}
           </div>
           {valores.length >= 2 && (
             <div className="-mx-4 mt-1.5 min-h-10 flex-1">
-              <AreaMini valores={valores} altura={60} />
+              <AreaMini valores={valores} altura={60} cor={cor} />
             </div>
           )}
         </div>

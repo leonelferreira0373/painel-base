@@ -4,6 +4,7 @@
 import { Button, Input, Select } from "@cloudflare/kumo";
 import { useEffect, useState } from "react";
 import { CONECTORES_DE_ORIGEM, gerarCommits, gerarImplementacoes, GITHUB_DE_ORIGEM, RAMOS_DE_DEMONSTRACAO, type Commit, type Conector, type LigacaoGitHub } from "@/dados/deploys";
+import { estruturaDeRegisto } from "@/lib/copiar-dados";
 import { chamar, useApi, useLigacao } from "@/lib/api/cliente";
 import { useColecao } from "@/lib/api/colecao";
 import { erroDoRepositorio } from "@/lib/dev";
@@ -73,11 +74,11 @@ export function GitHub() {
   };
 
   const colunas: ColunaSimples<Commit>[] = [
-    { rotulo: "Commit", render: (c) => <code className="inline-flex items-center gap-1 text-xs">{c.sha}<BotaoCopiar texto={c.sha} tamanho="xs" dica="Copiar o commit" /></code> },
+    { rotulo: "Commit", render: (c) => <code className="inline-flex items-center gap-1 text-xs">{c.sha}<BotaoCopiar texto={c.sha} estruturado={estruturaDeRegisto(`Commit ${c.sha}`, { ...c }, "/dev/github/")} tamanho="xs" dica="Copiar os dados do commit" /></code> },
     { rotulo: "Mudança", render: (c) => <span className="block max-w-72 truncate" title={c.mensagem}>{c.mensagem}</span> },
     { rotulo: "Autor", render: (c) => c.autor },
     { rotulo: "Quando", render: (c) => <span className="tabular-nums">{dataHora(c.quando)}</span> },
-    { rotulo: "Testes", render: (c) => <Estado valor={c.testes} /> },
+    { rotulo: "Testes", filtro: (c) => String(c.testes), render: (c) => <Estado valor={c.testes} /> },
     ...(editar
       ? [
           {

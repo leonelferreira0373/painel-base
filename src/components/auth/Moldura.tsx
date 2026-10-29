@@ -71,7 +71,7 @@ export function PreferenciasCookies({ className = "" }: { className?: string }) 
       </button>
       <Dialog.Root open={aberto} onOpenChange={setAberto}>
         <Dialog size="base" className="p-6">
-          <div className="mb-3 flex items-start justify-between gap-4">
+          <div className="mb-3 flex items-center justify-between gap-4">
             <Dialog.Title className="text-lg font-semibold">Preferências de cookies</Dialog.Title>
             <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
           </div>

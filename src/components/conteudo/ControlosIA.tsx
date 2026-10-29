@@ -47,11 +47,11 @@ function Comportamento() {
         </Linha>
       </Cartao>
       <div className="flex items-center justify-between gap-3 rounded-xl bg-kumo-base px-4 py-3 ring ring-kumo-line">
-        <span className="inline-flex items-center gap-2 text-sm text-kumo-subtle">
+        <span className="inline-flex shrink-0 items-center gap-2 text-sm text-kumo-subtle">
           <span aria-hidden className={`size-2 rounded-full ${sujo ? "bg-kumo-warning" : "bg-kumo-success"}`} />
           {sujo ? "Alterações por guardar" : "Tudo guardado"}
         </span>
-        <div className="flex gap-2">
+        <div className="sem-barra flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto [&>*]:shrink-0 [&>*:first-child]:ml-auto">
           <Button variant="ghost" disabled={JSON.stringify(atual) === JSON.stringify(CONTROLOS_DE_ORIGEM)} onClick={() => (guardarControlos(CONTROLOS_DE_ORIGEM), setC(CONTROLOS_DE_ORIGEM), setMexeu(false))}>
             Repor o original
           </Button>
@@ -167,7 +167,7 @@ function Memoria() {
         <Dialog size="lg" className="p-6">
           {ver && (
             <div className="flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center justify-between gap-4">
                 <Dialog.Title className="min-w-0 truncate text-lg font-semibold">{ver.nome}</Dialog.Title>
                 <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
               </div>

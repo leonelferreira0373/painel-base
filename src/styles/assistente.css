@@ -39,3 +39,164 @@
 :root[data-mode="dark"] .aia {
   --chat-seta: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E");
 }
+
+/* ─── a interface nova do chat: folha com alça, três pontos, voltar na escrita e esbatido no topo ─── */
+.aia {
+  /* a altura do cabeçalho: até aí a conversa desvanece-se (no telemóvel é mais alta por causa da alça) */
+  --cabeca-alta: 4.6rem;
+}
+/* o esbatido: a conversa que sobe desvanece-se sob o cabeçalho; o fundo do cabeçalho é o do próprio cartão (nunca um branco por cima) */
+.aia .aia-cabeca {
+  background: none;
+}
+.aia .aia-lista {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--cabeca-alta) - 1.3rem), #000 calc(var(--cabeca-alta) + 0.5rem));
+  mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--cabeca-alta) - 1.3rem), #000 calc(var(--cabeca-alta) + 0.5rem));
+}
+.aia .aia-base::before {
+  background: linear-gradient(to bottom, transparent, var(--chat-branco));
+}
+
+/* os três pontos: o botão das opções */
+.aia .aia-menu-botao svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* sair da conversa e fechar o chat: a seta de voltar vive na área de escrita */
+.aia .aia-escrita {
+  padding-left: 0.3rem;
+}
+.aia .aia-voltar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: none;
+  color: var(--chat-azul);
+  cursor: pointer;
+  transition: background-color 0.15s ease-out;
+}
+@media (hover: hover) {
+  .aia .aia-voltar:hover {
+    background: var(--chat-amarelo);
+  }
+}
+.aia .aia-voltar:focus-visible {
+  outline: 2px solid var(--chat-azul);
+  outline-offset: 1px;
+}
+
+/* o menu das opções: um cartão do painel (anel, elevação, cantos de 16 px), sem o «Fechar» e os itens com folga */
+.aia .aia-menu {
+  top: calc(var(--cabeca-alta) - 0.6rem);
+  width: min(17.5rem, calc(100% - 1.5rem));
+  padding: 0.4rem;
+  border: 0;
+  border-radius: 1rem;
+  box-shadow:
+    0 0 0 1px var(--color-kumo-line),
+    var(--elevacao-popup);
+}
+.aia .aia-menu-topo {
+  display: none;
+}
+.aia .aia-menu-item {
+  gap: 0.75rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.7rem;
+  font-weight: 500;
+}
+.aia .aia-menu-item svg {
+  flex: none;
+  color: var(--chat-cinza);
+}
+.aia .aia-menu-perigo svg {
+  color: inherit;
+}
+
+/* a alça, o fundo e a folha só existem no telemóvel */
+.aia .aia-alca-zona,
+.aia .aia-fundo {
+  display: none;
+}
+@media (max-width: 39.99rem) {
+  .aia {
+    --cabeca-alta: 5.5rem;
+  }
+  /* a página fica escurecida por trás; tocar nela fecha o chat */
+  .aia .aia-fundo {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: color-mix(in srgb, black 45%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .aia[data-aberto="sim"] .aia-fundo {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* a folha sobe de baixo e deixa uma nesga da página por cima */
+  .aia .aia-painel {
+    inset: auto 0 0 0;
+    top: calc(env(safe-area-inset-top, 0px) + 3.25rem);
+    width: auto;
+    height: auto;
+    border: 0;
+    border-radius: 1.5rem 1.5rem 0 0;
+    transform: translateY(100%);
+    transform-origin: bottom center;
+    transition:
+      transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 0s linear 0.38s;
+    box-shadow:
+      0 0 0 1px var(--color-kumo-line),
+      0 -8px 32px rgb(0 0 0 / 0.18);
+  }
+  .aia[data-aberto="sim"] .aia-painel {
+    transform: translateY(var(--folha-dy, 0px));
+    transition:
+      transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 0s;
+  }
+  .aia[data-aberto="sim"] .aia-painel[data-arrastando-folha] {
+    transition: none;
+  }
+  .aia .aia-alca-zona {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 7;
+    display: grid;
+    height: 1.9rem;
+    place-items: center;
+    touch-action: none;
+    cursor: grab;
+  }
+  .aia .aia-alca {
+    width: 2.5rem;
+    height: 0.3rem;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--chat-azul) 28%, transparent);
+  }
+  .aia .aia-cabeca {
+    padding-top: 1.6rem;
+  }
+  .aia .aia-lista {
+    padding-top: 5.8rem;
+  }
+}
+
+/* o «a pensar» fora do chat (a pesquisa em linguagem natural): as mesmas classes do chat, com as cores do painel */
+.pesq-pensa {
+  --chat-azul: var(--text-color-kumo-default);
+  --chat-cinza: var(--text-color-kumo-subtle);
+  color: var(--text-color-kumo-subtle);
+}

@@ -4,6 +4,10 @@
 
 import { useSyncExternalStore } from "react";
 import { emailDe, FUNCOES } from "@/dados/rbac";
+import { tentarCodigo } from "./limite-tentativas";
+
+/** A chave do limite de tentativas do código de dois passos ao entrar (o ecrã lê a mesma para mostrar a espera). */
+export const CHAVE_DO_LIMITE_MFA = "mfa-entrada";
 
 export interface Sessao {
   funcaoId: string;
@@ -15,6 +19,8 @@ export interface Sessao {
 export interface RespostaAuth {
   ok: boolean;
   erro?: string;
+  /** Segundos até se poder tentar outra vez (o limite de tentativas do código fechou a entrada). */
+  espera?: number;
   /** A conta tem verificação em dois passos: falta o código. */
   codigo?: boolean;
 }
@@ -108,7 +114,9 @@ export const auth = {
     try {
       const p = JSON.parse(window.sessionStorage.getItem(PENDENTE) ?? "null") as { sessao: Sessao; lembrar: boolean } | null;
       if (!p) return { ok: false, erro: "A entrada expirou. Comece outra vez." };
-      if (codigo.replace(/\s/g, "") !== codigoTemporal(segredoDe(p.sessao.funcaoId))) return { ok: false, erro: "Esse código não está certo." };
+      // cinco códigos errados fecham a entrada por um tempo que cresce de cada vez; durante o fecho, nem o código certo serve
+      const r = tentarCodigo(CHAVE_DO_LIMITE_MFA, codigo.replace(/\s/g, "") === codigoTemporal(segredoDe(p.sessao.funcaoId)));
+      if (!r.ok) return { ok: false, erro: r.erro, espera: r.espera };
       guardar(p.sessao, p.lembrar);
       return { ok: true };
     } catch {
@@ -203,5 +211,5 @@ export function useSessao(): { sessao: Sessao | null; verificada: boolean } {
 }
 
 /** Rotas abertas, que se mostram sem o painel e sem sessão. */
-export const ROTAS_PUBLICAS = ["/entrar", "/registar", "/recuperar-palavra-passe", "/recuperar-email", "/repor-palavra-passe", "/verificar", "/privacidade", "/termos", "/cookies"];
+export const ROTAS_PUBLICAS = ["/entrar", "/registar", "/recuperar-palavra-passe", "/recuperar-email", "/repor-palavra-passe", "/verificar", "/receber", "/privacidade", "/termos", "/cookies"];
 export const ehPublica = (caminho: string) => ROTAS_PUBLICAS.some((r) => caminho === r || caminho.startsWith(`${r}/`));

@@ -16,6 +16,8 @@ export interface Modulo {
   grupo?: string;
   /** O que se faz neste módulo; aparece como dica no menu. */
   descricao?: string;
+  /** Os outros nomes que a pessoa lhe pode dar («tema» para a aparência); a pesquisa usa-os. */
+  palavras?: string;
 }
 
 export interface Area {
@@ -106,10 +108,10 @@ export const AREAS: Area[] = [
     rotulo: "Pagamentos",
     icone: "moeda",
     modulos: [
-      { id: "metricas", descricao: "Volume, número de pagamentos, ticket médio e taxa de sucesso do período.", rotulo: "Visão geral", icone: "grafico", tipo: "pagina" },
+      { id: "metricas", descricao: "Volume, número de pagamentos, ticket médio e taxa de sucesso do período.", palavras: "dinheiro, receitas, vendas, faturação", rotulo: "Visão geral", icone: "grafico", tipo: "pagina" },
       { id: "pagamentos", descricao: "Todos os pagamentos: confirmar, recusar e reembolsar.", rotulo: "Pagamentos", icone: "moeda", tipo: "registos" },
       { id: "comprovativos", descricao: "Os comprovativos recebidos, com a imagem, para validar ou rejeitar.", rotulo: "Comprovativos", icone: "ficheiro", tipo: "pagina" },
-      { id: "contas", descricao: "As contas e os IBANs que os clientes veem, configuráveis e validados.", rotulo: "Contas e IBANs", icone: "banco", tipo: "pagina" },
+      { id: "contas", descricao: "As contas e os IBANs que os clientes veem, configuráveis e validados.", palavras: "iban, bancos, transferência, contas bancárias", rotulo: "Contas e IBANs", icone: "banco", tipo: "pagina" },
     ],
   },
   {
@@ -122,12 +124,12 @@ export const AREAS: Area[] = [
       { id: "origens", descricao: "De onde vêm os visitantes: fonte, meio e campanha.", grupo: "Audiência", rotulo: "Origem dos visitantes", icone: "globo", tipo: "registos" },
       { id: "quentes", descricao: "As páginas mais vistas, com tempo médio e rejeição.", grupo: "Audiência", rotulo: "Páginas quentes", icone: "fogo", tipo: "registos" },
       { id: "cliques", descricao: "Os botões e ligações mais clicados.", grupo: "Audiência", rotulo: "Botões mais clicados", icone: "clique", tipo: "registos" },
-      { id: "campanhas", descricao: "Montar ligações com UTM para saber que campanha trouxe cada visitante.", grupo: "Campanhas", rotulo: "Campanhas e UTM", icone: "link", tipo: "pagina" },
+      { id: "campanhas", descricao: "Montar ligações com UTM para saber que campanha trouxe cada visitante.", palavras: "utm, ligações de campanha, links", grupo: "Campanhas", rotulo: "Campanhas e UTM", icone: "link", tipo: "pagina" },
       { id: "rastreio", descricao: "O script para pôr no site, os eventos que recebe e um teste.", grupo: "Campanhas", rotulo: "Rastreio no site", icone: "codigo", tipo: "pagina" },
-      { id: "campanhas-email", descricao: "Escrever uma campanha, escolher a audiência e enviar já ou agendar, com os resultados de cada uma.", grupo: "E-mail", rotulo: "Campanhas de e-mail", icone: "correio", tipo: "pagina" },
-      { id: "agendados-email", descricao: "O que vai sair: campanhas e mensagens por dia, com enviar já, mudar a hora e cancelar.", grupo: "E-mail", rotulo: "Agendados", icone: "relogio", tipo: "pagina" },
-      { id: "recebidos", descricao: "As mensagens que chegaram: ler, responder, reencaminhar e marcar com estrela.", grupo: "E-mail", rotulo: "Recebidos", icone: "transferir", tipo: "pagina" },
-      { id: "enviados", descricao: "As mensagens enviadas e se chegaram, foram abertas ou falharam.", grupo: "E-mail", rotulo: "Enviados", icone: "enviar", tipo: "pagina" },
+      { id: "campanhas-email", descricao: "Escrever uma campanha, escolher a audiência e enviar já ou agendar, com os resultados de cada uma.", palavras: "newsletter, mailing, enviar e-mails, mensagens em massa", grupo: "E-mail", rotulo: "Campanhas de e-mail", icone: "correio", tipo: "pagina" },
+      { id: "agendados-email", descricao: "O que vai sair: campanhas e mensagens por dia, com enviar já, mudar a hora e cancelar.", palavras: "programar envio, e-mails à espera, hora de envio", grupo: "E-mail", rotulo: "Agendados", icone: "relogio", tipo: "pagina" },
+      { id: "recebidos", descricao: "As mensagens que chegaram: ler, responder, reencaminhar e marcar com estrela.", palavras: "caixa de entrada, correio, mensagens recebidas", grupo: "E-mail", rotulo: "Recebidos", icone: "transferir", tipo: "pagina" },
+      { id: "enviados", descricao: "As mensagens enviadas e se chegaram, foram abertas ou falharam.", palavras: "correio enviado, mensagens enviadas", grupo: "E-mail", rotulo: "Enviados", icone: "enviar", tipo: "pagina" },
     ],
   },
   {
@@ -137,10 +139,11 @@ export const AREAS: Area[] = [
     icone: "pasta",
     modulos: [
       { id: "biblioteca", descricao: "Pastas e ficheiros guardados neste navegador: carregar, pré-visualizar, renomear, mover e remover.", rotulo: "Gestor de ficheiros", icone: "pasta", tipo: "pagina" },
-      { id: "galeria", descricao: "Carregar imagens e vê-las em grelha, com texto alternativo.", rotulo: "Galeria de imagens", icone: "galeria", tipo: "pagina" },
+      { id: "partilha", descricao: "Enviar ficheiros, imagens e texto para outro aparelho, direitos de um navegador para o outro (WebRTC), com um código, uma ligação ou um QR.", palavras: "snapshare, sendr, enviar ficheiros, partilhar, webrtc, p2p, qr, telemóvel, airdrop, transferir, para fora", rotulo: "Enviar ficheiros", icone: "partilha", tipo: "pagina" },
+      { id: "galeria", descricao: "Carregar imagens e vê-las em grelha, com texto alternativo.", palavras: "imagens, fotos, onde aparece", rotulo: "Galeria de imagens", icone: "galeria", tipo: "pagina" },
       { id: "blog", descricao: "Escrever, publicar e exportar artigos.", rotulo: "Editor de blog", icone: "artigo", tipo: "pagina" },
-      { id: "editor-produtos", descricao: "Criar e editar produtos, com as imagens da galeria.", rotulo: "Editor de produtos", icone: "produto", tipo: "pagina" },
-      { id: "faq", descricao: "Escrever as perguntas frequentes e as respostas: valem para o site e para o assistente de IA.", rotulo: "Editor de FAQ", icone: "ajuda", tipo: "pagina" },
+      { id: "editor-produtos", descricao: "Criar e editar produtos, com as imagens da galeria.", palavras: "produtos, loja, preço, stock, catálogo", rotulo: "Editor de produtos", icone: "produto", tipo: "pagina" },
+      { id: "faq", descricao: "Escrever as perguntas frequentes e as respostas: valem para o site e para o assistente de IA.", palavras: "perguntas frequentes, chatbot, respostas, sugestões do chat, pills", rotulo: "Editor de FAQ", icone: "ajuda", tipo: "pagina" },
     ],
   },
   {
@@ -149,9 +152,9 @@ export const AREAS: Area[] = [
     rotulo: "Assistente de IA",
     icone: "ia",
     modulos: [
-      { id: "comportamento", descricao: "Nome, tom, tamanho das respostas, instruções e limites do assistente.", rotulo: "Comportamento", icone: "engrenagem", tipo: "pagina" },
-      { id: "memoria", descricao: "Os PDF e as notas que o assistente tem na memória.", rotulo: "Memória", icone: "pdf", tipo: "pagina" },
-      { id: "testar", descricao: "Ver o que o assistente encontraria na memória e as instruções que recebe.", rotulo: "Testar", icone: "lupa", tipo: "pagina" },
+      { id: "comportamento", descricao: "Nome, tom, tamanho das respostas, instruções e limites do assistente.", palavras: "chatbot, assistente, tom, instruções, nome do assistente", rotulo: "Comportamento", icone: "engrenagem", tipo: "pagina" },
+      { id: "memoria", descricao: "Os PDF e as notas que o assistente tem na memória.", palavras: "chatbot, documentos, pdf, notas, conhecimento", rotulo: "Memória", icone: "pdf", tipo: "pagina" },
+      { id: "testar", descricao: "Ver o que o assistente encontraria na memória e as instruções que recebe.", palavras: "chatbot, experimentar, perguntar ao assistente", rotulo: "Testar", icone: "lupa", tipo: "pagina" },
     ],
   },
   {
@@ -160,18 +163,20 @@ export const AREAS: Area[] = [
     rotulo: "Developer tools",
     icone: "terminal",
     modulos: [
-      { id: "saude", descricao: "CPU, memória, disco, rede e serviços do servidor, em tempo real.", grupo: "Servidor", rotulo: "Saúde do servidor", icone: "servidor", tipo: "pagina" },
-      { id: "pedidos-web", descricao: "Os pedidos web a chegar agora, com estado, tempo e origem.", grupo: "Servidor", rotulo: "Pedidos em tempo real", icone: "pulso", tipo: "pagina" },
+      { id: "saude", descricao: "CPU, memória, disco, rede e serviços do servidor, em tempo real.", palavras: "servidor, cpu, memória, disco, desempenho, estado", grupo: "Servidor", rotulo: "Saúde do servidor", icone: "servidor", tipo: "pagina" },
+      { id: "pedidos-web", descricao: "Os pedidos web a chegar agora, com estado, tempo e origem.", palavras: "tráfego, visitas, ips, requisições", grupo: "Servidor", rotulo: "Pedidos em tempo real", icone: "pulso", tipo: "pagina" },
       { id: "erros", descricao: "Os erros agrupados, com o número de ocorrências e o estado.", grupo: "Servidor", rotulo: "Registo de erros", icone: "aviso", tipo: "registos" },
-      { id: "implementacoes", descricao: "As versões publicadas, o teste A/B entre duas e o rollback para uma anterior.", grupo: "Versões", rotulo: "Implementações", icone: "atualizar", tipo: "pagina" },
-      { id: "github", descricao: "O repositório do GitHub, os commits, lançar uma versão e os conectores.", grupo: "Versões", rotulo: "GitHub e conectores", icone: "codigo", tipo: "pagina" },
+      { id: "logs", descricao: "As linhas que o servidor escreve, em direto, como os registos do Render: do site, de contentores Docker, de ficheiros, do journald de um VPS ou do Cloudflare Workers.", palavras: "logs, registos, consola, tail, render, docker, journald, stdout, stderr, erros do servidor, linhas, em direto, cloudflare workers, vps", grupo: "Servidor", rotulo: "Registos do servidor", icone: "terminal", tipo: "pagina" },
+      { id: "implementacoes", descricao: "As versões publicadas, o teste A/B entre duas e o rollback para uma anterior.", palavras: "versões, publicar, deploy, rollback, voltar atrás, versão antiga, teste A/B", grupo: "Versões", rotulo: "Implementações", icone: "atualizar", tipo: "pagina" },
+      { id: "github", descricao: "O repositório do GitHub, os commits, lançar uma versão e os conectores.", palavras: "repositório, código, commits, ramo, ligar ao github", grupo: "Versões", rotulo: "GitHub e conectores", icone: "codigo", tipo: "pagina" },
       { id: "bd", descricao: "Tabelas, segurança por linha, consola de leitura e apagar linhas.", grupo: "Dados", rotulo: "Base de dados", icone: "base", tipo: "pagina" },
-      { id: "backups", descricao: "Cópias de segurança: destino, agenda, criar, restaurar e apagar.", grupo: "Dados", rotulo: "Cópias de segurança", icone: "guardar", tipo: "pagina" },
+      { id: "backups", descricao: "Cópias de segurança: destino, agenda, criar, restaurar e apagar.", palavras: "cópias, restaurar, guardar dados, segurança dos dados", grupo: "Dados", rotulo: "Cópias de segurança", icone: "guardar", tipo: "pagina" },
       { id: "limpeza", descricao: "Apagar cache, registos antigos, temporários e dados de teste.", grupo: "Dados", rotulo: "Limpeza", icone: "lixo", tipo: "pagina" },
-      { id: "firewall", descricao: "Ligar ou desligar o firewall, o limite de pedidos e as regras de IP.", grupo: "Proteção", rotulo: "Firewall", icone: "escudo", tipo: "pagina" },
+      { id: "firewall", descricao: "Ligar ou desligar o firewall, o limite de pedidos e as regras de IP.", palavras: "bloquear ip, atacantes, ataques, segurança, regras, limite de pedidos", grupo: "Proteção", rotulo: "Firewall", icone: "escudo", tipo: "pagina" },
       { id: "paginas", descricao: "Ativar, pôr em manutenção ou desativar páginas do site.", grupo: "Proteção", rotulo: "Páginas do site", icone: "globo", tipo: "pagina" },
-      { id: "envios", descricao: "Se os e-mails estão mesmo a ser enviados, o servidor de envio e o DNS.", grupo: "Ligações", rotulo: "Envio de e-mails", icone: "correio", tipo: "pagina" },
-      { id: "api", descricao: "Ligar este painel a um servidor e ver o contrato das APIs.", grupo: "Ligações", rotulo: "API e ligações", icone: "ligacao", tipo: "pagina" },
+      { id: "dns", descricao: "Os registos DNS da zona do site, e importar e exportar a zona em BIND.", palavras: "zona, bind, domínio, nameserver, mx, cname, txt, spf, dkim, registos, importar zona", grupo: "Ligações", rotulo: "Registos DNS", icone: "globo", tipo: "pagina" },
+      { id: "envios", descricao: "Se os e-mails estão mesmo a ser enviados, o servidor de envio e o DNS.", palavras: "e-mail, smtp, dns, spf, dkim, entrega", grupo: "Ligações", rotulo: "Envio de e-mails", icone: "correio", tipo: "pagina" },
+      { id: "api", descricao: "Ligar este painel a um servidor e ver o contrato das APIs.", palavras: "ligar servidor, token, endereços, openapi", grupo: "Ligações", rotulo: "API e ligações", icone: "ligacao", tipo: "pagina" },
     ],
   },
   {
@@ -180,11 +185,12 @@ export const AREAS: Area[] = [
     rotulo: "Administração",
     icone: "engrenagem",
     modulos: [
-      { id: "utilizadores", descricao: "Quem tem acesso ao painel e com que função.", rotulo: "Utilizadores e funções", icone: "escudo", tipo: "registos" },
+      { id: "utilizadores", descricao: "Quem tem acesso ao painel e com que função.", palavras: "pessoas, convites, funções, permissões, acessos, quem entra", rotulo: "Utilizadores e funções", icone: "escudo", tipo: "registos" },
       { id: "equipas", descricao: "Equipas, responsáveis e encomendas em curso.", rotulo: "Equipas", icone: "pessoas", tipo: "registos" },
       { id: "erp", descricao: "Ligação ao sistema de gestão: clientes, artigos e stock.", grupo: "Ligações", rotulo: "Ligação ao ERP", icone: "ligacao", tipo: "painel" },
       { id: "faturacao", descricao: "Ligação à faturação: documentos de venda e contas correntes.", grupo: "Ligações", rotulo: "Ligação à faturação", icone: "ligacao", tipo: "painel" },
-      { id: "atividade", descricao: "Registo de tudo o que os utilizadores fazem no painel.", rotulo: "Registo de atividade", icone: "relogio", tipo: "registos" },
+      { id: "atividade", descricao: "Cada sessão (quando entrou, o IP, o local, o aparelho) e tudo o que se fez nela, mais os convites e se foram aceites.", palavras: "histórico, sessões, registo, auditoria, logins, ip, quem fez o quê, convites, acessos", rotulo: "Sessões e atividade", icone: "relogio", tipo: "pagina" },
+      { id: "reciclagem", descricao: "Tudo o que se apagou, de qualquer tipo, fica aqui durante o prazo definido pelo Master Admin (90 dias por omissão) e pode ser restaurado ou apagado de vez.", palavras: "lixo, recuperar, restaurar, apagados, eliminados, desfazer, recycle bin, caixote", rotulo: "Reciclagem", icone: "lixo", tipo: "pagina" },
     ],
   },
   {
@@ -193,8 +199,8 @@ export const AREAS: Area[] = [
     rotulo: "Painel",
     icone: "paleta",
     modulos: [
-      { id: "modulos", descricao: "Escolher o pacote do negócio e ligar ou desligar cada área e módulo.", rotulo: "Módulos e pacotes", icone: "campos", tipo: "pagina" },
-      { id: "predefinicoes", descricao: "Mudar de uma vez o aspeto do painel e as áreas ligadas.", rotulo: "Predefinições", icone: "paleta", tipo: "pagina" },
+      { id: "modulos", descricao: "Escolher o pacote do negócio e ligar ou desligar cada área e módulo.", palavras: "ligar, desligar, ativar, desativar, esconder, mostrar, áreas, funcionalidades, pacote, hotel, táxi, loja", rotulo: "Módulos e pacotes", icone: "campos", tipo: "pagina" },
+      { id: "predefinicoes", descricao: "Mudar de uma vez o aspeto do painel e as áreas ligadas.", palavras: "tema, aspeto, modelo, preset, estilo do painel", rotulo: "Predefinições", icone: "paleta", tipo: "pagina" },
     ],
   },
 ];

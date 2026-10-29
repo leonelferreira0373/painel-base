@@ -3,13 +3,15 @@
 
 import { Chart, ChartPalette, type KumoChartOption } from "@cloudflare/kumo";
 import type { TimeseriesData } from "@cloudflare/kumo/components/chart";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { Ponto } from "@/lib/analysis/series";
 import { echarts } from "@/lib/echarts";
 import { useTema } from "@/lib/tema";
+import { clarear, comOpacidade, paletaDe, useCorDoGrafico } from "@/lib/cores-graficos";
 import { SEPARADOR_DE_ROTA } from "@/lib/rotas";
 import { SemDadosGrafico } from "../Estados";
 import { Pilula, SetaDeCaminho } from "../Frase";
+import { useIdDoGrafico } from "./CorDoGrafico";
 
 export type GraficoSpec =
   | { tipo: "linha"; pontos: Ponto[]; nome?: string }
@@ -51,14 +53,16 @@ export function seriesDe(pontos: Ponto[], nome: string, cor = ChartPalette.categ
 /** Contagens: o eixo não deve ter marcas com casas decimais. */
 const inteiros = (pontos: Ponto[]) => (pontos.every((p) => Number.isInteger(p.valor)) ? 1 : undefined);
 const eixoTexto = { color: TEXTO, fontSize: 11, fontFamily: "Inter Variable, Inter, system-ui, sans-serif" };
+const areaDe = (cor?: string) => ({ type: "linear" as const, x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: cor ? comOpacidade(cor, 0.26) : "rgba(21,93,252,0.26)" }, { offset: 1, color: cor ? comOpacidade(cor, 0.02) : "rgba(21,93,252,0.02)" }] });
 const AREA = { type: "linear" as const, x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(21,93,252,0.26)" }, { offset: 1, color: "rgba(21,93,252,0.02)" }] };
 const grelhaBase = { left: 8, right: 12, top: 16, bottom: 4, containLabel: true };
 const dica = { trigger: "item" as const, backgroundColor: "#fff", borderColor: GRELHA, textStyle: { color: "#171717", fontSize: 12 } };
 
 /** Opções de ECharts para tudo o que não é uma série temporal. */
-export function opcoesDe(spec: GraficoSpec): KumoChartOption {
+export function opcoesDe(spec: GraficoSpec, cor?: string): KumoChartOption {
+  const base = cor ?? ChartPalette.categorical(0);
   if (spec.tipo === "empilhadas" || spec.tipo === "linhas") {
-    const cores = spec.series.map((_, i) => ChartPalette.categorical(i));
+    const cores = cor ? paletaDe(cor, spec.series.length) : spec.series.map((_, i) => ChartPalette.categorical(i));
     return {
       color: cores,
       grid: { left: 8, right: 12, top: 12, bottom: 4, containLabel: true },
@@ -77,9 +81,9 @@ export function opcoesDe(spec: GraficoSpec): KumoChartOption {
     return {
       grid: { ...grelhaBase, left: 8, right: 56 },
       tooltip: { ...dica, trigger: "axis", axisPointer: { type: "shadow" } },
-      xAxis: { type: "value", axisLabel: { ...eixoTexto, formatter: (v: number) => curto(v) }, splitLine: { lineStyle: { color: GRELHA } } },
+      xAxis: { type: "value", splitNumber: 3, axisLabel: { ...eixoTexto, hideOverlap: true, formatter: (v: number) => curto(v) }, splitLine: { lineStyle: { color: GRELHA } } },
       yAxis: { type: "category", data: dados.map((p) => p.rotulo), axisTick: { show: false }, axisLine: { show: false }, axisLabel: { ...eixoTexto, color: "#171717", width: 130, overflow: "truncate" } },
-      series: [{ type: "bar", data: dados.map((p, i) => ({ value: p.valor, itemStyle: { color: i === dados.length - 1 ? ChartPalette.categorical(0) : "#8fb0ff", borderRadius: [0, 7, 7, 0] } })), barMaxWidth: 26, label: { show: true, position: "right", color: "#171717", fontSize: 11, formatter: (p: { value: number }) => formatar(p.value) } }],
+      series: [{ type: "bar", data: dados.map((p, i) => ({ value: p.valor, itemStyle: { color: i === dados.length - 1 ? base : cor ? clarear(cor, 0.45) : "#8fb0ff", borderRadius: [0, 7, 7, 0] } })), barMaxWidth: 26, label: { show: true, position: "right", color: "#171717", fontSize: 11, formatter: (p: { value: number }) => formatar(p.value) } }],
     } as KumoChartOption;
   }
   if (spec.tipo === "colunas") {
@@ -95,7 +99,7 @@ export function opcoesDe(spec: GraficoSpec): KumoChartOption {
       tooltip: { ...dica, trigger: "axis", axisPointer: { type: "shadow" } },
       xAxis: { type: "category", data: spec.pontos.map(rotulo), axisLabel: { ...eixoTexto, hideOverlap: true }, axisTick: { show: false }, axisLine: { lineStyle: { color: GRELHA, width: 1.5 } } },
       yAxis: { type: "value", minInterval: inteiros(spec.pontos), axisLabel: { ...eixoTexto, formatter: (v: number) => curto(v) }, splitLine: { lineStyle: { color: GRELHA } } },
-      series: [{ type: "bar", data: spec.pontos.map((p) => p.valor), barMaxWidth: 18, itemStyle: { color: ChartPalette.categorical(0), borderRadius: [6, 6, 0, 0] } }],
+      series: [{ type: "bar", data: spec.pontos.map((p) => p.valor), barMaxWidth: 18, itemStyle: { color: base, borderRadius: [6, 6, 0, 0] } }],
     } as KumoChartOption;
   }
   if (spec.tipo === "histograma") {
@@ -104,7 +108,7 @@ export function opcoesDe(spec: GraficoSpec): KumoChartOption {
       tooltip: { ...dica, trigger: "axis", axisPointer: { type: "shadow" } },
       xAxis: { type: "category", data: spec.classes.map((c) => `${curto(c.de)} – ${curto(c.ate)}`), axisLabel: { ...eixoTexto, hideOverlap: true }, axisTick: { show: false }, axisLine: { lineStyle: { color: GRELHA } } },
       yAxis: { type: "value", axisLabel: { ...eixoTexto, formatter: (v: number) => curto(v) }, splitLine: { lineStyle: { color: GRELHA } } },
-      series: [{ type: "bar", data: spec.classes.map((c) => c.n), barCategoryGap: "6%", itemStyle: { color: ChartPalette.categorical(0), borderRadius: [6, 6, 0, 0] } }],
+      series: [{ type: "bar", data: spec.classes.map((c) => c.n), barCategoryGap: "6%", itemStyle: { color: base, borderRadius: [6, 6, 0, 0] } }],
     } as KumoChartOption;
   }
   if (spec.tipo === "dispersao") {
@@ -113,14 +117,14 @@ export function opcoesDe(spec: GraficoSpec): KumoChartOption {
       tooltip: { ...dica, formatter: (p: { value: number[] }) => `${spec.rx}: ${formatar(p.value[0])}<br/>${spec.ry}: ${formatar(p.value[1])}` },
       xAxis: { type: "value", name: spec.rx, nameLocation: "middle", nameGap: 26, nameTextStyle: eixoTexto, scale: true, axisLabel: { ...eixoTexto, formatter: (v: number) => curto(v) }, splitLine: { lineStyle: { color: GRELHA } } },
       yAxis: { type: "value", name: spec.ry, nameTextStyle: { ...eixoTexto, align: "left" }, scale: true, axisLabel: { ...eixoTexto, formatter: (v: number) => curto(v) }, splitLine: { lineStyle: { color: GRELHA } } },
-      series: [{ type: "scatter", symbolSize: 11, data: spec.pontos.map((p) => [p.x, p.y]), itemStyle: { color: ChartPalette.categorical(0), opacity: 0.62, borderColor: "#fff", borderWidth: 1.5 } }],
+      series: [{ type: "scatter", symbolSize: 11, data: spec.pontos.map((p) => [p.x, p.y]), itemStyle: { color: base, opacity: 0.62, borderColor: "#fff", borderWidth: 1.5 } }],
     } as KumoChartOption;
   }
   if (spec.tipo === "rosca") {
     return {
       tooltip: { ...dica, formatter: "{b}: {c} ({d} %)" },
       legend: { orient: "vertical", right: 8, top: "middle", icon: "circle", itemWidth: 8, itemHeight: 8, textStyle: { color: "#171717", fontSize: 12, width: 130, overflow: "truncate" }, formatter: (n: string) => n },
-      color: [0, 1, 2, 3, 4, 5].map((i) => ChartPalette.categorical(i)),
+      color: cor ? paletaDe(cor, 6) : [0, 1, 2, 3, 4, 5].map((i) => ChartPalette.categorical(i)),
       series: [{ type: "pie", radius: ["46%", "84%"], center: ["32%", "50%"], avoidLabelOverlap: true, label: { show: false }, itemStyle: { borderColor: "#fff", borderWidth: 4, borderRadius: 6 }, data: spec.pontos.map((p) => ({ name: p.rotulo, value: p.valor })) }],
     } as KumoChartOption;
   }
@@ -143,7 +147,7 @@ export function opcoesDe(spec: GraficoSpec): KumoChartOption {
     tooltip: { ...dica, trigger: "axis" },
     xAxis: { type: "category", data: pontos.map((p) => p.rotulo), boundaryGap: false, axisLabel: { ...eixoTexto, hideOverlap: true }, axisLine: { lineStyle: { color: GRELHA } }, axisTick: { show: false } },
     yAxis: { type: "value", minInterval: inteiros(pontos), axisLabel: { ...eixoTexto, formatter: (v: number) => curto(v) }, splitLine: { lineStyle: { color: GRELHA } } },
-    series: [{ type: "line", data: pontos.map((p) => p.valor), showSymbol: false, smooth: 0.15, lineStyle: { width: 3.5, color: ChartPalette.categorical(0), cap: "round", join: "round" }, itemStyle: { color: ChartPalette.categorical(0) }, areaStyle: { color: AREA } }],
+    series: [{ type: "line", data: pontos.map((p) => p.valor), showSymbol: false, smooth: 0.15, lineStyle: { width: 3.5, color: base, cap: "round", join: "round" }, itemStyle: { color: base }, areaStyle: { color: areaDe(cor) } }],
   } as KumoChartOption;
 }
 
@@ -154,7 +158,8 @@ export function alturaDe(spec: GraficoSpec, base: number): number {
 }
 
 /** Opções completas (incluindo séries temporais) para desenhar fora do ecrã na exportação para PDF. */
-export function opcoesExportacao(spec: GraficoSpec): KumoChartOption {
+export function opcoesExportacao(spec: GraficoSpec, cor?: string): KumoChartOption {
+  const base = cor ?? ChartPalette.categorical(0);
   if (spec.tipo === "linha" && ehSerieTemporal(spec.pontos)) {
     const horario = spec.pontos[0]?.chave.includes("T");
     const dia = (t: number) => (horario ? new Date(t).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }) : new Date(t).toLocaleDateString("pt-PT", { day: "2-digit", month: "short" }));
@@ -168,10 +173,10 @@ export function opcoesExportacao(spec: GraficoSpec): KumoChartOption {
       },
       xAxis: { type: "time", axisLabel: { ...eixoTexto, hideOverlap: true, formatter: (v: number) => dia(v) }, axisLine: { lineStyle: { color: GRELHA, width: 1.5 } }, axisTick: { show: false }, splitLine: { show: false } },
       yAxis: { type: "value", minInterval: inteiros(spec.pontos), axisLabel: { ...eixoTexto, formatter: (v: number) => curto(v) }, splitLine: { lineStyle: { color: GRELHA } } },
-      series: [{ type: "line", showSymbol: false, symbol: "circle", symbolSize: 11, smooth: 0.15, data: spec.pontos.map((p) => [marcaTempo(p.chave) as number, p.valor]), lineStyle: { width: 3.5, color: ChartPalette.categorical(0), cap: "round", join: "round" }, itemStyle: { color: ChartPalette.categorical(0), borderColor: "#fff", borderWidth: 2.5 }, emphasis: { focus: "series" }, areaStyle: { color: AREA } }],
+      series: [{ type: "line", showSymbol: false, symbol: "circle", symbolSize: 11, smooth: 0.15, data: spec.pontos.map((p) => [marcaTempo(p.chave) as number, p.valor]), lineStyle: { width: 3.5, color: base, cap: "round", join: "round" }, itemStyle: { color: base, borderColor: "#fff", borderWidth: 2.5 }, emphasis: { focus: "series" }, areaStyle: { color: areaDe(cor) } }],
     } as KumoChartOption;
   }
-  return opcoesDe(spec);
+  return opcoesDe(spec, cor);
 }
 
 /** No tema escuro, troca as cores fixas do gráfico (texto, linhas, fundo das dicas) pelas suas versões escuras; o PDF continua a usar as claras. */
@@ -196,23 +201,27 @@ export function semDados(spec: GraficoSpec): boolean {
 export function Grafico({ spec, altura = 240 }: { spec: GraficoSpec; altura?: number; nome?: string }) {
   const vazio = semDados(spec);
   const { efetivo } = useTema();
-  const opcoes = useMemo(() => (vazio ? null : efetivo === "escuro" ? paraEscuro(opcoesExportacao(spec)) : opcoesExportacao(spec)), [spec, vazio, efetivo]);
+  const id = useIdDoGrafico();
+  const [cor] = useCorDoGrafico(id);
+  const opcoes = useMemo(() => (vazio ? null : efetivo === "escuro" ? paraEscuro(opcoesExportacao(spec, cor)) : opcoesExportacao(spec, cor)), [spec, vazio, efetivo, cor]);
+  const botaoDaCor: ReactNode = null;
   if (!opcoes) return <SemDadosGrafico altura={altura} />;
   if (spec.tipo === "rosca" && spec.rotas) {
     // as páginas leem-se em pills: a legenda é do painel (não do canvas) e o anel fica ao centro do seu espaço
     const sem = { ...opcoes, legend: { show: false }, series: (opcoes.series as { center?: string[] }[]).map((s) => ({ ...s, center: ["50%", "50%"] })) } as KumoChartOption;
     return (
-      <div className="flex items-center gap-4">
+      <div className="group/grafico relative flex items-center gap-4">
+        {botaoDaCor}
         <div className="min-w-0 flex-1">
           <Chart echarts={echarts} options={sem} height={alturaDe(spec, altura)} />
         </div>
         <ul className="flex w-[46%] shrink-0 flex-col gap-1.5">
           {spec.pontos.map((p, i) => (
-            <li key={p.rotulo} className="flex min-w-0 items-center gap-2 text-xs text-kumo-default">
-              <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: ChartPalette.categorical(i % 6) }} />
-              <span className="min-w-0 flex-1 truncate">
+            <li key={p.rotulo} className="flex min-w-0 items-start gap-2 text-xs text-kumo-default">
+              <span aria-hidden className="mt-[7px] size-2 shrink-0 rounded-full" style={{ background: cor ? paletaDe(cor, 6)[i % 6] : ChartPalette.categorical(i % 6) }} />
+              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-y-1">
                 {p.rotulo.split(SEPARADOR_DE_ROTA).map((parte, j) => (
-                  <span key={j}>
+                  <span key={j} className="inline-flex max-w-full items-center">
                     {j > 0 && <SetaDeCaminho />}
                     <Pilula>{parte}</Pilula>
                   </span>
@@ -224,5 +233,10 @@ export function Grafico({ spec, altura = 240 }: { spec: GraficoSpec; altura?: nu
       </div>
     );
   }
-  return <Chart echarts={echarts} options={opcoes} height={alturaDe(spec, altura)} />;
+  return (
+    <div className="group/grafico relative">
+      {botaoDaCor}
+      <Chart echarts={echarts} options={opcoes} height={alturaDe(spec, altura)} />
+    </div>
+  );
 }

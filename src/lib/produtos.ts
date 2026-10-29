@@ -74,6 +74,10 @@ export function useProdutos() {
     produtos,
     pronto,
     guardar: (p: Produto) => definir((l) => (l.some((x) => x.id === p.id) ? l.map((x) => (x.id === p.id ? p : x)) : [p, ...l])),
-    remover: (id: string) => definir((l) => l.filter((x) => x.id !== id)),
+    remover: (id: string) => {
+      const p = produtos.find((x) => x.id === id);
+      if (p) void import("./reciclagem").then((r) => r.reciclar({ tipo: "Produto", dados: p, origem: { kind: "colecao", chave: "produtos" } }));
+      definir((l) => l.filter((x) => x.id !== id));
+    },
   };
 }

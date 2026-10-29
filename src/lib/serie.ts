@@ -42,3 +42,18 @@ export function acumular(serie: number[]): number[] {
 
 /** Uma série só serve para desenhar se tem pelo menos dois pontos; senão devolve uma lista vazia e o cartão fica só com o número. */
 export const serieValida = (serie: number[] | undefined): number[] => (serie && serie.length >= 2 && serie.every(Number.isFinite) ? serie : []);
+
+/**
+ * A variação, em percentagem, da média dos últimos N valores face à dos N anteriores (N é metade da série): é a que se mostra ao lado do valor de um cartão.
+ * Sem pelo menos quatro pontos, ou com a média anterior a zero, não há variação.
+ */
+export function variacaoDeSerie(serie: number[]): { variacao: number; n: number } | null {
+  const v = serieValida(serie);
+  if (v.length < 4) return null;
+  const n = Math.floor(v.length / 2);
+  const media = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  const antes = media(v.slice(v.length - 2 * n, v.length - n));
+  const agora = media(v.slice(v.length - n));
+  if (antes === 0) return null;
+  return { variacao: ((agora - antes) / Math.abs(antes)) * 100, n };
+}

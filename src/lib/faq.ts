@@ -9,6 +9,8 @@ export interface Faq {
   resposta: string;
   /** Só as publicadas aparecem no site e no assistente. */
   ativa: boolean;
+  /** Aparece como pill (pergunta pronta) no chat do assistente; uma publicada que não é sugerida continua a ser resposta oficial. */
+  sugerida: boolean;
   criado: string;
   atualizado: string;
 }
@@ -18,7 +20,7 @@ export const LIMITE_DA_RESPOSTA = 2000;
 
 /** Uma pergunta nova e vazia, já publicada. */
 export function faqNova(id: string, agora = new Date().toISOString()): Faq {
-  return { id, pergunta: "", resposta: "", ativa: true, criado: agora, atualizado: agora };
+  return { id, pergunta: "", resposta: "", ativa: true, sugerida: true, criado: agora, atualizado: agora };
 }
 
 /** Para comparar perguntas: sem acentos, sem maiúsculas, sem pontuação e sem o «?» do fim. */
@@ -49,8 +51,8 @@ export function moverFaq(lista: Faq[], id: string, passo: -1 | 1): Faq[] {
   return novo;
 }
 
-/** No formato das perguntas prontas do assistente (`ai-chat`): as publicadas, pela ordem da lista. */
-export const perguntasProntas = (lista: Faq[]) => faqAtivas(lista).map((f) => ({ pergunta: f.pergunta.trim(), resposta: f.resposta.trim() }));
+/** No formato das perguntas prontas do assistente (`ai-chat`): as publicadas que se sugerem no chat, pela ordem da lista. */
+export const perguntasProntas = (lista: Faq[]) => faqAtivas(lista).filter((f) => f.sugerida).map((f) => ({ pergunta: f.pergunta.trim(), resposta: f.resposta.trim() }));
 
 /** As publicadas como documentos da memória do assistente, para procurar nelas e contá-las nas instruções (cada pergunta com a sua resposta é uma só passagem). */
 export function faqComoDocumentos(lista: Faq[]): DocumentoDeMemoria[] {
@@ -77,12 +79,18 @@ export function lerFaq(): Faq[] {
     const texto = window.localStorage.getItem(CHAVE);
     if (texto !== null) {
       const v: unknown = JSON.parse(texto);
-      if (Array.isArray(v)) return v.filter(valida);
+      if (Array.isArray(v)) return v.filter(valida).map((f) => ({ ...f, sugerida: f.sugerida !== false }));
     }
   } catch {
     /* sem armazenamento ou texto estragado: ficam as de partida */
   }
   return FAQ_DE_ORIGEM;
+}
+
+/** Guarda (ou altera) uma pergunta, sem hook: para quem não é um ecrã (a IA do painel). */
+export function guardarFaqAgora(f: Faq): void {
+  const lista = lerFaq();
+  gravarFaq(lista.some((x) => x.id === f.id) ? lista.map((x) => (x.id === f.id ? f : x)) : [...lista, f]);
 }
 
 function gravarFaq(lista: Faq[]): void {
@@ -113,7 +121,11 @@ export function useFaq() {
     const lista = lerFaq();
     gravarFaq(lista.some((x) => x.id === f.id) ? lista.map((x) => (x.id === f.id ? f : x)) : [...lista, f]);
   }, []);
-  const remover = useCallback((id: string) => gravarFaq(lerFaq().filter((x) => x.id !== id)), []);
+  const remover = useCallback((id: string) => {
+    const f = lerFaq().find((x) => x.id === id);
+    if (f) void import("./reciclagem").then((r) => r.reciclar({ tipo: "Pergunta da FAQ", dados: f, origem: { kind: "faq" } }));
+    gravarFaq(lerFaq().filter((x) => x.id !== id));
+  }, []);
   const mover = useCallback((id: string, passo: -1 | 1) => gravarFaq(moverFaq(lerFaq(), id, passo)), []);
   return { faq, pronto, guardar, remover, mover };
 }

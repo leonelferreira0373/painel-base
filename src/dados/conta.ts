@@ -7,18 +7,21 @@ export interface SecaoConta {
   icone: Icone;
   /** O que se faz nesta secção; aparece como dica no menu. */
   descricao: string;
+  /** Os outros nomes que a pessoa lhe pode dar; a pesquisa usa-os. */
+  palavras?: string;
 }
 
 export const SECOES_CONTA: SecaoConta[] = [
-  { id: "perfil", rotulo: "Perfil", icone: "pessoa", descricao: "O seu nome, a fotografia, a assinatura e os formatos de data e hora." },
-  { id: "seguranca", rotulo: "Segurança", icone: "escudo", descricao: "Palavra-passe, verificação em dois passos, chaves de acesso e sessões abertas." },
-  { id: "contactos", rotulo: "E-mail e telefone", icone: "correio", descricao: "Mudar o e-mail da conta sem perder o histórico, e os contactos de recuperação." },
-  { id: "notificacoes", rotulo: "Notificações", icone: "campainha", descricao: "O que recebe, por onde, a que horas e quem decide por si quando está ausente." },
-  { id: "lembretes", rotulo: "Lembretes", icone: "lembrete", descricao: "Avisos seus, com data, hora e repetição." },
-  { id: "aparencia", rotulo: "Aparência", icone: "paleta", descricao: "Tema claro ou escuro, movimento, dicas e a barra lateral." },
-  { id: "atalhos", rotulo: "Atalhos", icone: "teclado", descricao: "As combinações de teclas para abrir a pesquisa, a barra lateral e outras ações." },
-  { id: "tokens", rotulo: "Chaves de acesso pessoais", icone: "chave", descricao: "Chaves para ligar outras aplicações à sua conta, com validade e permissões." },
-  { id: "dados", rotulo: "Dados e privacidade", icone: "cadeado", descricao: "Descarregar os seus dados, ver a atividade da conta e pedir a eliminação." },
+  { id: "perfil", rotulo: "Perfil", icone: "pessoa", descricao: "O seu nome, a fotografia, a assinatura e os formatos de data e hora.", palavras: "nome, foto, fotografia, avatar, assinatura, fuso horário, formato da data" },
+  { id: "seguranca", rotulo: "Segurança", icone: "escudo", descricao: "Palavra-passe, verificação em dois passos, chaves de acesso e sessões abertas.", palavras: "palavra-passe, senha, password, dois passos, 2fa, sessões, chaves de acesso" },
+  { id: "contactos", rotulo: "E-mail e telefone", icone: "correio", descricao: "Mudar o e-mail da conta sem perder o histórico, e os contactos de recuperação.", palavras: "e-mail, telefone, telemóvel, recuperação" },
+  { id: "notificacoes", rotulo: "Notificações", icone: "campainha", descricao: "O que recebe, por onde, a que horas e quem decide por si quando está ausente.", palavras: "avisos, alertas, e-mail, ausente, silêncio" },
+  { id: "lembretes", rotulo: "Lembretes", icone: "lembrete", descricao: "Avisos seus, com data, hora e repetição.", palavras: "alarme, aviso, agenda, repetir" },
+  { id: "aparencia", rotulo: "Aparência", icone: "paleta", descricao: "Tema claro ou escuro, movimento, dicas e a barra lateral.", palavras: "tema, escuro, claro, modo noturno, cores, letras, barra lateral, menu, movimento" },
+  { id: "atalhos", rotulo: "Atalhos", icone: "teclado", descricao: "As combinações de teclas para abrir a pesquisa, a barra lateral e outras ações.", palavras: "teclado, teclas, navegar, navegação, combinações, pesquisa rápida, barra lateral" },
+  { id: "tokens", rotulo: "Tokens da API", icone: "chave", descricao: "Tokens para ligar aplicações e IAs às APIs do painel, com permissões por área e módulo, filtros de IP e validade.", palavras: "api, chave, token, integração, permissões, ia, agente, openapi, ferramentas, bearer, chaves de acesso pessoais" },
+  { id: "exportar", rotulo: "Exportar", icone: "transferir", descricao: "Os formatos em que pode exportar (PDF, CSV, Excel, Word, TXT, imagens, ZIP, BIND), cada um com o seu interruptor.", palavras: "descarregar, pdf, csv, excel, word, txt, zip, imagem, bind, dns, formatos, importar" },
+  { id: "dados", rotulo: "Dados e privacidade", icone: "cadeado", descricao: "Descarregar os seus dados, ver a atividade da conta e pedir a eliminação.", palavras: "privacidade, descarregar, exportar, apagar conta, rgpd" },
 ];
 
 export const caminhoConta = (secao: string) => `/conta/${secao}/`;

@@ -54,7 +54,7 @@ export const FUNCOES: Funcao[] = [
     rotulo: "Leitor",
     pessoa: "Eduarda Lopes",
     areas: { inicio: VER, vendas: VER, admin: VER },
-    fechados: ["utilizadores", "erp", "faturacao", "atividade"],
+    fechados: ["utilizadores", "erp", "faturacao", "atividade", "reciclagem"],
   },
 ];
 

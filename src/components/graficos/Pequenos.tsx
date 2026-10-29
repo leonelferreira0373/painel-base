@@ -76,7 +76,7 @@ export function Contador({ valor, decimais = 0 }: { valor: number; decimais?: nu
 }
 
 /** Gráfico de área sem eixos, da largura toda do cartão (os das estatísticas da análise, como os da Cloudflare). */
-export function AreaMini({ valores, altura = 60 }: { valores: number[]; altura?: number }) {
+export function AreaMini({ valores, altura = 60, cor }: { valores: number[]; altura?: number; cor?: string }) {
   const max = Math.max(1, ...valores);
   const n = Math.max(2, valores.length);
   const x = (i: number) => (i / (n - 1)) * 100;
@@ -84,8 +84,8 @@ export function AreaMini({ valores, altura = 60 }: { valores: number[]; altura?:
   const linha = valores.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(" ");
   return (
     <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="block w-full" style={{ height: altura }} aria-hidden>
-      <path d={`${linha} L100,40 L0,40 Z`} fill="var(--color-kumo-brand)" opacity="0.14" />
-      <path d={linha} fill="none" stroke="var(--color-kumo-brand)" strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+      <path d={`${linha} L100,40 L0,40 Z`} fill={cor ?? "var(--color-kumo-brand)"} opacity="0.14" />
+      <path d={linha} fill="none" stroke={cor ?? "var(--color-kumo-brand)"} strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
 }

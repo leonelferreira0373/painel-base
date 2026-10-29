@@ -1,13 +1,14 @@
 // Definições da conta, parte 3: notificações (e-mail, canais, silêncio, ausência) e lembretes (criar, ligar, repetir; avisam enquanto a página está aberta).
 "use client";
 
+import { reciclar } from "@/lib/reciclagem";
 import { Badge, Banner, Button, Empty, Input, InputArea, Select } from "@cloudflare/kumo";
 import { useState } from "react";
 import { EVENTOS } from "@/dados/conta";
 import { FUNCOES } from "@/dados/rbac";
 import { identificador, useConta, type Canais, type Repeticao } from "@/lib/conta";
 import { useApp } from "@/lib/estado";
-import { Dica } from "../Dica";
+import { Dica, DicaInfo } from "../Dica";
 import { ICONES, Ic } from "../Icones";
 import { Cartao, Interruptor, Linha, LinhaCampo, haTempo } from "./Pecas";
 import { SeletorPersonalizavel } from "../SeletorPersonalizavel";
@@ -36,7 +37,7 @@ export function SecaoNotificacoes() {
         <div className="grid grid-cols-[1fr_repeat(3,3rem)] items-center gap-x-1.5 sm:grid-cols-[1fr_repeat(3,3.75rem)] sm:gap-x-2 border-t border-kumo-hairline px-4 py-2 text-xs font-medium text-kumo-subtle first:border-t-0">
           <span>Acontecimento</span>
           <span className="text-center">E-mail</span>
-          <span className="text-center">No painel</span>
+          <span className="text-center">Painel</span>
           <span className="text-center">SMS</span>
         </div>
         {EVENTOS.map((e) => {
@@ -45,11 +46,7 @@ export function SecaoNotificacoes() {
             <div key={e.id} className="grid grid-cols-[1fr_repeat(3,3rem)] items-center gap-x-1.5 sm:grid-cols-[1fr_repeat(3,3.75rem)] sm:gap-x-2 border-t border-kumo-hairline px-4 py-3">
               <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium">
                 {e.rotulo}
-                <Dica conteudo={e.dica}>
-                  <span className="inline-flex cursor-help text-kumo-inactive max-sm:hidden">
-                    <Ic nome="info" tamanho={13} />
-                  </span>
-                </Dica>
+                <DicaInfo titulo={e.rotulo} texto={e.dica} />
               </span>
               <span className="flex justify-center">
                 <Interruptor marcado={e.obrigatorioEmail ? true : c.email && conta.receberEmails} desativado={!!e.obrigatorioEmail || !conta.receberEmails} aoMudar={(v) => ligar(e.id, "email", v)} rotulo={`${e.rotulo}: e-mail`} />
@@ -140,7 +137,7 @@ export function SecaoLembretes() {
           <div className="grid gap-4 sm:grid-cols-3">
             <SeletorDeDataHora label="Quando" valor={quando} aoMudar={setQuando} erro={passado ? "Escolha uma hora que ainda não passou." : undefined} />
             <SeletorPersonalizavel label="Repetir" valor={repetir} opcoes={REPETICAO.opcoes} personalizado={REPETICAO.personalizado} aoMudar={(v) => setRepetir(v as Repeticao)} />
-            <Select label="Avisar por" value={canal} onValueChange={(v) => setCanal(String(v) as "painel" | "email")} items={{ painel: "No painel", email: "No painel e por e-mail" }} />
+            <Select label="Avisar por" value={canal} onValueChange={(v) => setCanal(String(v) as "painel" | "email")} items={{ painel: "Painel", email: "Painel e e-mail" }} />
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
@@ -179,7 +176,7 @@ export function SecaoLembretes() {
             <Linha key={l.id} titulo={<span className="inline-flex flex-wrap items-center gap-2">{l.titulo}{estado(l)}</span>} estado={`${new Date(l.quando).toLocaleString("pt-PT", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · ${nomeRepeticao(l.repetir).toLowerCase()} · ${l.canal === "email" ? "painel e e-mail" : "painel"}`}>
               <Interruptor marcado={l.ativo} aoMudar={(v) => mudar((c) => ({ lembretes: c.lembretes.map((x) => (x.id === l.id ? { ...x, ativo: v, disparado: v ? false : x.disparado } : x)) }))} rotulo={`Ligar o lembrete ${l.titulo}`} />
               <Dica conteudo="Apagar o lembrete">
-                <Button variant="ghost" shape="square" icon={ICONES.lixo} aria-label="Apagar o lembrete" onClick={() => mudar((c) => ({ lembretes: c.lembretes.filter((x) => x.id !== l.id) }), `Lembrete apagado: ${l.titulo}`)} />
+                <Button variant="ghost" shape="square" icon={ICONES.lixo} aria-label="Apagar o lembrete" onClick={() => (void reciclar({ tipo: "Lembrete", dados: l, origem: { kind: "conta", campo: "lembretes" } }), mudar((c) => ({ lembretes: c.lembretes.filter((x) => x.id !== l.id) }), `Lembrete apagado: ${l.titulo}`))} />
               </Dica>
             </Linha>
           ))

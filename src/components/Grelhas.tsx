@@ -4,7 +4,7 @@
 import { Button, DropdownMenu, Empty, Input, LayerCard, Pagination, Table, Tooltip } from "@cloudflare/kumo";
 import { MenuCartao, SeparadorDeMenu } from "./Flutuantes";
 import { caminho } from "@/dados/estrutura";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { T } from "@/dados/textos";
 import { formatar } from "@/components/graficos/Graficos";
@@ -17,6 +17,8 @@ import { CorpoDica, Dica } from "./Dica";
 import { Esbatido, EsqueletoTabela } from "./Estados";
 import { ControlosDePaginacao } from "./Paginacao";
 import { Ic, ICONES } from "./Icones";
+import { BotaoDeFiltro, FiltroDaTabela, useFiltrosDaTabela } from "./FiltroDeColuna";
+import { opcoesDe, passaNoFiltro } from "@/lib/filtro-colunas";
 
 function Pesquisa({ valor, aoMudar }: { valor: string; aoMudar: (v: string) => void }) {
   return (
@@ -68,16 +70,20 @@ function IconeOrdem({ sentido }: { sentido: "asc" | "desc" | null }) {
   );
 }
 
-function Cabeca({ rotulo, ordenada, sentido, aoOrdenar, numerica, sub, dica, menu }: { rotulo: string; ordenada: boolean; sentido: "asc" | "desc" | null; aoOrdenar: () => void; numerica?: boolean; sub?: string; dica?: ReactNode; menu?: ReactNode }) {
+function Cabeca({ rotulo, ordenada, sentido, aoOrdenar, numerica, sub, dica, menu, filtro }: { rotulo: string; ordenada: boolean; sentido: "asc" | "desc" | null; aoOrdenar: () => void; numerica?: boolean; sub?: string; dica?: ReactNode; menu?: ReactNode; /** Nas colunas de ações, estados e nomes: o funil no lugar da dupla seta. */ filtro?: { escondidas: number; aoAbrir: () => void } }) {
   return (
     <Table.Head className={`group/cab ${numerica ? "text-right" : ""}`}>
       <div className={`flex items-center gap-1 ${numerica ? "justify-end" : ""}`}>
-        <Dica conteudo={dica ?? `Ordenar por ${rotulo}. Clique outra vez para inverter e mais uma para limpar.`}>
-          <button onClick={aoOrdenar} className={`inline-flex items-center gap-1.5 font-medium hover:text-kumo-default ${numerica ? "flex-row-reverse" : ""}`} aria-label={`${T.geral.ordenar}: ${rotulo}`}>
-            {rotulo}
-            <IconeOrdem sentido={ordenada ? sentido : null} />
-          </button>
-        </Dica>
+        {filtro ? (
+          <BotaoDeFiltro rotulo={rotulo} escondidas={filtro.escondidas} aoAbrir={filtro.aoAbrir} numerica={numerica} />
+        ) : (
+          <Dica conteudo={dica ?? `Ordenar por ${rotulo}. Clique outra vez para inverter e mais uma para limpar.`}>
+            <button onClick={aoOrdenar} className={`inline-flex items-center gap-1.5 font-medium hover:text-kumo-default ${numerica ? "flex-row-reverse" : ""}`} aria-label={`${T.geral.ordenar}: ${rotulo}`}>
+              {rotulo}
+              <IconeOrdem sentido={ordenada ? sentido : null} />
+            </button>
+          </Dica>
+        )}
         {menu}
       </div>
       {sub && <div className="text-[11px] font-normal text-kumo-inactive">{sub}</div>}
@@ -90,6 +96,8 @@ function Cabeca({ rotulo, ordenada, sentido, aoOrdenar, numerica, sub, dica, men
 export interface ColunaGrelha {
   rotulo: string;
   numerica?: boolean;
+  /** Números e datas ordenam-se (a dupla seta); as outras colunas têm filtro (o funil) quando as linhas trazem `valores`. */
+  ordenavel?: boolean;
 }
 
 export interface LinhaGrelha {
@@ -97,19 +105,28 @@ export interface LinhaGrelha {
   celulas: ReactNode[];
   /** Valores usados para ordenar, uma por coluna. */
   ordem: (string | number)[];
+  /** O texto de cada coluna, para o filtro (as colunas sem ordem têm filtro). */
+  valores?: string[];
   texto: string;
   acoes?: ReactNode;
   pendente?: boolean;
 }
 
-export function GrelhaRegistos({ colunas, linhas, porPagina = 10, filtros }: { colunas: ColunaGrelha[]; linhas: LinhaGrelha[]; porPagina?: number; filtros?: ReactNode }) {
+export function GrelhaRegistos({ colunas, linhas, porPagina = 10, filtros, tabela }: { colunas: ColunaGrelha[]; linhas: LinhaGrelha[]; porPagina?: number; filtros?: ReactNode; /** Identifica a tabela para guardar os filtros (por omissão, a página). */ tabela?: string }) {
   const { pronto } = useApp();
+  const pathname = usePathname() ?? "";
+  const filtrosGuardados = useFiltrosDaTabela(tabela ?? `${pathname}:registos`);
+  const [colunaAberta, setColunaAberta] = useState<number | null>(null);
+  const comFiltro = (i: number) => colunas[i].ordenavel === false || (colunas[i].ordenavel === undefined && !colunas[i].numerica && linhas.some((l) => l.valores !== undefined));
   const [q, setQ] = useState("");
   const [ord, setOrd] = useState<{ col: number; desc: boolean } | null>(null);
   const [pagina, setPagina] = useState(0);
   const filtradas = useMemo(() => {
     const termo = q.trim().toLowerCase();
-    const base = termo ? linhas.filter((l) => l.texto.includes(termo)) : linhas;
+    const porTexto = termo ? linhas.filter((l) => l.texto.includes(termo)) : linhas;
+    // os filtros das colunas: uma linha passa se, em cada coluna filtrada, o seu valor não está escondido
+    const colunasFiltradas = colunas.map((c, i) => ({ i, escondidos: filtrosGuardados.escondidos[c.rotulo] })).filter((x) => x.escondidos && x.escondidos.size > 0);
+    const base = colunasFiltradas.length ? porTexto.filter((l) => colunasFiltradas.every((x) => passaNoFiltro(l.valores?.[x.i] ?? "", x.escondidos))) : porTexto;
     if (!ord) return base;
     return [...base].sort((a, b) => {
       const x = a.ordem[ord.col];
@@ -117,22 +134,34 @@ export function GrelhaRegistos({ colunas, linhas, porPagina = 10, filtros }: { c
       const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "pt");
       return ord.desc ? -c : c;
     });
-  }, [linhas, q, ord]);
-  useEffect(() => setPagina(0), [q, ord]);
+  }, [linhas, q, ord, filtrosGuardados.escondidos, colunas]);
+  useEffect(() => setPagina(0), [q, ord, filtrosGuardados.escondidos]);
   const visiveis = filtradas.slice(pagina * porPagina, (pagina + 1) * porPagina);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <Pesquisa valor={q} aoMudar={setQ} />
         {filtros}
+        {filtrosGuardados.ativos > 0 && (
+          <Button variant="ghost" size="sm" icon={ICONES.fechar} onClick={filtrosGuardados.limparTudo}>
+            Limpar {filtrosGuardados.ativos === 1 ? "o filtro" : `os ${filtrosGuardados.ativos} filtros`}
+          </Button>
+        )}
       </div>
+      <FiltroDaTabela
+        coluna={colunaAberta === null ? null : colunas[colunaAberta]?.rotulo ?? null}
+        opcoes={colunaAberta === null ? [] : opcoesDe(linhas.map((l) => l.valores?.[colunaAberta] ?? ""))}
+        escondidos={colunaAberta === null ? new Set() : (filtrosGuardados.escondidos[colunas[colunaAberta]?.rotulo] ?? new Set())}
+        aoMudar={(e) => colunaAberta !== null && filtrosGuardados.definir(colunas[colunaAberta].rotulo, e)}
+        aoFechar={() => setColunaAberta(null)}
+      />
       <LayerCard className="pleno overflow-hidden p-0">
         <Esbatido className="sem-barra tabela-larga overflow-x-auto">
           <Table>
             <Table.Header>
               <Table.Row>
                 {colunas.map((c, i) => (
-                  <Cabeca key={c.rotulo} rotulo={c.rotulo} numerica={c.numerica} ordenada={ord?.col === i} sentido={ord?.col === i ? (ord.desc ? "desc" : "asc") : null} aoOrdenar={() => setOrd((o) => (o?.col === i ? (o.desc ? null : { col: i, desc: true }) : { col: i, desc: false }))} />
+                  <Cabeca key={c.rotulo} rotulo={c.rotulo} numerica={c.numerica} filtro={comFiltro(i) ? { escondidas: filtrosGuardados.escondidos[c.rotulo]?.size ?? 0, aoAbrir: () => setColunaAberta(i) } : undefined} ordenada={ord?.col === i} sentido={ord?.col === i ? (ord.desc ? "desc" : "asc") : null} aoOrdenar={() => setOrd((o) => (o?.col === i ? (o.desc ? null : { col: i, desc: true }) : { col: i, desc: false }))} />
                 ))}
                 <Table.Head />
               </Table.Row>
@@ -178,7 +207,7 @@ function MenuColuna({ nome, tipo, temData, aoVisualizar, aoRemover }: { nome: st
     <DropdownMenu>
       <Tooltip
         content={`Opções da coluna ${nome}`}
-        render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" size="xs" icon={ICONES.mais3} aria-label={`Opções da coluna ${nome}`} className="rotate-90 text-kumo-subtle opacity-0 transition-opacity focus-visible:opacity-100 group-hover/cab:opacity-100 data-[popup-open]:opacity-100 [@media(hover:none)]:opacity-100" />} />}
+        render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" size="xs" icon={ICONES.mais3} aria-label={`Opções da coluna ${nome}`} className="text-kumo-subtle opacity-0 transition-opacity focus-visible:opacity-100 group-hover/cab:opacity-100 data-[popup-open]:opacity-100 [@media(hover:none)]:opacity-100" />} />}
       />
       <MenuCartao>
         <DropdownMenu.Group>
@@ -239,13 +268,17 @@ function Campos({ colunas, ocultas, aoAlternar, aoMostrarTodas }: { colunas: str
 
 export function GrelhaDados({ colunas, linhas, tipos, porPagina = 25 }: { colunas: string[]; linhas: Celula[][]; tipos: TipoColuna[]; porPagina?: number }) {
   const { pronto } = useApp();
+  const pathname = usePathname() ?? "";
+  const filtrosGuardados = useFiltrosDaTabela(`${pathname}:dados`);
+  const [colunaAberta, setColunaAberta] = useState<number | null>(null);
+  const comFiltro = (i: number) => !["inteiro", "numero", "data"].includes(tipos[i] ?? "texto");
   const router = useRouter();
   const [q, setQ] = useState("");
   const consulta = useDeferredValue(q);
   const [ord, setOrd] = useState<{ col: number; desc: boolean } | null>(null);
   const [pagina, setPagina] = useState(0);
   const [ocultas, setOcultas] = useState<Set<number>>(new Set());
-  useEffect(() => setPagina(0), [consulta, ord, linhas]);
+  useEffect(() => setPagina(0), [consulta, ord, linhas, filtrosGuardados.escondidos]);
   useEffect(() => setOcultas(new Set()), [colunas]);
 
   const indices = useMemo(() => {
@@ -253,6 +286,9 @@ export function GrelhaDados({ colunas, linhas, tipos, porPagina = 25 }: { coluna
     let idx: number[] = [];
     if (termo === "") idx = Array.from({ length: linhas.length }, (_, i) => i);
     else for (let i = 0; i < linhas.length; i++) if (linhas[i].some((c) => c !== null && String(c).toLowerCase().includes(termo))) idx.push(i);
+    // os filtros das colunas (só as que têm algo escondido gastam tempo)
+    const ativas = colunas.map((nome, i) => ({ i, e: filtrosGuardados.escondidos[nome] })).filter((x) => x.e && x.e.size > 0);
+    if (ativas.length) idx = idx.filter((i) => ativas.every((x) => passaNoFiltro(vazio(linhas[i][x.i] ?? null) ? "" : paraTexto(linhas[i][x.i] ?? null), x.e)));
     if (ord) {
       const t = tipos[ord.col] ?? "texto";
       const chaves = new Map<number, number | string>();
@@ -267,7 +303,7 @@ export function GrelhaDados({ colunas, linhas, tipos, porPagina = 25 }: { coluna
       });
     }
     return idx;
-  }, [linhas, consulta, ord, tipos]);
+  }, [linhas, consulta, ord, tipos, colunas, filtrosGuardados.escondidos]);
 
   const cols = colunas.map((_, i) => i).filter((i) => !ocultas.has(i));
   const temData = tipos.includes("data");
@@ -290,7 +326,19 @@ export function GrelhaDados({ colunas, linhas, tipos, porPagina = 25 }: { coluna
       <div className="flex flex-wrap items-center gap-2">
         <Pesquisa valor={q} aoMudar={setQ} />
         <Campos colunas={colunas} ocultas={ocultas} aoAlternar={alternar} aoMostrarTodas={() => setOcultas(new Set())} />
+        {filtrosGuardados.ativos > 0 && (
+          <Button variant="ghost" size="sm" icon={ICONES.fechar} onClick={filtrosGuardados.limparTudo}>
+            Limpar {filtrosGuardados.ativos === 1 ? "o filtro" : `os ${filtrosGuardados.ativos} filtros`}
+          </Button>
+        )}
       </div>
+      <FiltroDaTabela
+        coluna={colunaAberta === null ? null : (colunas[colunaAberta] ?? null)}
+        opcoes={colunaAberta === null ? [] : opcoesDe(linhas.map((l) => (vazio(l[colunaAberta] ?? null) ? "" : paraTexto(l[colunaAberta] ?? null))))}
+        escondidos={colunaAberta === null ? new Set() : (filtrosGuardados.escondidos[colunas[colunaAberta]] ?? new Set())}
+        aoMudar={(e) => colunaAberta !== null && filtrosGuardados.definir(colunas[colunaAberta], e)}
+        aoFechar={() => setColunaAberta(null)}
+      />
       <LayerCard className="pleno overflow-hidden p-0">
         <Esbatido className="sem-barra tabela-larga max-h-[520px] overflow-auto">
           <Table>
@@ -302,6 +350,7 @@ export function GrelhaDados({ colunas, linhas, tipos, porPagina = 25 }: { coluna
                     key={`${colunas[i]}-${i}`}
                     rotulo={colunas[i]}
                     sub={tipos[i]}
+                    filtro={comFiltro(i) ? { escondidas: filtrosGuardados.escondidos[colunas[i]]?.size ?? 0, aoAbrir: () => setColunaAberta(i) } : undefined}
                     dica={<CorpoDica titulo={colunas[i]} texto={DICA_TIPO[tipos[i]]} linhas={[{ rotulo: "Tipo", valor: tipos[i] }, { rotulo: "Ordenar", valor: "Clique para ordenar, outra vez para inverter e mais uma para limpar." }]} />}
                     numerica={tipos[i] === "inteiro" || tipos[i] === "numero"}
                     ordenada={ord?.col === i} sentido={ord?.col === i ? (ord.desc ? "desc" : "asc") : null}

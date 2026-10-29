@@ -16,6 +16,9 @@ import { Galeria } from "./conteudo/Galeria";
 import { GestorDeFicheiros } from "./conteudo/GestorDeFicheiros";
 import { Faq } from "./conteudo/Faq";
 import { Produtos } from "./conteudo/Produtos";
+import { UsoDaIa } from "./ia/UsoDaIa";
+import { AtividadeDoPainel } from "./atividade/AtividadeDoPainel";
+import { Reciclagem } from "./reciclagem/Reciclagem";
 import { CaixaDeEmail } from "./super/EmailCaixa";
 import { CampanhasDeEmail, EmailsAgendados } from "./super/EmailCampanhas";
 import { FinanceiroDoHotel } from "./negocios/FinanceiroDoHotel";
@@ -36,6 +39,9 @@ import { ApiLigacoes, Backups, EnviosDeEmail, Firewall, Limpeza, PaginasDoSite }
 import { Campanhas, MarketingVisao, Rastreio } from "./super/MarketingPaginas";
 import { Comprovativos, ContasIban, PagamentosVisao } from "./super/PagamentosPaginas";
 import type { ComponentType } from "react";
+import { RegistosDns } from "./super/DevDns";
+import { RegistosDoServidor } from "./super/DevLogs";
+import { PartilhaDeFicheiros } from "./partilha/PartilhaDeFicheiros";
 import { Pagina } from "./ui";
 import { VisaoGeral } from "./VisaoGeral";
 
@@ -54,7 +60,7 @@ const ECRAS: Record<string, Record<string, ComponentType>> = {
   hotel: { "financeiro-hotel": FinanceiroDoHotel },
   taxi: { "mapa-taxi": MapaDoTaxi },
   painel: { modulos: ModulosDoPainel, predefinicoes: Predefinicoes },
-  dev: { implementacoes: Implementacoes, github: GitHub, saude: SaudeVps, "pedidos-web": PedidosEmTempoReal, bd: BaseDeDados, backups: Backups, limpeza: Limpeza, firewall: Firewall, paginas: PaginasDoSite, envios: EnviosDeEmail, api: ApiLigacoes },
+  dev: { dns: RegistosDns, logs: RegistosDoServidor, implementacoes: Implementacoes, github: GitHub, saude: SaudeVps, "pedidos-web": PedidosEmTempoReal, bd: BaseDeDados, backups: Backups, limpeza: Limpeza, firewall: Firewall, paginas: PaginasDoSite, envios: EnviosDeEmail, api: ApiLigacoes },
 };
 
 function SemAcesso() {
@@ -117,11 +123,18 @@ export function Modulo({ areaId, moduloId }: { areaId: string; moduloId: string 
   if (areaId === "conteudo") {
     if (moduloId === "biblioteca") return <GestorDeFicheiros />;
     if (moduloId === "galeria") return <Galeria />;
+    if (moduloId === "partilha") return (
+      <PermissaoProvider editar={podeEditar(funcao, areaId, moduloId)}>
+        <PartilhaDeFicheiros />
+      </PermissaoProvider>
+    );
     if (moduloId === "editor-produtos") return <Produtos />;
     if (moduloId === "faq") return <Faq />;
     return <Blog />;
   }
-  if (areaId === "ia") return <ControlosDaIA aba={moduloId as "comportamento" | "memoria" | "testar"} />;
+  if (areaId === "admin" && moduloId === "atividade") return <AtividadeDoPainel />;
+  if (areaId === "admin" && moduloId === "reciclagem") return <Reciclagem />;
+  if (areaId === "ia") return moduloId === "uso" ? <UsoDaIa /> : <ControlosDaIA aba={moduloId as "comportamento" | "memoria" | "testar"} />;
   const Ecra = ECRAS[areaId]?.[moduloId];
   if (Ecra)
     return (

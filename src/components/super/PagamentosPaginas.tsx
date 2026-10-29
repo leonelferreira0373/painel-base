@@ -4,6 +4,7 @@
 import { Badge, Button, Input, Select } from "@cloudflare/kumo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CONTAS_DE_ORIGEM, gerarComprovativos, gerarPagamentos, METODOS_DE_PAGAMENTO, type ContaBancaria, type Pagamento } from "@/dados/super-dados";
+import { estruturaDeRegisto } from "@/lib/copiar-dados";
 import { REGISTOS } from "@/dados/modulos";
 import { useColecao } from "@/lib/api/colecao";
 import { useApi } from "@/lib/api/cliente";
@@ -95,7 +96,7 @@ export function PagamentosVisao() {
             chave="pagamentos-visao"
             className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
             itens={[
-              { id: "volume", conteudo: <CartaoEstatistica titulo="Volume confirmado" valor={dinheiro(m.volume)} variacao={null} valores={serie} dica="A soma dos pagamentos confirmados." /> },
+              { id: "volume", conteudo: <CartaoEstatistica titulo="Volume confirmado" valor={dinheiro(m.volume)} valores={serie} dica="A soma dos pagamentos confirmados." /> },
               { id: "numero", conteudo: <Estatistica titulo="Pagamentos" valor={inteiro(m.numero)} dica="Todos os pagamentos registados, em qualquer estado." numero={m.numero} serie={series.numero} /> },
               { id: "ticket", conteudo: <Estatistica titulo="Ticket médio" valor={dinheiro(m.ticketMedio)} dica="O volume confirmado a dividir pelo número de pagamentos confirmados." numero={m.ticketMedio} serie={series.ticket} /> },
               { id: "sucesso", conteudo: <Estatistica titulo="Taxa de sucesso" valor={percentagem(m.taxaDeSucesso)} dica="Confirmados sobre confirmados mais recusados." numero={m.taxaDeSucesso * 100} serie={series.sucesso} /> },
@@ -201,7 +202,7 @@ export function Comprovativos() {
               }
               estado={`${dataHora(c.meta?.recebido ?? c.criado)} · ${formatarTamanho(c.tamanho)}${c.meta?.nota ? ` · ${c.meta.nota}` : ""}`}
             >
-              <div className="flex flex-wrap items-center justify-end gap-1">
+              <div className="flex flex-nowrap items-center justify-end gap-1 [&>*]:shrink-0">
                 <Estado valor={c.meta?.estado ?? "Por validar"} modulo="comprovativos" />
                 <Button variant="ghost" size="sm" onClick={() => setVer(c)}>
                   Ver
@@ -293,8 +294,8 @@ export function ContasIban() {
               }
               estado={`${c.titular} · ${formatarIban(c.iban)}`}
             >
-              <div className="flex flex-wrap items-center justify-end gap-1">
-                <BotaoCopiar texto={formatarIban(c.iban)} tamanho="sm" variante="ghost" quadrado dica="Copiar o IBAN" />
+              <div className="flex flex-nowrap items-center justify-end gap-1 [&>*]:shrink-0">
+                <BotaoCopiar texto={formatarIban(c.iban)} estruturado={estruturaDeRegisto(`Conta bancária ${c.banco}`, { banco: c.banco, titular: c.titular, iban: c.iban, "iban formatado": formatarIban(c.iban), moeda: c.moeda, principal: c.principal, ativa: c.ativa }, "/pagamentos/contas/")} tamanho="sm" variante="ghost" quadrado dica="Copiar os dados da conta" />
                 <Interruptor marcado={c.ativa} aoMudar={(v) => contas.guardar({ ...c, ativa: v, principal: v ? c.principal : false })} rotulo={`Conta ${c.banco} ativa`} desativado={!editar} />
                 {editar && !c.principal && c.ativa && (
                   <Button variant="ghost" size="sm" onClick={() => tornarPrincipal(c)}>
@@ -328,7 +329,7 @@ export function ContasIban() {
             <span className="font-medium">{principal.titular}</span>
             <span className="inline-flex flex-wrap items-center gap-2 tabular-nums">
               {principal.banco} · {formatarIban(principal.iban)} ({principal.moeda})
-              <BotaoCopiar texto={formatarIban(principal.iban)} tamanho="xs" dica="Copiar o IBAN" />
+              <BotaoCopiar texto={formatarIban(principal.iban)} estruturado={estruturaDeRegisto(`Conta bancária ${principal.banco}`, { banco: principal.banco, titular: principal.titular, iban: principal.iban, "iban formatado": formatarIban(principal.iban), moeda: principal.moeda }, "/pagamentos/pagamentos/")} tamanho="xs" dica="Copiar os dados da conta" />
             </span>
             <span className="text-kumo-subtle">Depois de pagar, envie o comprovativo com a referência do pagamento.</span>
           </div>

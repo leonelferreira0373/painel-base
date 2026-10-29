@@ -140,7 +140,7 @@ export function Galeria() {
         <Dialog size="lg" className="p-6">
           {atual && (
             <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center justify-between gap-4">
                 <Dialog.Title className="min-w-0 truncate text-lg font-semibold">{atual.nome}</Dialog.Title>
                 <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
               </div>

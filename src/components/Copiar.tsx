@@ -3,6 +3,7 @@
 
 import { Button } from "@cloudflare/kumo";
 import { useEffect, useState } from "react";
+import { copiarEstruturado, type PayloadEstruturado } from "@/lib/copiar-dados";
 import { Dica } from "./Dica";
 import { Ic, type Icone } from "./Icones";
 
@@ -46,10 +47,11 @@ export function IconeMorfico({ estado, repouso, tamanho }: { estado: EstadoDeCop
 }
 
 /** Botão de copiar. `tamanho="xs"` é o compacto das linhas de dados (ver `LinhaOrdenada`). */
-export function BotaoCopiar({ texto, rotulo, dica = "Copiar", tamanho = "base", variante = "secondary", quadrado = false }: { texto: string; rotulo?: string; dica?: string; tamanho?: "xs" | "sm" | "base"; variante?: "ghost" | "secondary"; quadrado?: boolean }) {
+export function BotaoCopiar({ texto, estruturado, rotulo, dica = "Copiar", tamanho = "base", variante = "secondary", quadrado = false }: { texto: string; estruturado?: PayloadEstruturado; rotulo?: string; dica?: string; tamanho?: "xs" | "sm" | "base"; variante?: "ghost" | "secondary"; quadrado?: boolean }) {
   const [estado, definir] = useResultadoTemporario();
   const icone = <IconeMorfico estado={estado} repouso="copiar" tamanho={tamanho === "xs" ? 14 : 16} />;
-  const copiarTexto = async () => definir((await copiar(texto)) ? "ok" : "erro");
+  // com a informação estruturada copia-se tudo (texto e tabela); sem ela, só o valor
+  const copiarTexto = async () => definir((await (estruturado ? copiarEstruturado(estruturado) : copiar(texto))) ? "ok" : "erro");
   const mensagem = estado === "ok" ? "Copiado" : estado === "erro" ? "Não foi possível copiar para a área de transferência" : dica;
   return (
     <Dica conteudo={mensagem}>

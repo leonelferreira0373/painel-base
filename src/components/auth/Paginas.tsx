@@ -4,9 +4,11 @@
 import { Banner, Button, Checkbox, Input } from "@cloudflare/kumo";
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { auth, regrasSenha, senhaValida, useSessao } from "@/lib/auth";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { auth, CHAVE_DO_LIMITE_MFA, regrasSenha, senhaValida, useSessao } from "@/lib/auth";
+import { formatarEspera, useLimiteDeTentativas } from "@/lib/limite-tentativas";
 import { toasts } from "@/lib/toasts";
+import { CampoOtp } from "../CampoOtp";
 import { Ic } from "../Icones";
 import { CampoSenha } from "./CampoSenha";
 import { TelaEntrada, TelaPainel, TelaRegisto } from "./Moldura";
@@ -418,21 +420,39 @@ export function PaginaVerificar() {
   const seguinte = useSeguinte();
   const [codigo, setCodigo] = useState("");
   const [erro, setErro] = useState<string | null>(null);
+  const [erroVisual, setErroVisual] = useState(false);
   const [, tique] = useState(0);
   const [temEntrada, setTemEntrada] = useState(true);
+  const limite = useLimiteDeTentativas(CHAVE_DO_LIMITE_MFA);
+  const apagar = useRef<number>(undefined);
   useJaEntrou(seguinte);
   useEffect(() => {
     setTemEntrada(auth.temEntradaPendente());
     const id = window.setInterval(() => tique((n) => n + 1), 1000);
-    return () => window.clearInterval(id);
+    return () => {
+      window.clearInterval(id);
+      window.clearTimeout(apagar.current);
+    };
   }, []);
+  useEffect(() => {
+    if (!limite.bloqueado) setErro((m) => (m?.startsWith("Demasiadas") ? null : m));
+  }, [limite.bloqueado]);
   const certo = typeof window !== "undefined" ? auth.codigoPendente() : null;
+  const verificar = (escrito: string) => {
+    if (limite.bloqueado || erroVisual) return;
+    const r = auth.confirmarCodigo(escrito);
+    limite.reler();
+    if (r.ok) return router.replace(seguinte);
+    setErro(r.erro ?? "Esse código não está certo.");
+    setErroVisual(true);
+    window.clearTimeout(apagar.current);
+    apagar.current = window.setTimeout(() => (setCodigo(""), setErroVisual(false)), 700);
+  };
   const submeter = (e: FormEvent) => {
     e.preventDefault();
-    const r = auth.confirmarCodigo(codigo);
-    if (!r.ok) return setErro(r.erro ?? "Esse código não está certo.");
-    router.replace(seguinte);
+    if (codigo.length === 6) verificar(codigo);
   };
+  const frase = limite.bloqueado ? `Demasiadas tentativas. Tente de novo dentro de ${formatarEspera(limite.espera)}.` : erro;
   return (
     <TelaEntrada atalho={{ rotulo: "Voltar", href: "/entrar/" }}>
       <div className="mb-6 text-left">
@@ -444,12 +464,21 @@ export function PaginaVerificar() {
         <Banner variant="alert" title="A entrada expirou" description="Volte ao início e introduza o e-mail e a palavra-passe outra vez." />
       ) : (
         <form onSubmit={submeter}>
-          {erro && <Banner className="mb-4" variant="error" title={erro} />}
+          {frase && <Banner className="mb-4" variant="error" title={frase} />}
           <p className="mb-4 text-sm text-kumo-subtle">Introduza o código de 6 dígitos da sua aplicação autenticadora.</p>
-          {certo && <Banner className="mb-4" variant="default" title={`Simulação: o código agora é ${certo.slice(0, 3)} ${certo.slice(3)}`} />}
-          <Input label="Código" size="lg" inputMode="numeric" autoComplete="one-time-code" maxLength={7} placeholder="000 000" value={codigo} onChange={(e) => (setCodigo(e.target.value.replace(/[^\d\s]/g, "")), setErro(null))} />
+          {certo && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-lg bg-kumo-tint px-3 py-2 text-sm text-kumo-default">
+              <span className="min-w-0">
+                Simulação: o código agora é <b className="whitespace-nowrap tabular-nums">{`${certo.slice(0, 3)} ${certo.slice(3)}`}</b>
+              </span>
+              <Button type="button" size="sm" variant="secondary" className="ml-auto" disabled={limite.bloqueado} onClick={() => (setErroVisual(false), setCodigo(certo))}>
+                Preencher
+              </Button>
+            </div>
+          )}
+          <CampoOtp valor={codigo} aoMudar={(v) => (setCodigo(v), setErroVisual(false), setErro(null))} aoCompletar={verificar} erro={erroVisual} desativado={limite.bloqueado} autoFocus tamanho="lg" />
           <div className="mt-6">
-            <Button type="submit" size="lg" variant="primary" className="w-full" disabled={codigo.replace(/\s/g, "").length !== 6}>
+            <Button type="submit" size="lg" variant="primary" className="w-full" disabled={codigo.length !== 6 || limite.bloqueado || erroVisual}>
               Verificar
             </Button>
           </div>

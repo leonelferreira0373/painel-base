@@ -1,8 +1,11 @@
 // Dicas (tooltips) do painel: o mesmo componente do Kumo que a Cloudflare usa, com um formato único para títulos, linhas e passos.
 "use client";
 
-import { Tooltip } from "@cloudflare/kumo";
-import type { ReactNode } from "react";
+import { Button, Popover, Tooltip } from "@cloudflare/kumo";
+import { useState, type MouseEvent, type ReactNode } from "react";
+import { copiarEstruturado, estruturaDeRegisto } from "@/lib/copiar-dados";
+import { perguntarAIa } from "@/lib/ia-contexto";
+import { PopupCartao } from "./Flutuantes";
 import { Frase, semMarcas } from "./Frase";
 import { Ic } from "./Icones";
 
@@ -42,11 +45,64 @@ export function CorpoDica({ titulo, texto, linhas }: { titulo?: string; texto?: 
   );
 }
 
-/** Ícone «i» com a explicação de uma métrica ou de um campo, como os dos títulos do painel da Cloudflare. */
+const FORMA_DO_INFO = "dica-info -m-1 inline-flex cursor-pointer items-center rounded-md p-1 text-kumo-inactive transition-colors hover:text-kumo-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand";
+
+/**
+ * Ícone «i» com a explicação de uma métrica ou de um campo, como os dos títulos do painel da Cloudflare. Passando o rato por cima mostra a dica; clicar (ou tocar, ou Enter) abre
+ * a explicação com «Copiar» (o título e o texto, estruturados) e «Perguntar à IA» (abre o chat e pergunta o que significa aqui). A janela só existe enquanto está aberta.
+ */
 export function DicaInfo({ texto, titulo }: { texto: string; titulo?: string }) {
+  const [aberta, setAberta] = useState(false);
+  const propriedades = {
+    type: "button" as const,
+    "aria-label": titulo ? `Mais sobre ${titulo}` : "Mais informação",
+    "aria-haspopup": "dialog" as const,
+    "aria-expanded": aberta,
+    className: FORMA_DO_INFO,
+    onClick: (e: MouseEvent) => {
+      e.stopPropagation();
+      setAberta(true);
+    },
+  };
+  if (!aberta)
+    return (
+      <Tooltip content={<CorpoDica titulo={titulo} texto={texto} />} side="top" render={<button {...propriedades} />}>
+        <Ic nome="info" tamanho={13} />
+      </Tooltip>
+    );
   return (
-    <Tooltip content={<CorpoDica titulo={titulo} texto={texto} />} side="top" render={<span className="dica-info inline-flex cursor-help items-center text-kumo-inactive transition-colors hover:text-kumo-subtle" aria-label={titulo ? `${titulo}: ${semMarcas(texto)}` : semMarcas(texto)} />}>
-      <Ic nome="info" tamanho={13} />
-    </Tooltip>
+    <Popover.Root open onOpenChange={(v) => !v && setAberta(false)}>
+      <Popover.Trigger render={<button {...propriedades} />}>
+        <Ic nome="info" tamanho={13} />
+      </Popover.Trigger>
+      <PopupCartao alinhar="start" modalNoTelemovel aoFechar={() => setAberta(false)} className="w-[min(340px,calc(100vw-2rem))]">
+        <ExplicacaoDaDica titulo={titulo} texto={texto} />
+      </PopupCartao>
+    </Popover.Root>
+  );
+}
+
+function ExplicacaoDaDica({ titulo, texto }: { titulo?: string; texto: string }) {
+  const [copiado, setCopiado] = useState<"ocioso" | "ok" | "erro">("ocioso");
+  const simples = semMarcas(texto);
+  const copiar = async () => {
+    setCopiado((await copiarEstruturado(estruturaDeRegisto(titulo ?? "Informação", { ...(titulo ? { campo: titulo } : {}), explicacao: simples }, window.location.pathname))) ? "ok" : "erro");
+    window.setTimeout(() => setCopiado("ocioso"), 2200);
+  };
+  return (
+    <div className="flex flex-col gap-3 p-3.5 text-left">
+      {titulo && <div className="break-words text-sm font-semibold text-kumo-default">{titulo}</div>}
+      <p className="text-sm leading-6 text-kumo-default">
+        <Frase>{texto}</Frase>
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="secondary" icon={<Ic nome={copiado === "ok" ? "certo" : copiado === "erro" ? "aviso" : "copiar"} tamanho={14} />} onClick={copiar}>
+          {copiado === "ok" ? "Copiado" : copiado === "erro" ? "Não copiou" : "Copiar"}
+        </Button>
+        <Button size="sm" variant="secondary" icon={<Ic nome="ia" tamanho={14} />} onClick={() => perguntarAIa(titulo ? `O que significa ${titulo} neste ecrã?` : "Explica-me esta informação do ecrã.", { enviar: true, contexto: { titulo: titulo ?? "uma informação do ecrã", dados: { ...(titulo ? { campo: titulo } : {}), explicacaoDoPainel: simples } } })}>
+          Perguntar à IA
+        </Button>
+      </div>
+    </div>
   );
 }

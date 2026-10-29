@@ -1,6 +1,6 @@
 // Testes das séries dos cartões: repartir por intervalos de tempo e contar, somar, fazer a média e dividir séries.
 import { describe, expect, it } from "vitest";
-import { acumular, agrupar, contarPorIntervalo, instante, intervalosPara, mediaPorIntervalo, razao, serieValida, somarPorIntervalo } from "./serie";
+import { acumular, agrupar, variacaoDeSerie, contarPorIntervalo, instante, intervalosPara, mediaPorIntervalo, razao, serieValida, somarPorIntervalo } from "./serie";
 
 const item = (t: number, estado = "ok", v = 1) => ({ t, estado, v });
 const tempo = (x: { t: number }) => x.t;
@@ -58,5 +58,21 @@ describe("séries dos cartões", () => {
   });
   it("lê datas ISO", () => {
     expect(instante("2026-10-29")).toBe(Date.UTC(2026, 9, 29));
+  });
+});
+
+describe("variacaoDeSerie", () => {
+  it("compara a média da segunda metade com a da primeira", () => {
+    expect(variacaoDeSerie([10, 10, 15, 15])).toEqual({ variacao: 50, n: 2 });
+    expect(variacaoDeSerie([20, 20, 10, 10])).toEqual({ variacao: -50, n: 2 });
+  });
+  it("com um número ímpar de pontos o mais antigo fica de fora", () => {
+    expect(variacaoDeSerie([99, 10, 10, 20, 20])).toEqual({ variacao: 100, n: 2 });
+  });
+  it("sem pontos que cheguem, ou com a base a zero, não há variação", () => {
+    expect(variacaoDeSerie([1, 2, 3])).toBeNull();
+    expect(variacaoDeSerie([])).toBeNull();
+    expect(variacaoDeSerie([0, 0, 5, 5])).toBeNull();
+    expect(variacaoDeSerie([1, Number.NaN, 3, 4])).toBeNull();
   });
 });

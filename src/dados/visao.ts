@@ -24,7 +24,6 @@ export const CARTOES_SERIE: CartaoSerie[] = [
   { id: "encomendas", titulo: "Encomendas", registos: "encomendas", campo: "data", href: caminho("vendas", "encomendas"), altura: 150, linha: 1 },
   { id: "devolucoes", titulo: "Devoluções", registos: "devolucoes", campo: "data", href: caminho("vendas", "devolucoes"), altura: 150, linha: 1 },
   { id: "notificacoes", titulo: "E-mails enviados", registos: "notificacoes", campo: "data", href: caminho("clientes", "notificacoes"), altura: 110, linha: 2 },
-  { id: "atividade", titulo: "Ações no painel", registos: "atividade", campo: "data", href: caminho("admin", "atividade"), altura: 110, linha: 2 },
   { id: "acessos", titulo: "Acessos", registos: "utilizadores", campo: "data", href: caminho("admin", "utilizadores"), altura: 110, linha: 2 },
 ];
 

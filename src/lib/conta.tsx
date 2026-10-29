@@ -5,7 +5,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Aparencia } from "@/dados/aparencia";
 import { EVENTOS } from "@/dados/conta";
 import { emailDe, FUNCOES, funcaoPorId, type Funcao } from "@/dados/rbac";
+import { registar as registarNaAtividade, terminarSessao as terminarSessaoDaAtividade } from "@/lib/atividade";
 import { auth } from "@/lib/auth";
+import { EVENTO_RESTAURAR_CONTA } from "@/lib/reciclagem-tipos";
 import { useApp } from "@/lib/estado";
 import { toasts } from "@/lib/toasts";
 
@@ -63,6 +65,8 @@ export interface Conta {
   personalizados?: Record<string, string[]>;
   /** A ordem dos cartões que o utilizador arrastou, por ecrã. */
   ordens?: Record<string, string[]>;
+  /** Os formatos de exportação ligados (Definições da conta > Exportar); o que não está escrito está ligado. */
+  exportar?: import("@/lib/exportar/formatos").PreferenciasDeExportar;
   /** Idioma da interface («pt-PT»). */
   idioma?: string;
   /** Atalhos de teclado que o utilizador mudou: identificador → combinação («Ctrl+K»). */
@@ -216,6 +220,7 @@ export function ContaProvider({ children }: { children: ReactNode }) {
   }, [estado, funcao.id]);
 
   const mudar = useCallback<Api["mudar"]>((alteracao, evento) => {
+    if (evento) registarNaAtividade("definicao", evento);
     setEstado((e) => {
       const parcial = typeof alteracao === "function" ? alteracao(e.conta) : alteracao;
       const atividade = evento ? [{ id: identificador(), quando: new Date().toISOString(), texto: evento }, ...e.conta.atividade].slice(0, 60) : e.conta.atividade;
@@ -227,7 +232,10 @@ export function ContaProvider({ children }: { children: ReactNode }) {
     setEstado((e) => ({ ...e, conta: { ...contaInicial(funcao), atividade: [{ id: identificador(), quando: new Date().toISOString(), texto: "Definições da conta repostas" }] } }));
   }, [funcao]);
 
-  const terminarSessao = useCallback(() => auth.terminar(), []);
+  const terminarSessao = useCallback(() => {
+    terminarSessaoDaAtividade("terminada");
+    auth.terminar();
+  }, []);
   const trocarConta = useCallback(
     (id: string) => {
       auth.trocar(id);
@@ -235,6 +243,17 @@ export function ContaProvider({ children }: { children: ReactNode }) {
     },
     [mudarFuncao],
   );
+
+  // O que se restaura da reciclagem (um lembrete, uma chave) volta para a conta.
+  useEffect(() => {
+    const repor = (e: Event) => {
+      const { campo, dados } = (e as CustomEvent<{ campo: "lembretes" | "tokens" | "fontes"; dados: { id: string } }>).detail;
+      if (campo === "lembretes") mudar((c) => (c.lembretes.some((x) => x.id === dados.id) ? {} : { lembretes: [...c.lembretes, dados as unknown as Lembrete] }), "Lembrete restaurado");
+      else if (campo === "tokens") mudar((c) => (c.tokens.some((x) => x.id === dados.id) ? {} : { tokens: [...c.tokens, dados as unknown as ChaveAcessoPessoal] }), "Chave de acesso restaurada");
+    };
+    window.addEventListener(EVENTO_RESTAURAR_CONTA, repor);
+    return () => window.removeEventListener(EVENTO_RESTAURAR_CONTA, repor);
+  }, [mudar]);
 
   // Preferências que mudam a página inteira.
   useEffect(() => {

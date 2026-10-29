@@ -46,7 +46,7 @@ export function PreVisualizar({ item, aoFechar }: { item: ItemDaBiblioteca | nul
       <Dialog size="lg" className="p-6">
         {item && (
           <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center justify-between gap-4">
               <Dialog.Title className="min-w-0 truncate text-lg font-semibold">{item.nome}</Dialog.Title>
               <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
             </div>

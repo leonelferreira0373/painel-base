@@ -240,3 +240,33 @@ h3 {
 [role="dialog"] div:has(> .kumo-input-placeholder) {
   box-shadow: none !important;
 }
+
+/* os diálogos abertos a partir do chat (o anel de contexto, por exemplo) ficam por cima dele (z-index 80) */
+[role="dialog"]:not(.aia-painel) {
+  z-index: 90;
+}
+[class*="bg-kumo-overlay"] {
+  z-index: 89;
+}
+
+/* Um seletor com rótulo ocupa a largura do campo, como os campos de texto (o do Kumo só tem a largura do texto e os formulários ficavam desalinhados). */
+div.grid.gap-2 > button[data-kumo-component="Select"][data-kumo-part="trigger"] {
+  width: 100%;
+}
+
+/* O texto dos avisos (Banner) é sempre da cor principal do tema; só o ícone leva a cor do tipo (aviso, erro, informação). */
+div.flex.w-full[class*="bg-kumo-warning-tint"],
+div.flex.w-full[class*="bg-kumo-danger-tint"],
+div.flex.w-full[class*="bg-kumo-info-tint"] {
+  color: var(--text-color-kumo-default);
+}
+div.flex.w-full[class*="bg-kumo-warning-tint"] svg {
+  color: var(--text-color-kumo-warning);
+}
+div.flex.w-full[class*="bg-kumo-danger-tint"] svg {
+  color: var(--text-color-kumo-danger);
+}
+div.flex.w-full[class*="bg-kumo-info-tint"] svg {
+  color: var(--text-color-kumo-default);
+}
+

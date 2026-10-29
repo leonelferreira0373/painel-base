@@ -19,9 +19,32 @@ Sobe um servidor sem dependências em `http://localhost:4000` e imprime o token.
 - **Firewall**: bloqueia de verdade (regras por IP ou gama e o limite de pedidos por minuto) e regista os bloqueios.
 - **Marketing**: as visitas e os cliques vêm do script `public/rastreio.js` (ver abaixo). Os **e-mails** (`/v1/marketing/emails` e `/v1/marketing/campanhas-email`) ficam em memória: o que se envia fica «Entregue», o que está agendado sai à hora marcada (a fila anda de 20 em 20 segundos) e uma campanha enviada recebe números simulados. **Este servidor não envia e-mails**; um servidor a sério envia e conta as aberturas e os cliques.
 - **Implementações, GitHub e conectores**: o teste A/B, a promoção e o rollback seguem as regras do painel (a versão B recebe de 1 a 99 % do tráfego). Os commits do GitHub são de exemplo: este servidor não fala com o GitHub.
+- **Tokens da API** (`/v1/painel/tokens`): guarda a impressão (SHA-256) de cada token e confere-a, mais o estado, a validade, o filtro de IP e as permissões, em cada pedido (ver «Tokens da API e IAs»). `TOKEN` continua a ser o token mestre, que pode tudo.
+- **Registos do servidor** (`/v1/dev/logs`): as linhas do próprio servidor (a consola e cada pedido) e das fontes que ligar por variáveis de ambiente (ver «Registos do servidor»).
 - **Configuração do painel** (`/v1/painel/configuracao`): guarda o pacote, as exceções ligadas ou desligadas e a predefinição. Num servidor a sério só o Master Admin a pode escrever.
 
 Variáveis: `PORTA` (4000), `TOKEN` (gera um) e `ORIGEM` (o endereço do painel para o CORS; por omissão `*`).
+
+## Tokens da API e IAs
+
+Em «Definições da conta → Tokens da API» cria-se um token como na Cloudflare: um nome, permissões (uma **área** ou um **módulo**, para **ler** ou para **editar**), filtros de IP (só estes endereços, ou todos menos estes) e uma validade. O painel gera o segredo no navegador (`bpt_` e 40 letras e números), mostra-o **uma só vez** e envia ao servidor só a impressão SHA-256 (`PUT /v1/painel/tokens/{id}`): o servidor nunca vê o token em claro. Em cada pedido, o servidor faz o SHA-256 do `Authorization: Bearer …`, procura a impressão, vê se o token está ativo (não revogado, dentro da validade), se o IP é permitido e se as permissões cobrem o pedido (`GET` pede «ler»; os outros métodos pedem «editar»; o módulo vem do caminho, como em `src/lib/tokens.ts`). `401` diz que o token não existe, expirou ou foi revogado; `403`, que não tem permissão ou que o IP não é permitido.
+
+Uma IA com um token controla o painel por inteiro só pelas APIs: `GET /v1/painel/tokens/ferramentas` devolve as ferramentas que esse token permite, no formato das ferramentas da Anthropic (`name`, `description`, `input_schema`), com o método e o caminho em `x-painel`. A IA escolhe a ferramenta e faz o pedido HTTP a que ela corresponde. `POST /v1/painel/tokens/verificar` diz o que o token pode fazer (para testar um token novo). O painel descarrega também o contrato OpenAPI completo.
+
+## Registos do servidor
+
+«Developer tools → Registos do servidor» mostra as linhas que o servidor escreve, em direto, como os registos do Render: pesquisa, níveis (depuração, informação, aviso, erro), fonte, pausa, hora local ou UTC, exportar em qualquer formato e investigar com a IA. O painel lê `GET /v1/dev/logs?desde=<id>&limite=500` de 1,5 em 1,5 segundos (`desde` é o `id` da última linha que já tem, e o `cursor` da resposta é o que se passa a pedir) e as fontes em `GET /v1/dev/logs/fontes`.
+
+O servidor de exemplo escreve nos registos a sua consola e cada pedido, e liga-se a mais fontes por variáveis de ambiente (todas opcionais):
+
+| Variável | Fonte |
+|---|---|
+| `LOGS_DOCKER=web,db` | `docker logs -f` de cada contentor |
+| `LOGS_FICHEIROS=/var/log/nginx/error.log,/var/log/app.log` | cada ficheiro, como `tail -f` (volta a ler se for rodado) |
+| `LOGS_JOURNALD=nginx.service,ssh.service` (ou `todos`) | `journalctl -f` de cada unidade do VPS |
+| `LOGS_CLOUDFLARE=nome-do-worker` | `npx wrangler tail` do Worker (precisa de `wrangler` com sessão aberta) |
+
+Cada linha tem `id` (cresce sempre, com zeros à esquerda), `quando` (ISO), `nivel`, `fonte` e `texto`; o nível adivinha-se do texto (`error`, `warn`, o estado HTTP de um pedido…). Num servidor a sério ponha um limite de linhas em memória ou leia diretamente do Loki, Vector ou Fluent Bit; o painel só precisa deste contrato.
 
 ## Ligar o painel ao servidor de um projeto
 

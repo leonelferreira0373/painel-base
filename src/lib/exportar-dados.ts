@@ -38,7 +38,7 @@ function corDo(variavel: string): string {
 const MAXIMO_DE_LINHAS = 60;
 
 /** Desenha o título e a tabela como imagem PNG, com as cores do tema em vigor. */
-export function paraImagem(d: DadosExportaveis): Promise<Blob | null> {
+export function paraImagem(d: DadosExportaveis, tipo: "image/png" | "image/jpeg" = "image/png"): Promise<Blob | null> {
   const largura = 640;
   const margem = 20;
   const altura = 28;
@@ -77,7 +77,7 @@ export function paraImagem(d: DadosExportaveis): Promise<Blob | null> {
     ctx.fillRect(margem, y - altura / 2, largura - margem * 2, 1);
     desenhar(l, y, texto, 400);
   }
-  return new Promise((resolver) => tela.toBlob(resolver, "image/png"));
+  return new Promise((resolver) => tela.toBlob(resolver, tipo, 0.92));
 }
 
 /** Copia a imagem da tabela para a área de transferência; `false` se o navegador não deixar. */

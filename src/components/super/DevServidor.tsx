@@ -45,7 +45,7 @@ export function SaudeVps() {
   const servicos = (s?.servicos ?? []).map((x) => (parados[x.nome] && Date.now() - parados[x.nome] < 4000 ? { ...x, estado: "a-arrancar" as const } : x));
   const colunas: ColunaSimples<Saude["servicos"][number]>[] = [
     { rotulo: "Serviço", render: (x) => <span className="font-medium">{x.nome}</span> },
-    { rotulo: "Estado", render: (x) => <Estado valor={x.estado === "saudavel" ? "Saudável" : x.estado === "a-arrancar" ? "A arrancar" : "Parado"} /> },
+    { rotulo: "Estado", filtro: (x) => String(x.estado === "saudavel" ? "Saudável" : x.estado === "a-arrancar" ? "A arrancar" : "Parado"), render: (x) => <Estado valor={x.estado === "saudavel" ? "Saudável" : x.estado === "a-arrancar" ? "A arrancar" : "Parado"} /> },
     { rotulo: "CPU", direita: true, render: (x) => percentagem(x.cpu, 1) },
     { rotulo: "Memória", direita: true, render: (x) => mb(x.memoria) },
     ...(editar ? [{ rotulo: "", direita: true, render: (x: Saude["servicos"][number]) => <Button variant="ghost" size="sm" onClick={() => setReiniciar(x.nome)}>Reiniciar</Button> }] : []),
@@ -57,10 +57,10 @@ export function SaudeVps() {
       {s && (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <CartaoEstatistica titulo="CPU" valor={percentagem(s.cpu, 0)} variacao={null} pior valores={historico.map((h) => h.cpu * 100)} dica={`Carga do servidor: ${s.carga.map((c) => c.toLocaleString("pt-PT", { maximumFractionDigits: 2 })).join(" · ")} (1, 5 e 15 minutos).`} />
-            <CartaoEstatistica titulo="Memória" valor={percentagem(s.memoria, 0)} variacao={null} pior valores={historico.map((h) => h.memoria * 100)} dica="A memória em uso, do total do servidor." />
-            <CartaoEstatistica titulo="Disco" valor={percentagem(s.disco, 0)} variacao={null} pior valores={historico.map((h) => h.disco * 100)} dica="O espaço ocupado do disco principal." />
-            <CartaoEstatistica titulo="Rede (saída)" valor={kbs(s.redeSaida)} variacao={null} valores={historico.map((h) => h.saida)} dica={`A entrada é de ${kbs(s.redeEntrada)}.`} />
+            <CartaoEstatistica titulo="CPU" valor={percentagem(s.cpu, 0)} pior valores={historico.map((h) => h.cpu * 100)} dica={`Carga do servidor: ${s.carga.map((c) => c.toLocaleString("pt-PT", { maximumFractionDigits: 2 })).join(" · ")} (1, 5 e 15 minutos).`} />
+            <CartaoEstatistica titulo="Memória" valor={percentagem(s.memoria, 0)} pior valores={historico.map((h) => h.memoria * 100)} dica="A memória em uso, do total do servidor." />
+            <CartaoEstatistica titulo="Disco" valor={percentagem(s.disco, 0)} pior valores={historico.map((h) => h.disco * 100)} dica="O espaço ocupado do disco principal." />
+            <CartaoEstatistica titulo="Rede (saída)" valor={kbs(s.redeSaida)} valores={historico.map((h) => h.saida)} dica={`A entrada é de ${kbs(s.redeEntrada)}.`} />
           </div>
           <div className="grid gap-4 lg:grid-cols-3">
             <Cartao titulo="CPU e memória (últimos 60 s)">
@@ -144,7 +144,7 @@ export function PedidosEmTempoReal() {
     { rotulo: "Hora", render: (p) => <span className="tabular-nums">{horaCompleta(p.quando)}</span> },
     { rotulo: "Método", render: (p) => <Badge variant="outline">{p.metodo}</Badge> },
     { rotulo: "Caminho", render: (p) => <span className="font-medium">{p.caminho}</span> },
-    { rotulo: "Estado", render: (p) => <Estado valor={String(p.estado)} variante={cor(p.estado)} /> },
+    { rotulo: "Estado", filtro: (p) => String(String(p.estado)), render: (p) => <Estado valor={String(p.estado)} variante={cor(p.estado)} /> },
     { rotulo: "Tempo", direita: true, render: (p) => `${p.ms} ms` },
     { rotulo: "IP", render: (p) => <span className="inline-flex items-center gap-2 tabular-nums">{p.ip}{acesso.bloqueadoPor(p.ip, p.pais) && <Estado valor="Bloqueado" variante="error" />}</span> },
     { rotulo: "País", render: (p) => p.pais },
@@ -204,7 +204,7 @@ export function PedidosEmTempoReal() {
         <Dialog size="lg" className="p-6">
           {detalhe && (
             <div className="flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center justify-between gap-4">
                 <Dialog.Title className="min-w-0 truncate text-lg font-semibold">
                   {detalhe.metodo} {detalhe.caminho}
                 </Dialog.Title>
@@ -291,7 +291,7 @@ export function BaseDeDados() {
         <Dialog size="lg" className="p-6">
           {tabelaAberta && (
             <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center justify-between gap-4">
                 <Dialog.Title className="text-lg font-semibold">Políticas de {tabelaAberta.nome}</Dialog.Title>
                 <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
               </div>

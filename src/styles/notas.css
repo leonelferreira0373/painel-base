@@ -1,0 +1,55 @@
+/* As notas adesivas: o texto rico (o mesmo na leitura e na escrita), os ficheiros dentro do texto e as cores do papel. O texto é sempre preto ou branco. */
+.nota-papel {
+  --nota-fundo: #fff3b0;
+  --nota-linha: rgb(0 0 0 / 0.12);
+  background: var(--nota-fundo);
+  color: #171717;
+}
+.nota-papel[data-cor="rosa"] { --nota-fundo: #ffd9e6; }
+.nota-papel[data-cor="verde"] { --nota-fundo: #d6f5d6; }
+.nota-papel[data-cor="azul"] { --nota-fundo: #d4e8ff; }
+.nota-papel[data-cor="cinza"] { --nota-fundo: #e8e8e8; }
+:root[data-mode="dark"] .nota-papel {
+  --nota-fundo: #4a4116;
+  --nota-linha: rgb(255 255 255 / 0.18);
+  color: #fafafa;
+}
+:root[data-mode="dark"] .nota-papel[data-cor="rosa"] { --nota-fundo: #4d2437; }
+:root[data-mode="dark"] .nota-papel[data-cor="verde"] { --nota-fundo: #1f4023; }
+:root[data-mode="dark"] .nota-papel[data-cor="azul"] { --nota-fundo: #1d3556; }
+:root[data-mode="dark"] .nota-papel[data-cor="cinza"] { --nota-fundo: #3a3a3a; }
+
+.nota-corpo {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.nota-corpo h2 { font-size: 1.05rem; font-weight: 600; margin: 0.6em 0 0.3em; }
+.nota-corpo h3 { font-size: 0.95rem; font-weight: 600; margin: 0.5em 0 0.25em; }
+.nota-corpo p, .nota-corpo div { margin: 0 0 0.4em; }
+.nota-corpo ul { list-style: disc; padding-left: 1.25rem; margin: 0.3em 0; }
+.nota-corpo ol { list-style: decimal; padding-left: 1.25rem; margin: 0.3em 0; }
+.nota-corpo blockquote { border-left: 3px solid var(--nota-linha, currentColor); padding-left: 0.75rem; margin: 0.4em 0; opacity: 0.85; }
+.nota-corpo code { font-family: ui-monospace, monospace; font-size: 0.8rem; background: rgb(0 0 0 / 0.08); border-radius: 4px; padding: 0 0.3em; }
+.nota-corpo pre { font-family: ui-monospace, monospace; font-size: 0.8rem; background: rgb(0 0 0 / 0.08); border-radius: 8px; padding: 0.5rem 0.75rem; overflow: auto; margin: 0.4em 0; }
+:root[data-mode="dark"] .nota-corpo code, :root[data-mode="dark"] .nota-corpo pre { background: rgb(255 255 255 / 0.1); }
+.nota-corpo a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.nota-corpo img, .nota-corpo video { max-width: 100%; max-height: 22rem; border-radius: 8px; margin: 0.3em 0; display: block; }
+.nota-corpo audio { width: 100%; max-width: 26rem; margin: 0.3em 0; display: block; }
+.nota-corpo a.nota-anexo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 6px;
+  padding: 0.15rem 0.55rem;
+  background: rgb(0 0 0 / 0.08);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+:root[data-mode="dark"] .nota-corpo a.nota-anexo { background: rgb(255 255 255 / 0.12); }
+.nota-corpo a.nota-anexo:hover { background: rgb(0 0 0 / 0.14); }
+
+.nota-editor { min-height: 9rem; max-height: 40dvh; overflow-y: auto; outline: none; }
+.nota-editor:empty::before { content: attr(data-vazio); opacity: 0.55; pointer-events: none; }

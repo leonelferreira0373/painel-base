@@ -77,6 +77,9 @@ const ROTULOS: Record<Formato, string> = {
   "doc-antigo": "Documento Office antigo",
 };
 
+/** O nome de um formato em palavras («Excel (XLSX)»). */
+export const rotuloDoFormato = (f: string): string => ROTULOS[f as Formato] ?? f;
+
 export async function extrairFicheiro(ficheiro: File, opcoes: Opcoes = {}): Promise<Extraido[]> {
   const bytes = new Uint8Array(await ficheiro.arrayBuffer());
   return extrairBytes(ficheiro.name, bytes, ficheiro.type, opcoes, 0, undefined);

@@ -9,8 +9,10 @@ import { FORMATOS_DATA, FUSOS } from "@/dados/conta";
 import { podeVer } from "@/dados/rbac";
 import { useConta } from "@/lib/conta";
 import { useApp } from "@/lib/estado";
+import { lerTelefone, paisPorFuso, telefoneDe } from "@/lib/telefone";
 import { useTema, type Tema } from "@/lib/tema";
 import { Avatar } from "../Avatar";
+import { CampoDeTelefone } from "../CampoDeTelefone";
 import { ICONES, Ic } from "../Icones";
 import { CodigoDialog } from "./CodigoDialog";
 import { Cartao, codigoSimulado, emailValido, Interruptor, Linha, LinhaCampo, mascarar } from "./Pecas";
@@ -192,7 +194,7 @@ function AlterarEmail({ aberto, aoMudar }: { aberto: boolean; aoMudar: (v: boole
               setPasso("codigo");
             }}
           >
-            <div className="mb-3 flex items-start justify-between gap-4">
+            <div className="mb-3 flex items-center justify-between gap-4">
               <Dialog.Title className="text-lg font-semibold">Alterar o e-mail da conta</Dialog.Title>
               <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
             </div>
@@ -241,8 +243,11 @@ export function SecaoContactos() {
     setTelefone(conta.telefone);
   }, [conta.emailRecuperacao, conta.telefone]);
   const erroRec = recuperacao && !emailValido(recuperacao) ? "Esse e-mail não parece certo." : recuperacao.trim().toLowerCase() === conta.email ? "Tem de ser diferente do e-mail da conta." : undefined;
-  const tel = telefone.replace(/[\s()-]/g, "");
-  const erroTel = telefone && !/^\+?\d{9,15}$/.test(tel) ? "Escreva o número com o indicativo, por exemplo +244 923 000 000." : undefined;
+  const [erroTel, setErroTel] = useState<string | null>(null);
+  const telefoneGuardado = (() => {
+    const l = lerTelefone(conta.telefone, paisPorFuso(conta.fuso));
+    return telefoneDe(l.pais, l.corpo) || conta.telefone;
+  })();
 
   return (
     <>
@@ -298,7 +303,7 @@ export function SecaoContactos() {
 
       <Cartao titulo="Telefone" dica="Recebe aqui os avisos por SMS que ativar em «Notificações» e pode usá-lo para recuperar a conta.">
         <LinhaCampo>
-          <Input label="Número" type="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} error={erroTel} />
+          <CampoDeTelefone rotulo="Número" valor={telefone} aoMudar={(v, e) => (setTelefone(v), setErroTel(e))} paisPorOmissao={paisPorFuso(conta.fuso)} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Badge variant={conta.telefoneVerificado ? "success" : "warning"}>{conta.telefoneVerificado ? "Verificado" : "Por verificar"}</Badge>
             <div className="flex gap-2">
@@ -316,7 +321,7 @@ export function SecaoContactos() {
       </Cartao>
 
       <AlterarEmail aberto={aberto} aoMudar={setAberto} />
-      <CodigoDialog aberto={verTel} aoMudar={setVerTel} titulo="Verifique o número" texto={<>Enviámos um SMS para <b>{conta.telefone}</b>.</>} codigo={codigoTel} aoReenviar={() => (setCodigoTel(codigoSimulado()), avisar("Novo código enviado"))} aoConfirmar={() => mudar({ telefoneVerificado: true }, "Número de telefone verificado")} rotuloAcao="Verificar" />
+      <CodigoDialog aberto={verTel} aoMudar={setVerTel} titulo="Verifique o número" texto={<>Enviámos um SMS para <b>{telefoneGuardado}</b>.</>} codigo={codigoTel} aoReenviar={() => (setCodigoTel(codigoSimulado()), avisar("Novo código enviado"))} aoConfirmar={() => mudar({ telefoneVerificado: true }, "Número de telefone verificado")} rotuloAcao="Verificar" />
     </>
   );
 }

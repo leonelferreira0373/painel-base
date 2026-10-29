@@ -56,7 +56,7 @@ export function Implementacoes() {
     { rotulo: "Mudança", render: (i) => <span className="block max-w-72 truncate" title={i.mensagem}>{i.mensagem}</span> },
     { rotulo: "Autor", render: (i) => i.autor },
     { rotulo: "Quando", render: (i) => <span className="tabular-nums">{dataHora(i.quando)}</span> },
-    { rotulo: "Estado", render: (i) => <Estado valor={i.estado} /> },
+    { rotulo: "Estado", filtro: (i) => String(i.estado), render: (i) => <Estado valor={i.estado} /> },
     { rotulo: "Tráfego", direita: true, render: (i) => `${i.trafego} %` },
     ...(editar
       ? [

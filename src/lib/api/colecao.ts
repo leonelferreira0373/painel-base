@@ -1,6 +1,8 @@
 // Uma coleção de itens com identificador (as contas bancárias, as regras do firewall…): em modo simulado vive no navegador; em modo ligado lê-se do servidor (GET na lista) e escreve-se com PUT e DELETE em `<lista>/{id}`, e o ecrã mostra sempre o que o servidor devolver. Os ecrãs não sabem em que modo estão.
 import { chamar, useApi, useLigacao } from "./cliente";
 import { useGuardado } from "../guardado";
+import { reciclar } from "../reciclagem";
+import { tipoDaColecao } from "../reciclagem-tipos";
 
 export function useColecao<T extends { id: string }>(caminho: string, chave: string, inicial: T[]) {
   const ligacao = useLigacao();
@@ -28,7 +30,9 @@ export function useColecao<T extends { id: string }>(caminho: string, chave: str
         api.recarregar();
       } else setLocal((l) => l.map((x) => novos.find((n) => n.id === x.id) ?? x));
     },
-    remover: async (id: string) => {
+    remover: async (id: string, opcoes?: { semReciclagem?: boolean }) => {
+      const antes = itens.find((x) => x.id === id);
+      if (antes && !opcoes?.semReciclagem) await reciclar({ tipo: tipoDaColecao(chave), dados: antes, origem: { kind: "colecao", chave, caminho } });
       if (ligado) {
         await chamar(ligacao, "DELETE", `${caminho}/{id}`, undefined, { id });
         api.recarregar();

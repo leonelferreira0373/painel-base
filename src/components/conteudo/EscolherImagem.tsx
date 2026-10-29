@@ -31,7 +31,7 @@ export function EscolherImagem({ aberto, aoMudar, aoEscolher, local, multiplo = 
   return (
     <Dialog.Root open={aberto} onOpenChange={aoMudar}>
       <Dialog size="lg" className="p-6">
-        <div className="mb-3 flex items-start justify-between gap-4">
+        <div className="mb-3 flex items-center justify-between gap-4">
           <Dialog.Title className="text-lg font-semibold">{multiplo ? "Escolher imagens" : "Escolher uma imagem"}</Dialog.Title>
           <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
         </div>

@@ -4,6 +4,7 @@
 import { Button, Input } from "@cloudflare/kumo";
 import { useEffect, useMemo, useState } from "react";
 import { gerarCliques, gerarOrigens, gerarPaginas, gerarResumoMarketing, type Clique, type Origem, type PaginaQuente, type ResumoMarketing } from "@/dados/super-dados";
+import { estruturaDeRegisto } from "@/lib/copiar-dados";
 import { chamar, useApi, useLigacao } from "@/lib/api/cliente";
 import { endpointPorId } from "@/lib/api/contrato";
 import { identificador } from "@/lib/conta";
@@ -52,7 +53,7 @@ export function MarketingVisao() {
             chave="marketing-visao"
             className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
             itens={[
-              { id: "visitas", conteudo: <CartaoEstatistica titulo="Visitas" valor={inteiro(r.visitas)} variacao={null} valores={serie} dica="Cada vez que alguém abre o site conta uma visita (uma sessão)." /> },
+              { id: "visitas", conteudo: <CartaoEstatistica titulo="Visitas" valor={inteiro(r.visitas)} valores={serie} dica="Cada vez que alguém abre o site conta uma visita (uma sessão)." /> },
               { id: "visitantes", conteudo: <Estatistica titulo="Visitantes" valor={inteiro(r.visitantes)} dica="Pessoas diferentes (o mesmo aparelho só conta uma vez)." numero={r.visitantes} serie={doDia("visitantes")} /> },
               { id: "paginas", conteudo: <Estatistica titulo="Páginas por visita" valor={r.paginasPorVisita.toLocaleString("pt-PT", { maximumFractionDigits: 1 })} dica="Quantas páginas se veem, em média, em cada visita." numero={r.paginasPorVisita} serie={doDia("paginasPorVisita")} /> },
               { id: "rejeicao", conteudo: <Estatistica titulo="Taxa de rejeição" valor={percentagem(r.rejeicao)} pior dica="Visitas que saíram sem ver mais nenhuma página." numero={r.rejeicao * 100} serie={doDia("rejeicao", 100)} /> },
@@ -153,7 +154,7 @@ export function Campanhas() {
             lista.map((c) => (
               <Linha key={c.id} titulo={<span className="truncate font-medium">{c.campanha}</span>} estado={`${c.fonte} / ${c.meio} · ${c.url.replace(/^https?:\/\//, "")}`}>
                 <div className="flex items-center gap-1">
-                  <BotaoCopiar texto={montarUrlUtm(c)} tamanho="sm" variante="ghost" quadrado dica="Copiar a ligação" />
+                  <BotaoCopiar texto={montarUrlUtm(c)} estruturado={estruturaDeRegisto(`Campanha ${c.campanha}`, { ...c, ligacao: montarUrlUtm(c) }, "/marketing/campanhas/")} tamanho="sm" variante="ghost" quadrado dica="Copiar os dados da campanha" />
                   {editar && <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Remover ${c.campanha}`} onClick={() => setApagar(c)} />}
                 </div>
               </Linha>

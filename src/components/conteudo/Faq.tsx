@@ -7,8 +7,10 @@ import { identificador } from "@/lib/conta";
 import { erroDaFaq, faqNova, LIMITE_DA_PERGUNTA, LIMITE_DA_RESPOSTA, useFaq, type Faq as PerguntaFrequente } from "@/lib/faq";
 import { useEditar } from "@/lib/permissao";
 import { Cartao, Confirmar, Interruptor, Linha } from "../conta/Pecas";
+import { DicaInfo } from "../Dica";
+import { Dica } from "../Dica";
 import { Frase } from "../Frase";
-import { ICONES } from "../Icones";
+import { Ic, ICONES } from "../Icones";
 import { BotaoIcone, Pagina, Titulo } from "../ui";
 import { Vazio } from "./ConteudoPecas";
 
@@ -60,6 +62,13 @@ export function Faq() {
               }
             >
               <div className="flex items-center gap-1">
+                {f.ativa && f.sugerida && (
+                  <Dica conteudo="Aparece como pergunta pronta no chat">
+                    <span className="inline-flex size-8 items-center justify-center text-kumo-subtle">
+                      <Ic nome="ia" tamanho={14} />
+                    </span>
+                  </Dica>
+                )}
                 <Interruptor marcado={f.ativa} aoMudar={(v) => guardar({ ...f, ativa: v, atualizado: new Date().toISOString() })} rotulo={f.ativa ? `Esconder «${f.pergunta}»` : `Publicar «${f.pergunta}»`} desativado={!editar} />
                 {editar && (
                   <>
@@ -89,6 +98,13 @@ export function Faq() {
             <div className="flex items-center justify-between gap-3 text-sm text-kumo-default">
               Publicada
               <Interruptor marcado={rascunho.ativa} aoMudar={(v) => mudar({ ativa: v })} rotulo="Publicada" />
+            </div>
+            <div className="flex items-center justify-between gap-3 text-sm text-kumo-default">
+              <span className="inline-flex items-center gap-1.5">
+                Sugerir no chat
+                <DicaInfo texto="Aparece como pergunta pronta (um pill) no chat do assistente. Sem isto, o assistente continua a usar a resposta quando lhe perguntam." />
+              </span>
+              <Interruptor marcado={rascunho.sugerida} aoMudar={(v) => mudar({ sugerida: v })} rotulo="Sugerir no chat" desativado={!rascunho.ativa} />
             </div>
           </div>
         )}

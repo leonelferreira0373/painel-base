@@ -239,7 +239,7 @@ export function AnaliseCliente({ cliente }: { cliente: string }) {
         <Dialog size="lg" className="p-6">
           {detalhe && (
             <div className="flex flex-col gap-5">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center justify-between gap-4">
                 <Dialog.Title className="text-xl font-semibold">{NOMES_DE_PAISES[detalhe] ?? detalhe}</Dialog.Title>
                 <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
               </div>

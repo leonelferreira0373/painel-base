@@ -51,7 +51,7 @@ export function Backups() {
   useEffect(() => setRascunho(config), [config]);
   const erro = erroDoDestino(rascunho.tipo, rascunho.endereco);
   const mudou = JSON.stringify(rascunho) !== JSON.stringify(config);
-  const copias = useMemo(() => [...colecao.itens].sort((a, b) => b.quando.localeCompare(a.quando)), [colecao.itens]);
+  const copias = useMemo(() => [...colecao.itens].sort((a, b) => (b.quando ?? "").localeCompare(a.quando ?? "")), [colecao.itens]);
   const concluidas = copias.filter((c) => c.estado === "Concluído");
   const baldes = useMemo(() => agrupar(copias, (c) => instante(c.quando), intervalosPara(copias.length)), [copias]);
 
@@ -88,7 +88,7 @@ export function Backups() {
     { rotulo: "Quando", render: (c) => <span className="tabular-nums">{dataHora(c.quando)}</span> },
     { rotulo: "Tipo", render: (c) => c.tipo },
     { rotulo: "Tamanho", direita: true, render: (c) => (c.bytes ? formatarTamanho(c.bytes) : "—") },
-    { rotulo: "Estado", render: (c) => <Estado valor={c.estado} /> },
+    { rotulo: "Estado", filtro: (c) => String(c.estado), render: (c) => <Estado valor={c.estado} /> },
     { rotulo: "Destino", render: (c) => <span className="text-kumo-subtle">{c.destino}</span> },
     ...(editar
       ? [
@@ -203,7 +203,7 @@ export function Firewall() {
     } else setLocal(novo);
   };
   const colunas: ColunaSimples<RegraFirewall>[] = [
-    { rotulo: "Ação", render: (r) => <Estado valor={r.acao === "bloquear" ? "Bloqueado" : "Permitido"} variante={r.acao === "bloquear" ? "error" : "success"} /> },
+    { rotulo: "Ação", filtro: (r) => String(r.acao === "bloquear" ? "Bloqueado" : "Permitido"), render: (r) => <Estado valor={r.acao === "bloquear" ? "Bloqueado" : "Permitido"} variante={r.acao === "bloquear" ? "error" : "success"} /> },
     { rotulo: "Alvo", render: (r) => <span className="font-medium tabular-nums">{r.alvo}</span> },
     { rotulo: "Nota", render: (r) => <span className="text-kumo-subtle">{r.nota || "—"}</span> },
     { rotulo: "Ativa", render: (r) => <Interruptor marcado={r.ativa} aoMudar={(v) => void regras.guardar({ ...r, ativa: v })} rotulo={`Regra ${r.alvo} ativa`} desativado={!editar} /> },
@@ -303,7 +303,7 @@ export function PaginasDoSite() {
   };
   const colunas: ColunaSimples<PaginaSite>[] = [
     { rotulo: "Página", render: (p) => <span title={p.caminho}><Rota caminho={p.caminho} /></span> },
-    { rotulo: "Estado", render: (p) => <Estado valor={NOME_DE_ESTADO(p.estado)} variante={p.estado === "ativa" ? "success" : p.estado === "manutencao" ? "warning" : "error"} /> },
+    { rotulo: "Estado", filtro: (p) => String(NOME_DE_ESTADO(p.estado)), render: (p) => <Estado valor={NOME_DE_ESTADO(p.estado)} variante={p.estado === "ativa" ? "success" : p.estado === "manutencao" ? "warning" : "error"} /> },
     { rotulo: "Mensagem aos visitantes", render: (p) => <span className="text-kumo-subtle">{p.mensagem || "—"}</span> },
     { rotulo: "Mudar para", render: (p) => <Select aria-label={`Estado de ${textoDaRota(p.caminho)}`} value={p.estado} onValueChange={(v) => escolher(p, String(v) as PaginaSite["estado"])} items={ESTADOS_DE_PAGINA} className="w-44" disabled={!editar} /> },
   ];
@@ -375,7 +375,7 @@ export function EnviosDeEmail() {
   const ligacao = useLigacao();
   const { avisar } = useApp();
   const editar = useEditar();
-  const lista = useColecao<EmailEnviado>("/v1/dev/emails", "emails", gerarEmails());
+  const lista = useColecao<EmailEnviado>("/v1/dev/emails", "dev-emails", gerarEmails());
   const dns = useApi<{ itens: VerificacaoDns[] }>("/v1/dev/emails/dns", () => ({ itens: DNS_DE_ORIGEM }));
   const [guardada, setGuardada] = useGuardado<ConfigDeEmail>("emails-config", EMAIL_DE_ORIGEM);
   const [config, setConfig] = useState(guardada);
@@ -426,7 +426,7 @@ export function EnviosDeEmail() {
     { rotulo: "Hora", render: (e) => <span className="tabular-nums">{dataHora(e.quando)}</span> },
     { rotulo: "Para", render: (e) => e.para },
     { rotulo: "Assunto", render: (e) => e.assunto },
-    { rotulo: "Estado", render: (e) => <Estado valor={e.estado} variante={e.estado === "Entregue" || e.estado === "Enviado" ? "success" : e.estado === "Fila" ? "warning" : "error"} /> },
+    { rotulo: "Estado", filtro: (e) => String(e.estado), render: (e) => <Estado valor={e.estado} variante={e.estado === "Entregue" || e.estado === "Enviado" ? "success" : e.estado === "Fila" ? "warning" : "error"} /> },
     { rotulo: "Erro", render: (e) => <span className="text-kumo-subtle">{e.erro ?? "—"}</span> },
     ...(editar ? [{ rotulo: "", direita: true, render: (e: EmailEnviado) => (e.estado === "Falhou" ? <Button variant="ghost" size="sm" onClick={() => void reenviar(e)}>Reenviar</Button> : null) }] : []),
   ];

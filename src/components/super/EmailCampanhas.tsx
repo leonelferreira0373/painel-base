@@ -191,7 +191,7 @@ export function CampanhasDeEmail() {
       ),
     },
     { rotulo: "Audiência", render: (c) => rotuloDaAudiencia(c.audiencia) },
-    { rotulo: "Estado", render: (c) => <Estado valor={c.estado} /> },
+    { rotulo: "Estado", filtro: (c) => String(c.estado), render: (c) => <Estado valor={c.estado} /> },
     {
       rotulo: "Envio",
       render: (c) => (c.estado === "Enviada" && c.enviadaEm ? <span className="tabular-nums">{dataHora(c.enviadaEm)}</span> : c.estado === "Agendada" && c.agendadaPara ? <span className="tabular-nums">{dataHora(c.agendadaPara)}</span> : "—"),

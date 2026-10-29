@@ -247,25 +247,4 @@ const equipas: DefRegistos = {
   },
 };
 
-const atividade: DefRegistos = {
-  id: "atividade",
-  titulo: "Registo de atividade",
-  colunas: [
-    { chave: "data", rotulo: "Data", tipo: "data" },
-    { chave: "hora", rotulo: "Hora" },
-    { chave: "utilizador", rotulo: "Utilizador" },
-    { chave: "acao", rotulo: "Ação" },
-    { chave: "modulo", rotulo: "Módulo" },
-  ],
-  campos: [],
-  graficos: [
-    { tipo: "linha", data: "data", titulo: "Ações por dia" },
-    { tipo: "barras", por: "modulo", titulo: "Ações por módulo" },
-  ],
-  semente: () => {
-    const s = new Sorteio(181);
-    return gerar(70, () => ({ data: s.dia(s.entre(-9, 0)), hora: s.hora(), utilizador: s.nome(), acao: s.de(["Iniciou sessão", "Aceitou uma encomenda", "Marcou uma encomenda como enviada", "Exportou dados", "Aprovou uma devolução", "Enviou um e-mail"]), modulo: s.de(["Encomendas", "Devoluções", "Catálogo de produtos", "Análise de dados", "Carteira de clientes"]) }), "at");
-  },
-};
-
-export const REGISTOS: Record<string, DefRegistos> = Object.fromEntries([encomendas, devolucoes, produtos, carteira, notificacoes, utilizadores, equipas, atividade, ...REGISTOS_SUPER, ...REGISTOS_NEGOCIOS].map((d) => [d.id, d]));
+export const REGISTOS: Record<string, DefRegistos> = Object.fromEntries([encomendas, devolucoes, produtos, carteira, notificacoes, utilizadores, equipas, ...REGISTOS_SUPER, ...REGISTOS_NEGOCIOS].map((d) => [d.id, d]));

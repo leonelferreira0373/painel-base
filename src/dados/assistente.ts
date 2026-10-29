@@ -16,32 +16,8 @@ const conteudo: ConteudoDoAssistente = {
     "Precisa de ajuda com uma encomenda, uma exportação ou as definições da conta? Pergunte-me.",
   ],
   abertura: ["Em que posso ajudar? Escolha uma pergunta ou escreva a sua."],
-  perguntas: [
-    {
-      pergunta: "Como crio um novo registo?",
-      resposta: "Abra o módulo pretendido no menu, por exemplo Encomendas, e use o botão «Novo registo» no topo da tabela. Preencha os campos obrigatórios e guarde: o registo aparece logo na lista. Em que módulo quer criar?",
-    },
-    {
-      pergunta: "O que significa cada estado?",
-      resposta: "Passe o rato sobre a etiqueta do estado: a dica explica o que significa, qual é o passo seguinte e quem o pode executar. Quer que lhe explique o fluxo de um módulo em concreto?",
-    },
-    {
-      pergunta: "Como mudo o tema, o idioma ou o fuso horário?",
-      resposta: "Abra o menu da conta, no canto superior direito do cabeçalho, e escolha Aparência, Idioma ou Fuso horário. Os submenus abrem para o lado onde houver espaço.",
-    },
-    {
-      pergunta: "Como altero os atalhos de teclado?",
-      resposta: "Em Definições da conta, na secção Atalhos, carregue em «Alterar» ao lado da ação e prima as teclas que quer usar. Pode repor a combinação de origem a qualquer momento.",
-    },
-    {
-      pergunta: "Como exporto os dados?",
-      resposta: "Na análise de dados, a página Exportar descarrega a tabela em CSV, Excel ou um relatório em PDF com gráficos. Já carregou um ficheiro?",
-    },
-    {
-      pergunta: "Quero falar com a equipa",
-      resposta: "Com todo o gosto. Deixe o seu nome e o melhor contacto e a equipa responde-lhe. Qual é o melhor e-mail ou número?",
-    },
-  ],
+  // as perguntas prontas (os pills do chat) vêm do painel: Conteúdo > Editor de FAQ (dados/faq.ts traz as de partida)
+  perguntas: [],
   instrucoes:
     "És o assistente de um painel de administração. Ajuda a encontrar páginas, a perceber estados e a fazer tarefas. Responde em português, de forma curta e clara, e não inventes dados: se não souberes, diz que a equipa responde.",
 };

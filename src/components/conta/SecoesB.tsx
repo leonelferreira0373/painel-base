@@ -1,6 +1,7 @@
 // Definições da conta, parte 2: segurança (palavra-passe, dois passos, chaves de acesso, sessões), chaves pessoais de acesso e dados e privacidade.
 "use client";
 
+import { reciclar } from "@/lib/reciclagem";
 import { Badge, Banner, Button, Checkbox, Dialog, Empty, Input, Meter, Select } from "@cloudflare/kumo";
 import { useState } from "react";
 import { AMBITOS } from "@/dados/conta";
@@ -21,7 +22,7 @@ function Janela({ aberto, aoMudar, titulo, children, largo = false }: { aberto: 
   return (
     <Dialog.Root open={aberto} onOpenChange={aoMudar}>
       <Dialog size={largo ? "lg" : "base"} className="p-6">
-        <div className="mb-3 flex items-start justify-between gap-4">
+        <div className="mb-3 flex items-center justify-between gap-4">
           <Dialog.Title className="text-lg font-semibold">{titulo}</Dialog.Title>
           <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
         </div>
@@ -335,7 +336,11 @@ export function SecaoTokens() {
           </Button>
         </div>
       </Janela>
-      <Confirmar aberto={!!revogar} aoMudar={(v) => !v && setRevogar(null)} titulo="Revogar a chave" perigo texto="As aplicações que a usam deixam de conseguir entrar na sua conta." rotuloAcao="Revogar" aoConfirmar={() => mudar((c) => ({ tokens: c.tokens.filter((t) => t.id !== revogar) }), "Chave de acesso revogada")} />
+      <Confirmar aberto={!!revogar} aoMudar={(v) => !v && setRevogar(null)} titulo="Revogar a chave" perigo texto="As aplicações que a usam deixam de conseguir entrar na sua conta." rotuloAcao="Revogar" aoConfirmar={() => {
+        const apagada = conta.tokens.find((t) => t.id === revogar);
+        if (apagada) void reciclar({ tipo: "Chave de acesso pessoal", dados: apagada, origem: { kind: "conta", campo: "tokens" } });
+        mudar((c) => ({ tokens: c.tokens.filter((t) => t.id !== revogar) }), "Chave de acesso revogada");
+      }} />
     </>
   );
 }

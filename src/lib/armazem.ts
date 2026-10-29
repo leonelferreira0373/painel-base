@@ -1,15 +1,19 @@
 // Armazenamento local do painel (IndexedDB): os ficheiros, a memória da IA e os artigos do blog ficam no navegador, sem servidor. Um hook por coleção mantém os ecrãs sincronizados: quem guarda ou remove avisa os outros.
 import { useCallback, useEffect, useState } from "react";
+import { lerLigacao } from "./api/cliente";
+import { registar, sessaoAtual } from "./atividade";
+import { novoItemApagado, tipoDoArmazem } from "./reciclagem-tipos";
 
-export type Loja = "ficheiros" | "memoria" | "artigos";
+export type Loja = "ficheiros" | "memoria" | "artigos" | "reciclagem" | "anexos";
 
 const BASE = "painel-dados";
-const LOJAS: Loja[] = ["ficheiros", "memoria", "artigos"];
+const LOJAS: Loja[] = ["ficheiros", "memoria", "artigos", "reciclagem", "anexos"];
 
 function abrir(): Promise<IDBDatabase> {
   return new Promise((ok, erro) => {
-    const r = indexedDB.open(BASE, 1);
-    r.onupgradeneeded = () => LOJAS.forEach((l) => r.result.createObjectStore(l, { keyPath: "id" }));
+    const r = indexedDB.open(BASE, 3);
+    // a versão 2 acrescenta a reciclagem: as lojas que já existem ficam como estavam
+    r.onupgradeneeded = () => LOJAS.forEach((l) => !r.result.objectStoreNames.contains(l) && r.result.createObjectStore(l, { keyPath: "id" }));
     r.onsuccess = () => ok(r.result);
     r.onerror = () => erro(r.error);
   });
@@ -35,6 +39,21 @@ export async function guardar<T extends { id: string }>(loja: Loja, item: T): Pr
 }
 
 export async function remover(loja: Loja, id: string): Promise<void> {
+  // o que se apaga vai primeiro para a reciclagem (em modo ligado é o servidor que a guarda)
+  // os ficheiros das notas vão com a nota (que é que vai para a reciclagem); a própria reciclagem não se recicla
+  if (loja !== "reciclagem" && loja !== "anexos" && lerLigacao().modo !== "ligado") {
+    try {
+      const item = await pedir<{ id: string } | undefined>(loja, "readonly", (s) => s.get(id));
+      if (item) {
+        const apagado = novoItemApagado({ tipo: tipoDoArmazem(loja, item), dados: item, origem: { kind: "armazem", loja }, por: sessaoAtual()?.utilizador ?? "Sistema", pagina: window.location.pathname });
+        await pedir("reciclagem", "readwrite", (s) => s.put(apagado));
+        registar("dados", `Apagou «${apagado.rotulo}» (${apagado.tipo.toLowerCase()}): fica na reciclagem`);
+        avisar("reciclagem");
+      }
+    } catch {
+      /* sem reciclagem apaga-se na mesma, como antes */
+    }
+  }
   await pedir(loja, "readwrite", (s) => s.delete(id));
   avisar(loja);
 }

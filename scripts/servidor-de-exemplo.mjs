@@ -1,9 +1,10 @@
 // Servidor de exemplo do contrato das APIs do painel (docs/API.md): responde a todos os endereços de src/lib/api/contrato.ts, com dados em memória, token de acesso e CORS. Serve para ligar o painel já (Developer tools, «API e ligações») e para copiar como ponto de partida do servidor do seu projeto. Sem dependências: `node scripts/servidor-de-exemplo.mjs`.
 // A saúde do servidor é real (os números do sistema), os pedidos são os que este servidor recebeu, o firewall bloqueia de verdade (regras e limite por minuto) e os eventos de marketing vêm do script public/rastreio.js. O resto é a lista em memória que cada área precisa.
 import { createServer } from "node:http";
-import { statfsSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, readSync, statSync, statfsSync } from "node:fs";
+import { spawn } from "node:child_process";
 import os from "node:os";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 const porta = Number(process.env.PORTA ?? 4000);
 const token = process.env.TOKEN ?? randomBytes(12).toString("hex");
@@ -45,12 +46,206 @@ const estado = {
   ],
   mensagens: [],
   campanhasEmail: [],
+  tokens: [],
   tabelas: [
     { nome: "pagamentos", linhas: 0, bytes: 0, rls: true, politicas: [] },
     { nome: "eventos", linhas: 0, bytes: 0, rls: false, politicas: [] },
   ],
 };
 const porIp = new Map();
+
+// ---------- o contrato, os tokens e as permissões ----------
+
+// O contrato lê-se do próprio painel (src/lib/api/contrato.ts): cada token só pode usar os pedidos que as suas permissões deixam.
+const CONTRATO = (() => {
+  try {
+    const texto = readFileSync(new URL("../src/lib/api/contrato.ts", import.meta.url), "utf8");
+    return [...texto.matchAll(/\{ id: "([^"]+)", area: "([^"]+)", metodo: "([^"]+)", caminho: "([^"]+)", descricao: "((?:[^"\\]|\\.)*)"/g)].map(([, id, area, metodo, caminho, descricao]) => ({ id, area, metodo, caminho, descricao, re: new RegExp(`^${caminho.replace(/\{\w+\}/g, "[^/]+")}$`) }));
+  } catch {
+    return [];
+  }
+})();
+
+const MODULO_DO_CAMINHO = [
+  [/^\/v1\/dev\/saude/, "saude"], [/^\/v1\/dev\/pedidos/, "pedidos-web"], [/^\/v1\/dev\/erros/, "erros"], [/^\/v1\/dev\/logs/, "logs"], [/^\/v1\/dev\/bd/, "bd"], [/^\/v1\/dev\/backups/, "backups"], [/^\/v1\/dev\/limpeza/, "limpeza"],
+  [/^\/v1\/dev\/firewall/, "firewall"], [/^\/v1\/dev\/dns/, "dns"], [/^\/v1\/dev\/paginas/, "paginas"], [/^\/v1\/dev\/emails/, "envios"], [/^\/v1\/dev\/(implementacoes|github|conectores)/, "implementacoes"],
+  [/^\/v1\/pagamentos\/metricas/, "metricas"], [/^\/v1\/pagamentos/, "pagamentos"], [/^\/v1\/comprovativos/, "comprovativos"], [/^\/v1\/contas-bancarias/, "contas"],
+  [/^\/v1\/marketing\/campanhas-email/, "campanhas-email"], [/^\/v1\/marketing\/emails/, "enviados"], [/^\/v1\/painel\/tokens/, "tokens"], [/^\/v1\/painel\/(sessoes|atividade|convites)/, "atividade"],
+  [/^\/v1\/painel\/reciclagem/, "reciclagem"], [/^\/v1\/painel\/notas/, "notas"], [/^\/v1\/painel\/configuracao/, "modulos"],
+];
+const recursoDoPedido = (metodo, caminho) => {
+  const e = CONTRATO.find((x) => x.metodo === metodo && x.re.test(caminho));
+  return { area: e?.area ?? "*", modulo: MODULO_DO_CAMINHO.find(([re]) => re.test(caminho))?.[1] ?? "*", endpoint: e };
+};
+const permitido = (permissoes, metodo, caminho) => {
+  const r = recursoDoPedido(metodo, caminho);
+  const pedido = metodo === "GET" ? "ler" : "editar";
+  return permissoes.some((p) => (p.area === "*" || p.area === r.area) && (p.modulo === "*" || p.modulo === r.modulo) && (p.acesso === "editar" || pedido === "ler"));
+};
+const ipDoPedido = (req) => (req.headers["x-forwarded-for"]?.toString().split(",")[0] ?? req.socket.remoteAddress ?? "").replace(/^::ffff:/, "");
+const impressaoDe = (segredo) => createHash("sha256").update(segredo).digest("hex");
+const ipNaLista = (ip, valores) => valores.some((v) => ipNaGama(ip, v));
+
+/** Quem faz o pedido: o token mestre (TOKEN) pode tudo; um token «bpt_…» do painel pode o que as suas permissões, os seus IP e a sua validade deixam. */
+function autenticar(req, ip, metodo, caminho) {
+  const bearer = /^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1];
+  if (!bearer) return { codigo: 401, erro: "Token em falta ou errado." };
+  if (bearer === token) return { mestre: true };
+  if (!bearer.startsWith("bpt_")) return { codigo: 401, erro: "Token em falta ou errado." };
+  const t = estado.tokens.find((x) => x.impressao === impressaoDe(bearer));
+  if (!t) return { codigo: 401, erro: "O token não existe (ou foi rodado)." };
+  const agoraMs = Date.now();
+  if (t.revogado) return { codigo: 401, erro: "O token está revogado." };
+  if (t.expira && new Date(t.expira).getTime() <= agoraMs) return { codigo: 401, erro: "O token está expirado." };
+  if (t.inicio && new Date(t.inicio).getTime() > agoraMs) return { codigo: 401, erro: "O token ainda não vale." };
+  if (t.ips?.valores?.length && ip) {
+    const dentro = ipNaLista(ip, t.ips.valores);
+    if (t.ips.modo === "incluir" ? !dentro : dentro) return { codigo: 403, erro: "O endereço IP não é permitido por este token." };
+  }
+  const podeVerificar = metodo === "POST" && caminho === "/v1/painel/tokens/verificar";
+  const podeFerramentas = metodo === "GET" && caminho === "/v1/painel/tokens/ferramentas";
+  if (!podeVerificar && !podeFerramentas && !permitido(t.permissoes ?? [], metodo, caminho)) return { codigo: 403, erro: "O token não tem permissão para este pedido." };
+  t.ultimoUso = new Date().toISOString();
+  t.usos = (t.usos ?? 0) + 1;
+  return { token: t };
+}
+
+const descreverPermissao = (p) => `${p.area === "*" ? "Todas as áreas" : p.area}${p.area === "*" ? "" : ` · ${p.modulo === "*" ? "Todos os módulos" : p.modulo}`}: ${p.acesso === "editar" ? "Editar" : "Ler"}`;
+
+/** As ferramentas para uma IA, no formato das ferramentas da Anthropic: uma por pedido que o token permite. */
+const ferramentasDe = (permissoes) =>
+  CONTRATO.filter((e) => permitido(permissoes, e.metodo, e.caminho.replace(/\{\w+\}/g, "x"))).map((e) => {
+    const parametros = [...e.caminho.matchAll(/\{(\w+)\}/g)].map((x) => x[1]);
+    return {
+      name: e.id.replace(/[^a-zA-Z0-9_-]/g, "_"),
+      description: `${e.descricao} (${e.metodo} ${e.caminho})`,
+      input_schema: { type: "object", properties: { ...Object.fromEntries(parametros.map((n) => [n, { type: "string", description: `O identificador (${n}) no caminho.` }])), ...(e.metodo !== "GET" && e.metodo !== "DELETE" ? { corpo: { type: "object", description: "O corpo do pedido (ver o exemplo do contrato)." } } : {}) }, required: parametros },
+      "x-painel": { metodo: e.metodo, caminho: e.caminho, acesso: e.metodo === "GET" ? "ler" : "editar" },
+    };
+  });
+
+// ---------- os registos do servidor (como os do Render) ----------
+
+const REGISTOS = { linhas: [], proximo: 1, fontes: [{ id: "web", rotulo: "Este servidor (web)", tipo: "processo", ambiente: "VPS", ativa: true }] };
+const MAXIMO_DE_REGISTOS = 5000;
+const nivelDoTexto = (texto) => {
+  const s = texto.toLowerCase();
+  if (/\b(fatal|panic|critical|crit|error|erro|exception|traceback|segfault|unhandled|econnrefused|failed|falhou)\b/.test(s)) return "erro";
+  const http = /(?:^|\s)(?:"[a-z]+ [^"]*"|[a-z]+ \/\S*)\s+(\d{3})\b/.exec(s) ?? /\bstatus[= :]+(\d{3})\b/.exec(s);
+  if (http) {
+    const c = Number(http[1]);
+    if (c >= 500) return "erro";
+    if (c >= 400) return "aviso";
+  }
+  if (/\b(warn|warning|aviso|deprecated|timeout|retry|slow)\b/.test(s)) return "aviso";
+  if (/\b(debug|trace|verbose)\b/.test(s)) return "debug";
+  return "info";
+};
+function registo(fonte, texto, quando = agora(), nivel) {
+  const limpo = texto.replace(/\u001b\[[0-9;]*m/g, "").replace(/\s+$/, "");
+  if (!limpo) return;
+  REGISTOS.linhas.push({ id: String(REGISTOS.proximo++).padStart(9, "0"), quando, nivel: nivel ?? nivelDoTexto(limpo), fonte, texto: limpo.slice(0, 4000) });
+  if (REGISTOS.linhas.length > MAXIMO_DE_REGISTOS) REGISTOS.linhas.splice(0, REGISTOS.linhas.length - MAXIMO_DE_REGISTOS);
+}
+const marcarFonte = (f) => !REGISTOS.fontes.some((x) => x.id === f.id) && REGISTOS.fontes.push(f);
+
+/** Lê as linhas de um programa que escreve sem parar (docker logs, journalctl, wrangler tail) e volta a lançá-lo se cair. */
+function seguirProcesso(fonte, comando, argumentos, aoLinha) {
+  let buffer = "";
+  const lancar = () => {
+    let filho;
+    try {
+      filho = spawn(comando, argumentos, { stdio: ["ignore", "pipe", "pipe"] });
+    } catch {
+      return void (fonte.ativa = false);
+    }
+    fonte.ativa = true;
+    const ler = (d) => {
+      buffer += d.toString("utf8");
+      const partes = buffer.split(/\r?\n/);
+      buffer = partes.pop() ?? "";
+      for (const l of partes) aoLinha(l);
+    };
+    filho.stdout.on("data", ler);
+    filho.stderr.on("data", ler);
+    filho.on("error", () => (fonte.ativa = false));
+    filho.on("close", () => {
+      fonte.ativa = false;
+      setTimeout(lancar, 10_000).unref();
+    });
+  };
+  lancar();
+}
+
+/** Segue um ficheiro de registo (como o `tail -f`): só as linhas novas, e recomeça se o ficheiro for rodado. */
+function seguirFicheiro(fonte, caminho) {
+  let posicao = existsSync(caminho) ? statSync(caminho).size : 0;
+  let resto = "";
+  setInterval(() => {
+    try {
+      const tamanho = statSync(caminho).size;
+      if (tamanho < posicao) posicao = 0;
+      if (tamanho === posicao) return void (fonte.ativa = true);
+      const fd = openSync(caminho, "r");
+      const buf = Buffer.alloc(Math.min(tamanho - posicao, 1_000_000));
+      readSync(fd, buf, 0, buf.length, posicao);
+      closeSync(fd);
+      posicao += buf.length;
+      resto += buf.toString("utf8");
+      const partes = resto.split(/\r?\n/);
+      resto = partes.pop() ?? "";
+      for (const l of partes) registo(fonte.id, l);
+      fonte.ativa = true;
+    } catch {
+      fonte.ativa = false;
+    }
+  }, 1000).unref();
+}
+
+// As fontes ligam-se pelas variáveis de ambiente: LOGS_DOCKER=«web,db» (docker logs -f de cada contentor), LOGS_FICHEIROS=«/var/log/nginx/error.log,…», LOGS_JOURNALD=«nginx.service,ssh.service» (ou «todos») e LOGS_CLOUDFLARE=«nome-do-worker» (wrangler tail).
+for (const nome of (process.env.LOGS_DOCKER ?? "").split(",").map((x) => x.trim()).filter(Boolean)) {
+  const f = { id: `docker:${nome}`, rotulo: nome, tipo: "docker", ambiente: "VPS", ativa: false };
+  marcarFonte(f);
+  seguirProcesso(f, "docker", ["logs", "-f", "--since", "5m", "--timestamps", nome], (l) => {
+    const m = /^(\d{4}-\d\d-\d\dT[\d:.]+Z)\s+(.*)$/.exec(l);
+    registo(f.id, m ? m[2] : l, m ? m[1] : agora());
+  });
+}
+for (const caminho of (process.env.LOGS_FICHEIROS ?? "").split(",").map((x) => x.trim()).filter(Boolean)) {
+  const f = { id: caminho, rotulo: caminho, tipo: "ficheiro", ambiente: "VPS", ativa: false };
+  marcarFonte(f);
+  seguirFicheiro(f, caminho);
+}
+for (const unidade of (process.env.LOGS_JOURNALD ?? "").split(",").map((x) => x.trim()).filter(Boolean)) {
+  const f = { id: `journald:${unidade}`, rotulo: unidade === "todos" ? "journald (tudo)" : unidade, tipo: "journald", ambiente: "VPS", ativa: false };
+  marcarFonte(f);
+  seguirProcesso(f, "journalctl", ["-f", "-n", "0", "-o", "short-iso", ...(unidade === "todos" ? [] : ["-u", unidade])], (l) => registo(f.id, l.replace(/^\S+\s+\S+\s+/, "")));
+}
+for (const worker of (process.env.LOGS_CLOUDFLARE ?? "").split(",").map((x) => x.trim()).filter(Boolean)) {
+  const f = { id: `cloudflare:${worker}`, rotulo: `Cloudflare Workers (${worker})`, tipo: "cloudflare", ambiente: "Cloudflare", ativa: false };
+  marcarFonte(f);
+  seguirProcesso(f, "npx", ["wrangler", "tail", worker, "--format", "json"], (l) => {
+    try {
+      const e = JSON.parse(l);
+      const quando = e.eventTimestamp ? new Date(e.eventTimestamp).toISOString() : agora();
+      const pedido = e.event?.request;
+      if (pedido) registo(f.id, `${pedido.method} ${new URL(pedido.url).pathname} ${e.event?.response?.status ?? ""} ${e.outcome ?? ""}`.trim(), quando, e.outcome && e.outcome !== "ok" ? "erro" : undefined);
+      for (const x of e.logs ?? []) registo(f.id, (x.message ?? []).join(" "), quando, x.level === "error" ? "erro" : x.level === "warn" ? "aviso" : x.level === "debug" ? "debug" : undefined);
+      for (const x of e.exceptions ?? []) registo(f.id, `${x.name}: ${x.message}`, quando, "erro");
+    } catch {
+      registo(f.id, l);
+    }
+  });
+}
+
+// O que este servidor escreve na consola e cada pedido que recebe também entram nos registos.
+for (const [metodo, nivel] of [["log", undefined], ["info", "info"], ["warn", "aviso"], ["error", "erro"]]) {
+  const original = console[metodo].bind(console);
+  console[metodo] = (...a) => {
+    original(...a);
+    registo("web", a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "), agora(), nivel);
+  };
+}
 
 // ---------- ajudantes ----------
 
@@ -349,6 +544,40 @@ async function tratar(req, res, url, corpo) {
     return json(res, 200, { id: novo.id, estado: novo.estado });
   }
   if (p === "/v1/dev/emails/dns" && m === "GET") return json(res, 200, { itens: ["SPF", "DKIM", "DMARC", "PTR"].map((nome) => ({ nome, estado: "aviso", detalhe: "O servidor de exemplo não consulta o DNS: implemente esta verificação no seu servidor." })) });
+  // registos do servidor
+  if (p === "/v1/dev/logs/fontes" && m === "GET") return json(res, 200, { itens: REGISTOS.fontes });
+  if (p === "/v1/dev/logs" && m === "GET") {
+    const limite = Math.min(Math.max(Number(corpo.limite) || 200, 1), 1000);
+    const q = String(corpo.q ?? "").toLowerCase();
+    let itens = REGISTOS.linhas.filter((l) => (!corpo.desde || l.id > corpo.desde) && (!corpo.nivel || String(corpo.nivel).split(",").includes(l.nivel)) && (!corpo.fonte || String(corpo.fonte).split(",").includes(l.fonte)) && (!q || `${l.fonte} ${l.texto}`.toLowerCase().includes(q)));
+    // sem «desde» devolvem-se as últimas; com «desde», as que vieram depois, por ordem
+    itens = corpo.desde ? itens.slice(0, limite) : itens.slice(-limite);
+    return json(res, 200, { itens, cursor: itens.length ? itens[itens.length - 1].id : (corpo.desde ?? "") });
+  }
+  // tokens da API do painel
+  if (p === "/v1/painel/tokens" && m === "GET") return json(res, 200, { itens: estado.tokens });
+  if (e(/^\/v1\/painel\/tokens\/([^/]+)$/) && m === "PUT" && r[1] !== "verificar") {
+    // o painel gera o segredo e envia só a impressão (SHA-256): este servidor nunca vê o token em claro
+    if (typeof corpo.impressao !== "string" || corpo.impressao.length !== 64) return json(res, 400, { erro: "Falta a impressão do token (SHA-256 em hexadecimal)." });
+    if (!Array.isArray(corpo.permissoes) || corpo.permissoes.length === 0) return json(res, 400, { erro: "Falta pelo menos uma permissão." });
+    const antes = estado.tokens.find((x) => x.id === r[1]);
+    const novo = { ...corpo, id: r[1], criado: antes?.criado ?? agora(), modificado: agora(), ultimoUso: antes?.ultimoUso ?? null, usos: antes?.usos ?? 0 };
+    estado.tokens = antes ? estado.tokens.map((x) => (x.id === r[1] ? novo : x)) : [...estado.tokens, novo];
+    console.info(`${antes ? "Mudou" : "Criou"} o token «${novo.nome}» da API (${novo.permissoes.map(descreverPermissao).join("; ")})`);
+    return json(res, 200, novo);
+  }
+  if (e(/^\/v1\/painel\/tokens\/([^/]+)$/) && m === "DELETE" && r[1] !== "verificar") {
+    estado.tokens = estado.tokens.filter((x) => x.id !== r[1]);
+    return json(res, 200, { removida: true });
+  }
+  if (p === "/v1/painel/tokens/verificar" && m === "POST") {
+    const t = autenticar(req, ipDoPedido(req), m, p).token;
+    return json(res, 200, t ? { ativo: true, nome: t.nome, expira: t.expira ?? null, permissoes: t.permissoes.map(descreverPermissao) } : { ativo: true, nome: "Token mestre", expira: null, permissoes: ["Todas as áreas: Editar"] });
+  }
+  if (p === "/v1/painel/tokens/ferramentas" && m === "GET") {
+    const t = autenticar(req, ipDoPedido(req), m, p).token;
+    return json(res, 200, { ferramentas: ferramentasDe(t ? t.permissoes : [{ area: "*", modulo: "*", acesso: "editar" }]) });
+  }
   // configuração do painel (os módulos ligados e desligados)
   if (p === "/v1/painel/configuracao" && m === "GET") return json(res, 200, estado.painel);
   if (p === "/v1/painel/configuracao" && m === "PUT") {
@@ -478,6 +707,7 @@ const servidor = createServer(async (req, res) => {
     // os pedidos do próprio painel (leitura da lista) não enchem o registo
     if (url.pathname === "/v1/dev/pedidos") return;
     estado.pedidos.unshift({ id: id("rq"), quando: agora(), metodo: req.method, caminho: url.pathname, estado: codigo, ms: Date.now() - inicio, ip, pais: "", agente: (req.headers["user-agent"] ?? "").slice(0, 60) });
+    if (!url.pathname.startsWith("/v1/dev/logs")) registo("web", `${req.method} ${url.pathname} ${codigo} ${Date.now() - inicio}ms ${ip}`);
     estado.pedidos = estado.pedidos.slice(0, 1000);
     if (codigo >= 500) {
       const mensagem = `Erro ${codigo} em ${req.method} ${url.pathname}`;
@@ -492,9 +722,12 @@ const servidor = createServer(async (req, res) => {
     registar(429);
     return json(res, 429, { erro: "Bloqueado pelo firewall." });
   }
-  if (req.headers.authorization !== `Bearer ${token}` && url.pathname !== "/v1/eventos") {
-    registar(401);
-    return json(res, 401, { erro: "Token em falta ou errado." });
+  if (url.pathname !== "/v1/eventos") {
+    const quem = autenticar(req, ip, req.method, url.pathname);
+    if (quem.codigo) {
+      registar(quem.codigo);
+      return json(res, quem.codigo, { erro: quem.erro });
+    }
   }
   const corpo = req.method === "GET" || req.method === "DELETE" ? Object.fromEntries(url.searchParams) : await lerCorpo(req);
   const fim = res.end.bind(res);

@@ -10,10 +10,13 @@
 - **Módulos de registos** gerados por configuração: tabela com pesquisa, ordenação e paginação, formulário de novo registo, fluxo de estados com permissões por função, notificações e gráficos.
 - **Página inicial** com cartões de métricas (período, tipo de gráfico, esqueletos de carregamento), listas curtas e faixa de aviso.
 - **Controlo de acesso por função** (demonstração; ver `docs/AUTENTICACAO.md`).
-- **Definições da conta:** perfil, segurança, e-mail e telefone, notificações, lembretes, aparência, chaves de acesso pessoais, dados e privacidade.
+- **Definições da conta:** perfil, segurança, e-mail e telefone, notificações, lembretes, aparência, tokens da API (permissões por área e módulo, filtros de IP, validade e ferramentas para uma IA controlar o painel), exportar, dados e privacidade.
 - **Entrada:** entrar, registar, recuperar palavra-passe e e-mail, verificação em dois passos, páginas legais.
 - **Assistente de IA** (módulo [`ai-chat`](https://github.com/ferreirakorp/ai-chat)) aberto pelo botão «Perguntar à IA», com autorização para guardar as conversas.
 - **Super painel pronto a ligar:** Pagamentos (métricas, comprovativos com imagem, contas e IBANs validados), Marketing (de onde vêm os visitantes, páginas quentes, botões mais clicados, campanhas com UTM e o script de rastreio) e Developer tools (saúde do servidor, pedidos em tempo real, erros, base de dados com segurança por linha, cópias de segurança, firewall, páginas do site, envio de e-mails e limpeza). Correm em dados de demonstração e ligam-se a qualquer servidor que cumpra o contrato de `docs/API.md` (`npm run exemplo-api` sobe um servidor de exemplo).
+- **Enviar ficheiros** (Conteúdo): as funções do [SnapShare](https://github.com/leonelferreira0373/snapshare) dentro do painel, para enviar ficheiros, imagens e texto a outro aparelho por WebRTC, com um código, uma ligação ou um QR, sem servidor no meio. Quem recebe abre `/receber/` (sem entrar) ou o SnapShare.
+- **Registos do servidor** (Developer tools): as linhas do servidor em direto, como as do Render, do processo, de contentores Docker, de ficheiros, do journald de um VPS ou do Cloudflare Workers (ver `docs/API.md`).
+- **Reciclagem de 90 dias, sessões e atividade, notas em qualquer janela, exportar e importar em qualquer formato (BIND incluído), investigar com IA** e filtros por coluna com consulta por IA.
 - **Pesquisa rápida** com recentes e dicas, **atalhos de teclado configuráveis** e menu do utilizador com aparência, idioma e fuso horário.
 - **Tema claro e escuro**, desvanecimento nas pontas das áreas com scroll, dicas em todo o lado, estados vazios e de carregamento.
 - **Análise de dados no navegador:** CSV, JSON, XML, Excel, PDF (com OCR), Word, ZIP, e-mails e imagens → perfil, qualidade, gráficos, exportação em CSV, Excel e PDF. Nada sai do dispositivo.

@@ -221,12 +221,12 @@ export function PersonalizarAparencia() {
       </Cartao>
       <AdicionarLetra aberto={adicionarLetra} aoMudar={setAdicionarLetra} aoAdicionar={adicionarLetraNova} />
 
-      <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-kumo-base px-4 py-3 shadow-(--elevacao-popup) ring ring-kumo-line">
-        <span className="inline-flex items-center gap-2 text-sm text-kumo-subtle">
+      <div className="sticky bottom-4 z-10 flex items-center justify-between gap-3 rounded-xl bg-kumo-base px-4 py-3 shadow-(--elevacao-popup) ring ring-kumo-line">
+        <span className="inline-flex shrink-0 items-center gap-2 text-sm text-kumo-subtle">
           <span aria-hidden className={`size-2 rounded-full ${sujo ? "bg-kumo-warning" : "bg-kumo-success"}`} />
           {sujo ? "Alterações por guardar" : "Tudo guardado"}
         </span>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="sem-barra flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto [&>*]:shrink-0 [&>*:first-child]:ml-auto">
           <Button variant="ghost" disabled={!guardado} onClick={() => { mudar({ aparencia: undefined }, "Aparência reposta"); setRascunho({}); }}>
             Repor o original
           </Button>

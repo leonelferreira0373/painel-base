@@ -18,14 +18,19 @@ const EXCECOES = {
     ["src/components/SeletorDeCor.tsx", "um seletor de cor desenha as cores que se escolhem"],
     ["src/dados/predefinicoes.ts", "as cores de cada predefinição são dados do aspeto, como as de aparencia.ts"],
     ["src/lib/comprovativos.ts", "o comprovativo é uma imagem desenhada num canvas, com as cores de um recibo"],
+    ["src/assistente/", "código copiado do módulo ai-chat (licença em src/assistente/LICENCA.md), com as suas próprias cores"],
+    ["src/lib/cores-graficos.ts", "a paleta de cores que se escolhe para cada gráfico são dados, como as de aparencia.ts"],
+    ["src/lib/exportar/gerar.ts", "os documentos exportados (Word, PDF, imagens) são sempre claros"],
+    ["src/lib/pesquisa-documento.ts", "o HTML exportado de uma pesquisa é um ficheiro à parte, com as suas cores"],
   ],
   inputCru: [
     ["src/components/auth/CampoSenha.tsx", "o campo de palavra-passe tem o botão «Mostrar» dentro do campo, que o Input do Kumo não permite"],
     ["src/components/super/CampoIban.tsx", "o campo do IBAN tem o prefixo da moeda («AO06», «PT50») fixo dentro do campo, que o Input do Kumo não permite"],
   ],
+  comentarioInicial: [["src/assistente/", "código copiado do módulo ai-chat, que traz os seus comentários"]],
   setaGlifo: [["src/dados/atalhos.ts", "é a tecla «seta para a direita» do teclado, não um caminho entre ecrãs"]],
-  htmlEmTexto: [["src/app/layout.tsx", "o script do tema tem de correr antes de pintar; com next/script só corre depois do JavaScript e o tema piscava"]],
-  base64: [["src/lib/extract/", "ler anexos em base64 de e-mails (.eml) faz parte do formato"], ["src/lib/analysis/", "testes que montam e-mails com anexos"]],
+  htmlEmTexto: [["src/components/notas/", "o texto rico das notas é HTML limpo por `limparHtml` (src/lib/notas.ts) e escreve-se num editor editável"], ["src/app/layout.tsx", "o script do tema tem de correr antes de pintar; com next/script só corre depois do JavaScript e o tema piscava"]],
+  base64: [["src/lib/notas.ts", "as notas protegidas por palavra-passe guardam os bytes cifrados em texto"], ["src/components/notas/EditorDeNota.tsx", "os anexos das notas lêem-se e guardam-se em base64"], ["src/lib/extract/", "ler anexos em base64 de e-mails (.eml) faz parte do formato"], ["src/lib/analysis/", "testes que montam e-mails com anexos"]],
 };
 
 /** Nomes que nunca devem aparecer no código (por exemplo, o nome de um cliente). Acrescente os do seu projeto em scripts/padroes.json. */
@@ -85,7 +90,7 @@ for (const { abs, rel } of ficheiros) {
   });
 
   // 7. Todo o ficheiro de código começa por um comentário a dizer para que serve.
-  if (codigo && !/^\s*(\/\/|\/\*)/.test(texto)) aviso(rel, 1, "comentario-inicial", "o ficheiro tem de começar por um comentário a dizer para que serve");
+  if (codigo && !excecao(EXCECOES.comentarioInicial, rel) && !/^\s*(\/\/|\/\*)/.test(texto)) aviso(rel, 1, "comentario-inicial", "o ficheiro tem de começar por um comentário a dizer para que serve");
 }
 
 if (problemas.length) {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { erroDaFaq, faqAtivas, faqComoDocumentos, faqNova, LIMITE_DA_PERGUNTA, moverFaq, perguntasProntas, type Faq } from "./faq";
 import { CONTROLOS_DE_ORIGEM, instrucoesFinais, procurar } from "./ia-controlos";
 
-const f = (id: string, pergunta: string, resposta: string, ativa = true): Faq => ({ id, pergunta, resposta, ativa, criado: "2026-01-01", atualizado: "2026-01-01" });
+const f = (id: string, pergunta: string, resposta: string, ativa = true, sugerida = true): Faq => ({ id, pergunta, resposta, ativa, sugerida, criado: "2026-01-01", atualizado: "2026-01-01" });
 
 describe("erroDaFaq", () => {
   it("pede a pergunta e depois a resposta", () => {
@@ -37,8 +37,13 @@ describe("lista", () => {
     expect(moverFaq(lista, "4", 1)).toBe(lista);
     expect(moverFaq(lista, "zzz", 1)).toBe(lista);
   });
-  it("uma pergunta nova nasce vazia e publicada", () => {
-    expect(faqNova("x", "2026-01-01")).toMatchObject({ id: "x", pergunta: "", resposta: "", ativa: true });
+  it("as perguntas prontas do chat são as publicadas que se sugerem; as outras só respondem", () => {
+    const l = [f("1", "A?", "a"), f("2", "B?", "b", true, false), f("3", "C?", "c", false)];
+    expect(perguntasProntas(l).map((p) => p.pergunta)).toEqual(["A?"]);
+    expect(faqAtivas(l).map((x) => x.id)).toEqual(["1", "2"]);
+  });
+  it("uma pergunta nova nasce vazia, publicada e sugerida", () => {
+    expect(faqNova("x", "2026-01-01")).toMatchObject({ id: "x", pergunta: "", resposta: "", ativa: true, sugerida: true });
   });
 });
 

@@ -16,6 +16,11 @@ import { T } from "@/dados/textos";
 import { ehPublica, useSessao } from "@/lib/auth";
 import { atalhosEfetivos, combinacaoDe } from "@/lib/atalhos";
 import { useConta } from "@/lib/conta";
+import { catalogoDoPainel } from "@/lib/catalogo";
+import { devePerguntarAIa, mensagensDaPesquisa, perguntarAIa, pontuarPaginas, type PaginaPesquisavel } from "@/lib/pesquisa-ia";
+import { marcarEmUso, registarUsoDaIa, useEmUso } from "@/lib/ia-uso";
+import { AnelDeContexto } from "./ia/AnelDeContexto";
+import { PensarEmLinha } from "./ia/PensarEmLinha";
 import { useApp } from "@/lib/estado";
 import { useTema, type Tema } from "@/lib/tema";
 import { toasts } from "@/lib/toasts";
@@ -25,8 +30,15 @@ import { Avatar } from "./Avatar";
 import { SeletorCliente } from "./cliente/SeletorCliente";
 import { CorpoDica, Dica } from "./Dica";
 import { AssistentePainel, EVENTO_ASSISTENTE } from "./AssistentePainel";
+import { ObservadorDaAtividade } from "./atividade/ObservadorDaAtividade";
+import { JanelaDeDados } from "./exportar/JanelaDeDados";
+import { ChipDePesquisas, MotorDePesquisas } from "./pesquisa/MotorDePesquisas";
+import { PurgaDaReciclagem } from "./reciclagem/PurgaDaReciclagem";
+import { MotorDeNotas } from "./notas/MotorDeNotas";
+import { abrirDados } from "@/lib/dados-da-pagina";
+import { registar as registarNaAtividade } from "@/lib/atividade";
 import { EsbatidoGlobal } from "./Estados";
-import { Ic, ICONES } from "./Icones";
+import { Ic, ICONES, type Icone } from "./Icones";
 import { BotaoIcone } from "./ui";
 import { Frase } from "./Frase";
 import { CampoDePesquisa } from "./CampoDePesquisa";
@@ -381,6 +393,8 @@ function Navegacao() {
   );
 }
 
+const semAcentos = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 function Pesquisa({ aberta, aoMudar }: { aberta: boolean; aoMudar: (v: boolean) => void }) {
   const router = useRouter();
   const { funcao, registos } = useApp();
@@ -407,40 +421,88 @@ function Pesquisa({ aberta, aoMudar }: { aberta: boolean; aoMudar: (v: boolean) 
       .map((a) => ({
         id: a.id,
         label: a.rotulo,
-        items: a.modulos.filter((m) => podeVer(funcao, a.id, m.id) && (termo === "" || `${a.rotulo} ${m.rotulo}`.toLowerCase().includes(termo))).map((m) => ({ id: `${a.id}/${m.id}`, title: m.rotulo, sub: undefined as string | undefined, icone: m.icone, href: caminho(a.id, m.id) })),
+        items: a.modulos.filter((m) => podeVer(funcao, a.id, m.id) && (termo === "" || semAcentos(`${a.rotulo} ${m.rotulo} ${m.palavras ?? ""}`).includes(semAcentos(termo)))).map((m) => ({ id: `${a.id}/${m.id}`, title: m.rotulo, sub: undefined as string | undefined, icone: m.icone, href: caminho(a.id, m.id) })),
       }))
       .filter((g) => g.items.length > 0)
       .concat(
         (() => {
-          const itens = SECOES_CONTA.filter((c) => termo === "" || `conta definições ${c.rotulo}`.toLowerCase().includes(termo)).map((c) => ({ id: `conta/${c.id}`, title: c.rotulo, sub: undefined as string | undefined, icone: c.icone, href: caminhoConta(c.id) }));
+          const itens = SECOES_CONTA.filter((c) => termo === "" || semAcentos(`conta definições ${c.rotulo} ${c.palavras ?? ""}`).includes(semAcentos(termo))).map((c) => ({ id: `conta/${c.id}`, title: c.rotulo, sub: undefined as string | undefined, icone: c.icone, href: caminhoConta(c.id) }));
           return itens.length > 0 ? [{ id: "conta", label: "Definições da conta", items: itens }] : [];
         })(),
       )];
   }, [q, funcao, recentes, registos]);
+  // as páginas que a IA pode escolher: o que esta função vê, mais as definições da conta
+  const catalogo = useMemo(() => catalogoDoPainel(funcao), [funcao]);
+  const consulta = q.trim();
+  const porTexto = grupos.filter((g) => g.id !== "recentes").reduce((n, g) => n + g.items.length, 0);
+  const querIa = !!PROJETO.urlIa && aberta && devePerguntarAIa(consulta, porTexto);
+  const [ia, setIa] = useState<{ consulta: string; termos: string[]; pronto: boolean; escrevendo: boolean }>({ consulta: "", termos: [], pronto: true, escrevendo: false });
+  const iaEmUso = useEmUso("pesquisa");
+  useEffect(() => {
+    if (!querIa) return;
+    const ctl = new AbortController();
+    setIa({ consulta, termos: [], pronto: false, escrevendo: false });
+    marcarEmUso("pesquisa", 30_000);
+    // espera que a pessoa pare de escrever antes de perguntar
+    const espera = window.setTimeout(() => {
+      void perguntarAIa(PROJETO.urlIa, consulta, ctl.signal).then((r) => {
+        if (ctl.signal.aborted) return;
+        if (r.uso) registarNaAtividade("ia", `Pesquisa com IA: «${consulta.slice(0, 120)}»${r.termos.length ? ` (${r.termos.slice(0, 6).join(", ")})` : ""}`);
+        if (r.uso) registarUsoDaIa({ origem: "pesquisa", pergunta: consulta, resposta: r.termos.join(", "), uso: r.uso, partes: { sistema: mensagensDaPesquisa(consulta)[0].content.length, ferramentas: 0, mensagens: consulta.length } });
+        // o cérebro pensou; o lápis escolhe as páginas um instante antes de elas aparecerem
+        setIa({ consulta, termos: r.termos, pronto: false, escrevendo: r.termos.length > 0 });
+        marcarEmUso("pesquisa", 3_500);
+        window.setTimeout(() => !ctl.signal.aborted && setIa({ consulta, termos: r.termos, pronto: true, escrevendo: false }), r.termos.length > 0 ? 900 : 0);
+      });
+    }, 600);
+    return () => {
+      window.clearTimeout(espera);
+      ctl.abort();
+      marcarEmUso("pesquisa", 0);
+    };
+  }, [querIa, consulta, catalogo]);
+  const aPensar = querIa && !(ia.consulta === consulta && ia.pronto);
+  const dasSugestoes = useMemo(
+    () => (querIa && ia.consulta === consulta && ia.pronto ? pontuarPaginas([...ia.termos, consulta], catalogo).map((p) => ({ id: `ia/${p.id}`, title: p.rotulo, sub: p.area as string | undefined, icone: p.icone, href: p.href })) : []),
+    [querIa, ia, consulta, catalogo],
+  );
+  const todos = useMemo(() => (dasSugestoes.length > 0 ? [{ id: "ia", label: T.topo.sugestoesIa, items: dasSugestoes }, ...grupos] : grupos), [dasSugestoes, grupos]);
   type Item = (typeof grupos)[number]["items"][number];
+  const abrirItem = (item: Item, novaAba = false) => {
+    if (novaAba) window.open(item.href, "_blank", "noopener");
+    else router.push(item.href);
+    aoMudar(false);
+  };
   return (
     <CommandPalette.Root
       open={aberta}
       onOpenChange={aoMudar}
-      items={grupos}
+      items={todos}
       value={q}
       onValueChange={setQ}
-      itemToStringValue={(g: (typeof grupos)[number]) => g.label}
-      onSelect={(item: Item) => {
-        router.push(item.href);
-        aoMudar(false);
-      }}
-      getSelectableItems={() => grupos.flatMap((g) => g.items)}
+      itemToStringValue={(g: (typeof todos)[number]) => g.label}
+      // o Kumo só chama isto com Ctrl/Cmd + Enter (abrir noutro separador); o toque e o Enter simples passam pelo «onClick» de cada item
+      onSelect={(item: Item, detalhes?: { newTab?: boolean }) => abrirItem(item, !!detalhes?.newTab)}
+      getSelectableItems={() => todos.flatMap((g) => g.items)}
     >
-      <CommandPalette.Input placeholder={T.topo.pesquisaPlaceholder} />
+      <CommandPalette.Input
+        placeholder={T.topo.pesquisaPlaceholder}
+        trailing={
+          // à direita: o que a IA está a fazer (o brilho do chat, o cérebro e o lápis) e o anel de contexto, que só tem cor enquanto a IA trabalha
+          <span className="flex min-w-0 items-center gap-2">
+            {aPensar && <PensarEmLinha forma={ia.consulta === consulta && ia.escrevendo ? "lapis" : "cerebro"} texto={ia.consulta === consulta && ia.escrevendo ? T.topo.aEscolherComIa : T.topo.aPesquisarComIa} />}
+            {!!PROJETO.urlIa && <AnelDeContexto origem="pesquisa" ativo={iaEmUso || aPensar} />}
+          </span>
+        }
+      />
       <CommandPalette.List>
         <CommandPalette.Results>
-          {(g: (typeof grupos)[number]) => (
+          {(g: (typeof todos)[number]) => (
             <CommandPalette.Group key={g.id} items={g.items}>
               <CommandPalette.GroupLabel>{g.label}</CommandPalette.GroupLabel>
               <CommandPalette.Items>
                 {(item: Item) => (
-                  <CommandPalette.Item key={item.id} value={item}>
+                  <CommandPalette.Item key={item.id} value={item} onClick={() => abrirItem(item)}>
                     <span className="flex items-center gap-3">
                       <span className="text-kumo-subtle">
                         <Ic nome={item.icone} />
@@ -454,11 +516,17 @@ function Pesquisa({ aberta, aoMudar }: { aberta: boolean; aoMudar: (v: boolean) 
             </CommandPalette.Group>
           )}
         </CommandPalette.Results>
-        <CommandPalette.Empty>{T.topo.semResultados}</CommandPalette.Empty>
+        <CommandPalette.Empty>{aPensar ? T.topo.aPesquisarComIa : T.topo.semResultados}</CommandPalette.Empty>
+        {aPensar && todos.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-2 text-sm text-kumo-subtle">
+            <Ic nome="ia" tamanho={14} className="shrink-0" />
+            {T.topo.aPesquisarComIa}
+          </div>
+        )}
         {q.trim() === "" && (
           <div className="border-t border-kumo-hairline px-3 pb-2 pt-3">
             <div className="pb-1 text-xs font-medium text-kumo-subtle">{T.topo.dicasTitulo}</div>
-            {T.topo.dicasPesquisa.map((d) => (
+            {[...T.topo.dicasPesquisa, ...(PROJETO.urlIa ? [T.topo.dicaIa] : [])].map((d) => (
               <div key={d} className="flex items-center gap-2.5 py-1 text-sm text-kumo-subtle">
                 <Ic nome="info" tamanho={14} className="shrink-0" />
                 <span>
@@ -615,7 +683,9 @@ function Cabecalho({ aoPesquisar }: { aoPesquisar: () => void }) {
         )}
       </div>
       <div className="flex items-center gap-1">
+        <ChipDePesquisas />
         <Tooltip content={T.topo.perguntarIa} render={<Button variant="ghost" className="h-8" aria-label={T.topo.perguntarIa} icon={<Ic nome="ia" tamanho={16} peso="fill" className="-translate-y-px text-kumo-subtle" />} onClick={() => window.dispatchEvent(new Event(EVENTO_ASSISTENTE))}><span className="hidden md:inline">{T.topo.perguntarIa}</span></Button>} />
+        <Tooltip content="Exportar e importar" render={<Button variant="ghost" shape="square" icon={ICONES.transferir} aria-label="Exportar e importar" onClick={() => abrirDados("exportar")} />} />
         <Tooltip content={T.topo.pesquisar} render={<Button variant="ghost" shape="square" icon={ICONES.lupa} aria-label={T.topo.pesquisar} onClick={aoPesquisar} />} />
         <span className="hidden text-xs text-kumo-subtle sm:inline">{T.topo.simulacao}</span>
         <MenuUtilizador />
@@ -629,7 +699,7 @@ function Rodape() {
   const ligacoes = [
     { href: "/", rotulo: T.visao.titulo },
     ...(podeVer(funcao, "analise", "ficheiros") ? [{ href: caminho("analise", "ficheiros"), rotulo: "Análise de dados" }] : []),
-    ...(podeVer(funcao, "admin", "atividade") ? [{ href: caminho("admin", "atividade"), rotulo: "Registo de atividade" }] : []),
+    ...(podeVer(funcao, "admin", "atividade") ? [{ href: caminho("admin", "atividade"), rotulo: "Sessões e atividade" }] : []),
   ];
   return (
     <footer className="flex shrink-0 flex-wrap items-center justify-center gap-x-5 gap-y-1 border-t border-kumo-hairline bg-kumo-canvas px-3 py-2.5 text-xs text-kumo-subtle">
@@ -698,6 +768,11 @@ export function Shell({ children }: { children: ReactNode }) {
             <AtalhosGlobais aoPesquisar={alternarPesquisa} />
             <AparenciaPessoal />
             <AssistentePainel />
+            <ObservadorDaAtividade />
+            <JanelaDeDados />
+            <MotorDePesquisas />
+            <PurgaDaReciclagem />
+            <MotorDeNotas />
             <Rodape />
           </div>
         </Sidebar.Provider>
