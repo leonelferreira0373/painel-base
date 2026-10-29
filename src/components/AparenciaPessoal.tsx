@@ -5,11 +5,16 @@ import { useEffect } from "react";
 import { variaveisDoTema } from "@/lib/aparencia";
 import { useConta } from "@/lib/conta";
 import { useTema } from "@/lib/tema";
+import { registarFonte } from "@/lib/fontes";
 
 export const CHAVE_APARENCIA = "painel.aparencia";
 
 export function AparenciaPessoal() {
   const { conta } = useConta();
+  // as letras que a pessoa carregou (ficheiros e ligações) põem-se a funcionar em todo o painel
+  useEffect(() => {
+    (conta.fontes ?? []).forEach((f) => void registarFonte(f));
+  }, [conta.fontes]);
   const { efetivo } = useTema();
   const aparencia = conta.aparencia;
   useEffect(() => {

@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { Dica } from "./Dica";
 import { Esbatido } from "./Estados";
 import { Ic, ICONES } from "./Icones";
+import { mascaraDataHora } from "@/lib/mascaras";
 
 export interface Periodo {
   /** Número de dias, a contar do último dia. */
@@ -125,7 +126,8 @@ function Campo({ rotulo, valor, aoMudar }: { rotulo: string; valor: string; aoMu
           value={edicao ?? valor}
           aria-invalid={invalido}
           className="w-full pl-9 tabular-nums"
-          onChange={(e) => setEdicao(e.target.value)}
+          onChange={(e) => setEdicao(mascaraDataHora(e.target.value))}
+          inputMode="numeric"
           onBlur={() => {
             if (edicao !== null) setInvalido(!aoMudar(edicao));
             setEdicao(null);

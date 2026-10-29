@@ -1,7 +1,7 @@
 // Peças de página do painel (as mesmas proporções do painel da Cloudflare): contentor centrado, título com ações, cartão de métrica com menu de opções e cartão de painel.
 "use client";
 
-import { Button, DropdownMenu, Surface, Tooltip } from "@cloudflare/kumo";
+import { Button, DropdownMenu, LayerCard, Surface, Tooltip } from "@cloudflare/kumo";
 import { MenuCartao, SubMenuCartao, SeparadorDeMenu } from "./Flutuantes";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -186,13 +186,13 @@ export function CartaoMetrica({
 
 export function Painel({ titulo, children, acoes, className = "" }: { titulo: string; children: ReactNode; acoes?: ReactNode; className?: string }) {
   return (
-    <Surface className={`pleno flex min-w-0 flex-col rounded-xl ${className}`}>
-      <div className="flex min-h-11 items-center justify-between gap-3 px-4 pt-3">
-        <h3 className="text-sm font-semibold text-kumo-default">{titulo}</h3>
+    <LayerCard className={`pleno min-w-0 ${className}`}>
+      <LayerCard.Secondary className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-medium">{titulo}</h3>
         {acoes}
-      </div>
-      <div className="p-4 pt-2">{children}</div>
-    </Surface>
+      </LayerCard.Secondary>
+      <LayerCard.Primary className="p-4">{children}</LayerCard.Primary>
+    </LayerCard>
   );
 }
 

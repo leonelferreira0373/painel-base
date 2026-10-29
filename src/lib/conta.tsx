@@ -57,6 +57,10 @@ export interface Conta {
   fuso: string;
   /** As cores e as letras que o utilizador escolheu (Definições da conta → Aparência). */
   aparencia?: Aparencia;
+  /** As letras que a pessoa carregou (Definições da conta → Aparência → Letra); os ficheiros ficam no navegador. */
+  fontes?: import("@/dados/fontes").FonteCarregada[];
+  /** Os valores personalizados que a pessoa guardou em cada seletor de opções fixas (ver SeletorPersonalizavel): chave do seletor → valores. */
+  personalizados?: Record<string, string[]>;
   /** A ordem dos cartões que o utilizador arrastou, por ecrã. */
   ordens?: Record<string, string[]>;
   /** Idioma da interface («pt-PT»). */

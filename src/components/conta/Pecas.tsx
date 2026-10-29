@@ -1,7 +1,7 @@
 // Peças comuns das definições da conta: cartão com linhas, linha com título e controlo, interruptor, janela de confirmação e formatos de data.
 "use client";
 
-import { Button, Dialog, Input, Surface, Switch } from "@cloudflare/kumo";
+import { Button, Dialog, Input, LayerCard, Switch } from "@cloudflare/kumo";
 import { useEffect, useState, type ReactNode } from "react";
 import { Dica, DicaInfo } from "../Dica";
 import { ICONES } from "../Icones";
@@ -9,16 +9,16 @@ import { Pilula } from "../Frase";
 
 export function Cartao({ titulo, dica, acoes, children, perigo = false }: { titulo: string; dica?: string; acoes?: ReactNode; children: ReactNode; perigo?: boolean }) {
   return (
-    <Surface className={`pleno flex min-w-0 flex-col rounded-xl ${perigo ? "ring-kumo-danger/40" : ""}`}>
-      <div className="flex min-h-11 items-center justify-between gap-3 px-4 pt-3 pb-1">
-        <h3 className={`inline-flex items-center gap-1.5 text-sm font-semibold ${perigo ? "text-kumo-danger" : "text-kumo-default"}`}>
+    <LayerCard className={`pleno min-w-0 ${perigo ? "ring-kumo-danger/40" : ""}`}>
+      <LayerCard.Secondary className="flex items-center justify-between gap-3">
+        <h3 className={`inline-flex items-center gap-1.5 text-sm font-medium ${perigo ? "text-kumo-danger" : ""}`}>
           {titulo}
           {dica && <DicaInfo titulo={titulo} texto={dica} />}
         </h3>
         {acoes}
-      </div>
-      <div className="flex flex-col pb-1">{children}</div>
-    </Surface>
+      </LayerCard.Secondary>
+      <LayerCard.Primary className="flex flex-col p-0 pb-1">{children}</LayerCard.Primary>
+    </LayerCard>
   );
 }
 

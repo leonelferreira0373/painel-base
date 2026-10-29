@@ -14,6 +14,9 @@ import { Cartao, Linha } from "./Pecas";
 import { SeletorPersonalizavel } from "../SeletorPersonalizavel";
 import { LETRA } from "@/dados/personalizados";
 import { EscolhaDeCor } from "../SeletorDeCor";
+import type { FonteCarregada } from "@/dados/fontes";
+import { guardarFicheiro, registarFonte, retirarFonte } from "@/lib/fontes";
+import { AdicionarLetra, ListaDeLetras } from "./Letras";
 
 function CampoCor({ valor, origem, aoMudar }: { valor: string; origem: string; aoMudar: (hex: string) => void }) {
   const [escrito, setEscrito] = useState(valor);
@@ -108,6 +111,8 @@ function Previsao({ modo, rascunho }: { modo: Modo; rascunho: Aparencia }) {
 export function PersonalizarAparencia() {
   const { conta, mudar } = useConta();
   const guardado = conta.aparencia;
+  const fontes = conta.fontes ?? [];
+  const [adicionarLetra, setAdicionarLetra] = useState(false);
   const [rascunho, setRascunho] = useState<Aparencia>(guardado ?? {});
   const [modo, setModo] = useState<Modo>("claro");
   const sujo = JSON.stringify(rascunho) !== JSON.stringify(guardado ?? {});
@@ -129,6 +134,23 @@ export function PersonalizarAparencia() {
       else letras[id] = tipo;
       return { ...r, letras };
     });
+  const semLetra = (a: Aparencia | undefined, nome: string): Aparencia | undefined => {
+    if (!a?.letras) return a;
+    const letras = Object.fromEntries(Object.entries(a.letras).filter(([, v]) => v !== `pers:${nome}`));
+    return { ...a, letras };
+  };
+  /** Acrescenta uma letra: guarda o ficheiro no navegador, regista-a e põe a descrição na conta. */
+  const adicionarLetraNova = async (f: FonteCarregada, ficheiro?: File) => {
+    if (ficheiro) await guardarFicheiro(f.id, ficheiro);
+    await registarFonte(f);
+    mudar((c) => ({ fontes: [...(c.fontes ?? []), f] }), `Letra «${f.nome}» adicionada`);
+  };
+  /** Remove uma letra: tira-a do painel, apaga o ficheiro e deixa de a usar nas escolhas. */
+  const removerLetra = async (f: FonteCarregada) => {
+    await retirarFonte(f);
+    setRascunho((r) => semLetra(r, f.nome) ?? {});
+    mudar((c) => ({ fontes: (c.fontes ?? []).filter((x) => x.id !== f.id), aparencia: semLetra(c.aparencia, f.nome) }), `Letra «${f.nome}» removida`);
+  };
   const aviso = (id: CorId) => {
     if (id === "texto" || id === "textoSecundario") {
       const r = contraste(atual[id], atual.fundo);
@@ -176,18 +198,28 @@ export function PersonalizarAparencia() {
         </div>
       </Cartao>
 
-      <Cartao titulo="Letra" dica="Só há letras que já vêm no aparelho, por isso nada se descarrega e o painel não fica mais lento.">
+      <Cartao
+        titulo="Letra"
+        dica="Escolha uma das letras do painel, uma que já tenha no aparelho (pelo nome) ou carregue a sua: um ficheiro TTF, OTF, WOFF ou WOFF2, ou uma ligação. Os ficheiros ficam só neste navegador."
+        acoes={
+          <Button variant="secondary" size="sm" icon={ICONES.mais} onClick={() => setAdicionarLetra(true)}>
+            Adicionar letra
+          </Button>
+        }
+      >
         {LETRAS.map((l) => (
           <Linha key={l.id} titulo={l.rotulo} dica={l.descricao}>
             <div className="flex items-center gap-3">
               <span className="hidden text-base text-kumo-default sm:inline" style={{ fontFamily: pilhaDe(rascunho.letras?.[l.id]) }}>
                 Aa 0123
               </span>
-              <SeletorPersonalizavel rotulo={l.rotulo} valor={rascunho.letras?.[l.id] ?? "inter"} opcoes={Object.fromEntries(TIPOS_DE_LETRA.map((t) => [t.id, t.rotulo]))} personalizado={LETRA.personalizado} aoMudar={(v) => definirLetra(l.id, v)} />
+              <SeletorPersonalizavel rotulo={l.rotulo} valor={rascunho.letras?.[l.id] ?? "inter"} opcoes={{ ...Object.fromEntries(TIPOS_DE_LETRA.map((t) => [t.id, t.rotulo])), ...Object.fromEntries(fontes.map((f) => [`pers:${f.nome}`, `${f.nome} (carregada)`])) }} personalizado={LETRA.personalizado} aoMudar={(v) => definirLetra(l.id, v)} />
             </div>
           </Linha>
         ))}
+        <ListaDeLetras fontes={fontes} aoRemover={removerLetra} />
       </Cartao>
+      <AdicionarLetra aberto={adicionarLetra} aoMudar={setAdicionarLetra} aoAdicionar={adicionarLetraNova} />
 
       <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-kumo-base px-4 py-3 shadow-(--elevacao-popup) ring ring-kumo-line">
         <span className="inline-flex items-center gap-2 text-sm text-kumo-subtle">
