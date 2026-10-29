@@ -18,7 +18,7 @@ import { AbasAnalise, SemDados, SeletorTabela } from "./Comum";
 function Formato({ chave, icone, nome, descricao, aoClicar, desativado }: { chave: string; icone: Icone; nome: string; descricao: string; aoClicar: () => void; desativado?: boolean }) {
   return (
     <Dica linha lado="bottom" conteudo={DICA_EXPORTAR[chave]}>
-      <button onClick={aoClicar} disabled={desativado} className="w-full text-left disabled:cursor-not-allowed disabled:opacity-50">
+      <button onClick={aoClicar} disabled={desativado} className="w-full cursor-pointer text-left disabled:cursor-not-allowed disabled:opacity-50">
         <Surface className="pleno grid grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded-xl p-4 transition-colors hover:bg-kumo-tint">
           <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-kumo-info-tint text-kumo-brand sm:row-span-2">
             <Ic nome={icone} tamanho={22} />

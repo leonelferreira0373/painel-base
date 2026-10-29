@@ -55,6 +55,8 @@ export function EsbatidoGlobal() {
     const aoRolar = (e: Event) => e.currentTarget instanceof HTMLElement && medir(e.currentTarget);
     const seguir = (el: HTMLElement) => {
       if (seguidas.has(el) || el.dataset.semEsbatido !== undefined || el.classList.contains("esbatido")) return;
+      // O cartão de um menu ou de uma janela não leva a máscara do esbatido: cortava-lhe a sombra. As áreas que rolam dentro dele levam.
+      if (el.matches('[role="menu"],[role="dialog"]')) return;
       seguidas.add(el);
       el.classList.add("esbatido");
       el.addEventListener("scroll", aoRolar, { passive: true });

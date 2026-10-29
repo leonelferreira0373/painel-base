@@ -2,13 +2,15 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { Aparencia } from "@/dados/aparencia";
 import { EVENTOS } from "@/dados/conta";
 import { emailDe, FUNCOES, funcaoPorId, type Funcao } from "@/dados/rbac";
 import { auth } from "@/lib/auth";
 import { useApp } from "@/lib/estado";
 import { toasts } from "@/lib/toasts";
 
-export type Repeticao = "nao" | "diario" | "semanal" | "mensal";
+/** «cada-N» é uma repetição personalizada, de N em N dias. */
+export type Repeticao = "nao" | "diario" | "semanal" | "mensal" | `cada-${number}`;
 
 export interface Sessao {
   id: string;
@@ -53,6 +55,10 @@ export interface Conta {
   foto?: string;
   assinatura: string;
   fuso: string;
+  /** As cores e as letras que o utilizador escolheu (Definições da conta → Aparência). */
+  aparencia?: Aparencia;
+  /** A ordem dos cartões que o utilizador arrastou, por ecrã. */
+  ordens?: Record<string, string[]>;
   /** Idioma da interface («pt-PT»). */
   idioma?: string;
   /** Atalhos de teclado que o utilizador mudou: identificador → combinação («Ctrl+K»). */
@@ -72,12 +78,14 @@ export interface Conta {
   codigosRecuperacao: number;
   chavesAcesso: { id: string; nome: string; criada: string }[];
   alertaInicio: boolean;
-  tempoLimite: "15" | "60" | "480" | "nunca";
+  /** «nunca» ou os minutos de inatividade (as opções fixas ou um valor personalizado). */
+  tempoLimite: string;
   senhaParaSensiveis: boolean;
   sessoes: Sessao[];
 
   receberEmails: boolean;
-  resumo: "nunca" | "diario" | "semanal";
+  /** «nunca», «diario», «semanal» ou «cada-N» (de N em N dias). */
+  resumo: string;
   horaResumo: string;
   notif: Record<string, Canais>;
   silencio: { ativo: boolean; de: string; ate: string };
@@ -168,6 +176,7 @@ const proxima = (quando: string, repetir: Repeticao): string => {
   while (d.getTime() <= agora) {
     if (repetir === "diario") d.setDate(d.getDate() + 1);
     else if (repetir === "semanal") d.setDate(d.getDate() + 7);
+    else if (repetir.startsWith("cada-")) d.setDate(d.getDate() + Math.max(1, Number(repetir.slice(5))));
     else d.setMonth(d.getMonth() + 1);
   }
   const p = (n: number) => String(n).padStart(2, "0");

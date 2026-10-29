@@ -16,7 +16,11 @@ export type GraficoSpec =
   | { tipo: "histograma"; classes: { de: number; ate: number; n: number }[] }
   | { tipo: "dispersao"; pontos: { x: number; y: number }[]; rx: string; ry: string }
   | { tipo: "rosca"; pontos: Ponto[] }
-  | { tipo: "matriz"; nomes: string[]; valores: number[][] };
+  | { tipo: "matriz"; nomes: string[]; valores: number[][] }
+  /** Colunas empilhadas: uma camada por série (por exemplo, os pedidos por estado, dia a dia). */
+  | { tipo: "empilhadas"; rotulos: string[]; series: { nome: string; valores: number[] }[]; unidade?: string }
+  /** Várias linhas no mesmo eixo (por exemplo, os percentis do tempo de resposta). */
+  | { tipo: "linhas"; rotulos: string[]; series: { nome: string; valores: number[] }[]; unidade?: string };
 
 const pt = new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 2 });
 const compacto = new Intl.NumberFormat("pt-PT", { notation: "compact", maximumFractionDigits: 1 });
@@ -50,6 +54,21 @@ const dica = { trigger: "item" as const, backgroundColor: "#fff", borderColor: G
 
 /** Opções de ECharts para tudo o que não é uma série temporal. */
 export function opcoesDe(spec: GraficoSpec): KumoChartOption {
+  if (spec.tipo === "empilhadas" || spec.tipo === "linhas") {
+    const cores = spec.series.map((_, i) => ChartPalette.categorical(i));
+    return {
+      color: cores,
+      grid: { left: 8, right: 12, top: 12, bottom: 4, containLabel: true },
+      tooltip: { ...dica, trigger: "axis", axisPointer: { type: spec.tipo === "empilhadas" ? "shadow" : "line" } },
+      xAxis: { type: "category", data: spec.rotulos, axisTick: { show: false }, axisLine: { lineStyle: { color: GRELHA } }, axisLabel: { ...eixoTexto, hideOverlap: true } },
+      yAxis: { type: "value", axisLabel: { ...eixoTexto, formatter: (v: number) => `${curto(v)}${spec.unidade ? ` ${spec.unidade}` : ""}` }, splitLine: { lineStyle: { color: GRELHA, type: "dashed" } } },
+      series: spec.series.map((s, i) =>
+        spec.tipo === "empilhadas"
+          ? { type: "bar", name: s.nome, stack: "total", data: s.valores, barMaxWidth: 22, itemStyle: { color: cores[i] }, emphasis: { focus: "series" } }
+          : { type: "line", name: s.nome, data: s.valores, showSymbol: false, smooth: 0.2, lineStyle: { width: 2.5, color: cores[i] }, itemStyle: { color: cores[i] } },
+      ),
+    } as KumoChartOption;
+  }
   if (spec.tipo === "barras") {
     const dados = [...spec.pontos].reverse();
     return {
@@ -153,8 +172,8 @@ export function opcoesExportacao(spec: GraficoSpec): KumoChartOption {
 }
 
 /** No tema escuro, troca as cores fixas do gráfico (texto, linhas, fundo das dicas) pelas suas versões escuras; o PDF continua a usar as claras. */
-const ESCURO: Record<string, string> = { "#737373": "#a3a3a3", "#e5e5e5": "#303030", "#171717": "#f2f2f2", "#fff": "#1c1c1c", "#ffffff": "#1c1c1c", "#8fb0ff": "#4f7ee8" };
-function paraEscuro<T>(v: T): T {
+const ESCURO: Record<string, string> = { "#eef0f4": "#2a2a2a", "#c9d6f2": "#2b3a5e", "#737373": "#a3a3a3", "#e5e5e5": "#303030", "#171717": "#f2f2f2", "#fff": "#1c1c1c", "#ffffff": "#1c1c1c", "#8fb0ff": "#4f7ee8" };
+export function paraEscuro<T>(v: T): T {
   if (typeof v === "string") return (ESCURO[v.toLowerCase()] ?? v) as T;
   if (Array.isArray(v)) return v.map(paraEscuro) as T;
   if (v && typeof v === "object") return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, paraEscuro(x)])) as T;
@@ -166,6 +185,7 @@ export function semDados(spec: GraficoSpec): boolean {
   if (spec.tipo === "histograma") return spec.classes.length === 0 || spec.classes.every((c) => c.n === 0);
   if (spec.tipo === "matriz") return spec.nomes.length === 0;
   if (spec.tipo === "dispersao") return spec.pontos.length === 0;
+  if (spec.tipo === "empilhadas" || spec.tipo === "linhas") return spec.series.every((s) => s.valores.every((v) => v === 0));
   return spec.pontos.length === 0 || spec.pontos.every((p) => p.valor === 0);
 }
 

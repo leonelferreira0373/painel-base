@@ -4,7 +4,12 @@ import {
   AirplaneIcon,
   CaretDownIcon,
   CaretUpIcon,
+  ImageIcon,
+  BracketsCurlyIcon,
+  CaretDoubleLeftIcon,
+  CaretDoubleRightIcon,
   KeyboardIcon,
+  DotsSixIcon,
   SparkleIcon,
   SunIcon,
   MoonIcon,
@@ -140,7 +145,12 @@ const BASE = {
   subida: ArrowUpRightIcon,
   baixo: CaretDownIcon,
   cima: CaretUpIcon,
+  imagem: ImageIcon,
+  json: BracketsCurlyIcon,
+  inicio: CaretDoubleLeftIcon,
+  fim: CaretDoubleRightIcon,
   teclado: KeyboardIcon,
+  arrastar: DotsSixIcon,
   ia: SparkleIcon,
   sol: SunIcon,
   lua: MoonIcon,
@@ -161,7 +171,7 @@ const BASE = {
   descida: ArrowDownRightIcon,
 } satisfies Record<string, IconeFosforo>;
 
-/** Todos os ícones saem com traço grosso («bold»), para terem peso visual no painel. */
+/** Todos os ícones saem com traço grosso («bold»), para terem peso visual no painel. Nunca «duotone»: pinta um retângulo cinzento por trás do desenho. */
 const reforcar = (Componente: IconeFosforo): IconeFosforo => {
   const Pesado = forwardRef<SVGSVGElement, IconProps>((props, ref) => <Componente ref={ref} weight="bold" {...props} />);
   Pesado.displayName = "IconePesado";
@@ -172,8 +182,8 @@ export const ICONES = Object.fromEntries(Object.entries(BASE).map(([nome, compon
 
 export type Icone = keyof typeof BASE;
 
-/** Ícone SVG; os grandes (a partir de 28 px) usam o desenho «duotone», com mais corpo. */
+/** Ícone SVG, sempre com o traço grosso («bold»); nunca «duotone», que pinta um retângulo cinzento por trás do desenho. */
 export function Ic({ nome, tamanho = 16, className, peso }: { nome: Icone; tamanho?: number; className?: string; peso?: "regular" | "bold" | "fill" | "duotone" }) {
   const Componente = BASE[nome];
-  return <Componente size={tamanho} weight={peso ?? (tamanho >= 28 ? "duotone" : "bold")} className={className} aria-hidden />;
+  return <Componente size={tamanho} weight={peso ?? "bold"} className={className} aria-hidden />;
 }

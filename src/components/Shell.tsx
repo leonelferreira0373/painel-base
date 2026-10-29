@@ -2,6 +2,8 @@
 "use client";
 
 import { Breadcrumbs, Button, CommandPalette, DropdownMenu, Popover, Sidebar, Toasty, Tooltip, TooltipProvider, useSidebar } from "@cloudflare/kumo";
+import { AparenciaPessoal } from "./AparenciaPessoal";
+import { MenuCartao, PopupCartao, SeparadorDeMenu, SubMenuCartao } from "./Flutuantes";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -18,12 +20,16 @@ import { useApp } from "@/lib/estado";
 import { useTema, type Tema } from "@/lib/tema";
 import { toasts } from "@/lib/toasts";
 import { useEntradaGlobal } from "./analise/Ficheiros";
+import { CONTEXTO, caminhoContexto, entidadesDe, paginaDoContexto } from "@/dados/contexto";
 import { Avatar } from "./Avatar";
+import { SeletorCliente } from "./cliente/SeletorCliente";
 import { CorpoDica, Dica } from "./Dica";
 import { AssistentePainel, EVENTO_ASSISTENTE } from "./AssistentePainel";
 import { EsbatidoGlobal } from "./Estados";
 import { Ic, ICONES } from "./Icones";
 import { BotaoIcone } from "./ui";
+import { Frase } from "./Frase";
+import { CampoDePesquisa } from "./CampoDePesquisa";
 
 /** Onde estamos: a área e o módulo (ou, nas páginas de um cliente, «cliente» e a página). O identificador da conta, quando existe, não conta. */
 export function localizar(pathname: string): { areaId: string; moduloId: string; cliente?: string } {
@@ -100,25 +106,12 @@ function PerfilLateral() {
             }
           />
         </Dica>
-        <Popover.Portal>
-          <Popover.Positioner collisionPadding={12} side="bottom" align="start" sideOffset={8}>
-            <Popover.Popup className="w-[288px] max-w-[calc(100vw-16px)] overflow-hidden p-0">
+        <PopupCartao className="w-[288px] max-w-[calc(100vw-16px)]">
               <div className="flex items-center border-b border-kumo-line pr-3">
                 <Ic nome="lupa" tamanho={14} className="ml-3 shrink-0 text-kumo-subtle" />
-                <input
-                  type="text"
-                  role="combobox"
-                  aria-label="Pesquisar contas"
-                  aria-controls="lista-contas"
-                  aria-expanded="true"
-                  aria-autocomplete="list"
-                  placeholder="Pesquisar contas…"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  className="min-w-0 grow border-0 bg-transparent px-2 py-2.5 font-sans text-sm text-kumo-default outline-none placeholder:text-kumo-subtle"
-                />
+                <CampoDePesquisa valor={q} aoMudar={setQ} rotulo="Pesquisar contas" placeholder="Pesquisar contas…" idLista="lista-contas" />
               </div>
-              <div id="lista-contas" role="listbox" aria-label="Contas" className="max-h-[176px] overflow-y-auto p-1.5">
+              <div id="lista-contas" role="listbox" data-incorporado aria-label="Contas" className="flex max-h-[176px] flex-col gap-1 overflow-y-auto p-1.5">
                 {contas.length === 0 && <div className="px-2.5 py-2 text-sm text-kumo-subtle">{T.topo.semResultados}</div>}
                 {contas.map((f) => (
                   <button
@@ -149,9 +142,7 @@ function PerfilLateral() {
                   Criar conta
                 </Link>
               </div>
-            </Popover.Popup>
-          </Popover.Positioner>
-        </Popover.Portal>
+            </PopupCartao>
       </Popover.Root>
     </div>
   );
@@ -180,9 +171,11 @@ function ItemRecente({ href, rotulo, area, fixado, aoIr }: { href: string; rotul
 function Navegacao() {
   const pathname = usePathname();
   const router = useRouter();
-  const { funcao } = useApp();
+  const { funcao, registos } = useApp();
   const { open, setOpen, isMobile, setOpenMobile, isPeeking } = useSidebar();
-  const { areaId, moduloId } = localizar(pathname);
+  const { areaId, moduloId, cliente: clienteSlug } = localizar(pathname);
+  const entidades = useMemo(() => entidadesDe(registos[CONTEXTO.registos] ?? []), [registos]);
+  const voltarHref = caminho(CONTEXTO.voltar.area, CONTEXTO.voltar.modulo);
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
   const [recentes, setRecentes] = useState<string[]>([]);
   const [fixados, setFixados] = useState<string[]>([]);
@@ -207,7 +200,12 @@ function Navegacao() {
   const expandido = open || isMobile || isPeeking;
 
   const entradaDe = (href: string) => {
-    const { areaId: a, moduloId: m } = localizar(href);
+    const { areaId: a, moduloId: m, cliente } = localizar(href);
+    if (cliente) {
+      const ent = entidades.find((e) => e.slug === cliente);
+      const pg = paginaDoContexto(m);
+      return ent && pg ? { href: caminhoContexto(ent.nome, pg.id), rotulo: pg.rotulo, area: ent.nome, icone: pg.icone } : null;
+    }
     const area = AREAS.find((x) => x.id === a);
     const mod = area?.modulos.find((x) => x.id === m);
     return area && mod && podeVer(funcao, area.id, mod.id) ? { href: caminho(area.id, mod.id), rotulo: mod.rotulo, area: area.rotulo, icone: mod.icone } : null;
@@ -252,7 +250,7 @@ function Navegacao() {
               }
             />
             <Sidebar.CollapsibleContent>
-              <Sidebar.MenuSub>
+              <Sidebar.MenuSub className="mt-1 gap-1">
                 {b.ms.map((m) => (
                   subBotao(a, m)
                 ))}
@@ -276,9 +274,25 @@ function Navegacao() {
               <span className="flex-1 text-left text-kumo-subtle">Pesquisa rápida…</span>
               {expandido && <kbd className="rounded bg-kumo-tint px-1 py-0.5 text-[11px] text-kumo-subtle">Ctrl K</kbd>}
             </Sidebar.MenuButton>
-            <Sidebar.MenuButton icon={ICONES.casa} href="/" active={areaId === "inicio"} onClick={ir("/")} tooltip="Início">
-              Início
-            </Sidebar.MenuButton>
+            {clienteSlug ? (
+              <>
+                <Sidebar.MenuButton icon={ICONES.anterior} href={voltarHref} onClick={ir(voltarHref)} tooltip={`Voltar a ${CONTEXTO.rotuloPlural}`} className="bg-kumo-tint">
+                  Voltar a {CONTEXTO.rotuloPlural}
+                </Sidebar.MenuButton>
+                {CONTEXTO.paginas.map((p) => {
+                  const href = caminhoContexto(entidades.find((e) => e.slug === clienteSlug)?.nome ?? clienteSlug, p.id);
+                  return (
+                    <Sidebar.MenuButton key={p.id} icon={ICONES[p.icone]} href={href} active={moduloId === p.id} onClick={ir(href)} tooltip={p.rotulo}>
+                      {p.rotulo}
+                    </Sidebar.MenuButton>
+                  );
+                })}
+              </>
+            ) : (
+              <Sidebar.MenuButton icon={ICONES.casa} href="/" active={areaId === "inicio"} onClick={ir("/")} tooltip="Início">
+                Início
+              </Sidebar.MenuButton>
+            )}
             <Sidebar.MenuItem>
               <Sidebar.Collapsible>
                 <Sidebar.CollapsibleTrigger
@@ -290,7 +304,7 @@ function Navegacao() {
                   }
                 />
                 <Sidebar.CollapsibleContent>
-                  <Sidebar.MenuSub>
+                  <Sidebar.MenuSub className="mt-1 gap-1">
                     {listaRecentes.length === 0 && <span className="px-3 py-2 text-[13px] text-kumo-subtle">Os módulos que abrir aparecem aqui</span>}
                     {listaRecentes.map((r) => (
                       <ItemRecente key={r.href} href={r.href} rotulo={r.rotulo} area={r.area} fixado={fixados.includes(r.href)} aoIr={ir(r.href)} />
@@ -324,7 +338,7 @@ function Navegacao() {
             </Sidebar.Menu>
           </Sidebar.Group>
         )}
-        {grupos.map((g) => (
+        {(clienteSlug ? [] : grupos).map((g) => (
           <Sidebar.Group key={g.rotulo}>
             <Sidebar.Separator />
             <Sidebar.GroupLabel>{g.rotulo}</Sidebar.GroupLabel>
@@ -351,7 +365,7 @@ function Navegacao() {
                       }
                     />
                     <Sidebar.CollapsibleContent>
-                      <Sidebar.MenuSub>{sub(a)}</Sidebar.MenuSub>
+                      <Sidebar.MenuSub className="mt-1 gap-1">{sub(a)}</Sidebar.MenuSub>
                     </Sidebar.CollapsibleContent>
                   </Sidebar.Collapsible>
                 </Sidebar.MenuItem>
@@ -369,7 +383,7 @@ function Navegacao() {
 
 function Pesquisa({ aberta, aoMudar }: { aberta: boolean; aoMudar: (v: boolean) => void }) {
   const router = useRouter();
-  const { funcao } = useApp();
+  const { funcao, registos } = useApp();
   const [q, setQ] = useState("");
   const [recentes, setRecentes] = useState<string[]>([]);
   useEffect(() => {
@@ -378,7 +392,12 @@ function Pesquisa({ aberta, aoMudar }: { aberta: boolean; aoMudar: (v: boolean) 
   const grupos = useMemo(() => {
     const termo = q.trim().toLowerCase();
     const dosRecentes = termo !== "" ? [] : recentes.flatMap((r) => {
-      const { areaId, moduloId } = localizar(r);
+      const { areaId, moduloId, cliente } = localizar(r);
+      if (cliente) {
+        const ent = entidadesDe(registos[CONTEXTO.registos] ?? []).find((e) => e.slug === cliente);
+        const pg = paginaDoContexto(moduloId);
+        return ent && pg ? [{ id: `recente/${r}`, title: pg.rotulo, sub: ent.nome, icone: pg.icone, href: caminhoContexto(ent.nome, pg.id) }] : [];
+      }
       const area = AREAS.find((x) => x.id === areaId);
       const mod = area?.modulos.find((x) => x.id === moduloId);
       return area && mod && podeVer(funcao, area.id, mod.id) ? [{ id: `recente/${area.id}/${mod.id}`, title: mod.rotulo, sub: area.rotulo, icone: mod.icone, href: caminho(area.id, mod.id) }] : [];
@@ -397,7 +416,7 @@ function Pesquisa({ aberta, aoMudar }: { aberta: boolean; aoMudar: (v: boolean) 
           return itens.length > 0 ? [{ id: "conta", label: "Definições da conta", items: itens }] : [];
         })(),
       )];
-  }, [q, funcao, recentes]);
+  }, [q, funcao, recentes, registos]);
   type Item = (typeof grupos)[number]["items"][number];
   return (
     <CommandPalette.Root
@@ -442,7 +461,9 @@ function Pesquisa({ aberta, aoMudar }: { aberta: boolean; aoMudar: (v: boolean) 
             {T.topo.dicasPesquisa.map((d) => (
               <div key={d} className="flex items-center gap-2.5 py-1 text-sm text-kumo-subtle">
                 <Ic nome="info" tamanho={14} className="shrink-0" />
-                {d}
+                <span>
+                  <Frase>{d}</Frase>
+                </span>
               </div>
             ))}
           </div>
@@ -505,48 +526,48 @@ function MenuUtilizador() {
   return (
     <DropdownMenu>
       <Tooltip content={`${conta.nome}. Menu da conta`} render={<DropdownMenu.Trigger render={<button aria-label="Menu da conta" className="flex size-9 items-center justify-center rounded-lg transition-colors hover:bg-kumo-tint"><Avatar foto={conta.foto} nome={conta.nome} tamanho={26} /></button>} />} />
-      <DropdownMenu.Content collisionPadding={12} className="w-[232px]">
-        <DropdownMenu.Group>
-          <DropdownMenu.Label className="truncate">{conta.email}</DropdownMenu.Label>
-        </DropdownMenu.Group>
-        <DropdownMenu.Separator />
+      <MenuCartao>
+        <DropdownMenu.Item disabled>
+          <span className="max-w-40 truncate text-xs">{conta.email}</span>
+        </DropdownMenu.Item>
+        <SeparadorDeMenu />
         <DropdownMenu.LinkItem href={caminhoConta("perfil")} icon={<Ic nome="pessoa" />} render={<Link href={caminhoConta("perfil")} />}>
           Definições da conta
         </DropdownMenu.LinkItem>
         <DropdownMenu.Sub>
           <DropdownMenu.SubTrigger icon={<Ic nome="paleta" />}>Aparência</DropdownMenu.SubTrigger>
-          <DropdownMenu.SubContent sideOffset={10} collisionPadding={12}>
+          <SubMenuCartao>
             {TEMAS.map((t) => (
               <DropdownMenu.Item key={t.id} icon={<Ic nome={t.icone} />} selected={t.id === tema} onClick={() => definir(t.id)}>
                 {t.rotulo}
               </DropdownMenu.Item>
             ))}
-          </DropdownMenu.SubContent>
+          </SubMenuCartao>
         </DropdownMenu.Sub>
         <DropdownMenu.Sub>
           <DropdownMenu.SubTrigger icon={<Ic nome="globo" />}>Idioma</DropdownMenu.SubTrigger>
-          <DropdownMenu.SubContent sideOffset={10} collisionPadding={12}>
+          <SubMenuCartao>
             <DropdownMenu.Item selected={idioma === "pt-PT"} onClick={() => mudar({ idioma: "pt-PT" }, "Idioma alterado")}>
               Português
             </DropdownMenu.Item>
             <DropdownMenu.Item disabled>English (em breve)</DropdownMenu.Item>
-          </DropdownMenu.SubContent>
+          </SubMenuCartao>
         </DropdownMenu.Sub>
         <DropdownMenu.Sub>
           <DropdownMenu.SubTrigger icon={<Ic nome="relogio" />}>Fuso horário</DropdownMenu.SubTrigger>
-          <DropdownMenu.SubContent sideOffset={10} collisionPadding={12}>
+          <SubMenuCartao>
             {FUSOS.map((f) => (
               <DropdownMenu.Item key={f.id} selected={f.id === conta.fuso} onClick={() => mudar({ fuso: f.id }, "Fuso horário alterado")}>
                 {f.rotulo}
               </DropdownMenu.Item>
             ))}
-          </DropdownMenu.SubContent>
+          </SubMenuCartao>
         </DropdownMenu.Sub>
-        <DropdownMenu.Separator />
+        <SeparadorDeMenu />
         <DropdownMenu.Item icon={<Ic nome="sair" />} variant="danger" onClick={terminarSessao}>
           Terminar sessão
         </DropdownMenu.Item>
-      </DropdownMenu.Content>
+      </MenuCartao>
     </DropdownMenu>
   );
 }
@@ -554,7 +575,7 @@ function MenuUtilizador() {
 function Cabecalho({ aoPesquisar }: { aoPesquisar: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { areaId, moduloId } = localizar(pathname);
+  const { areaId, moduloId, cliente } = localizar(pathname);
   const area = AREAS.find((a) => a.id === areaId);
   const modulo = area?.modulos.find((m) => m.id === moduloId);
   const ir = (href: string) => (e: React.MouseEvent) => {
@@ -567,6 +588,9 @@ function Cabecalho({ aoPesquisar }: { aoPesquisar: () => void }) {
         <span className="md:hidden">
           <AlternarBarra />
         </span>
+        {cliente ? (
+          <SeletorCliente slug={cliente} pagina={moduloId} />
+        ) : (
         <Breadcrumbs>
           {areaId === "inicio" ? (
             <Breadcrumbs.Current icon={<Ic nome="casa" tamanho={16} />}>{T.visao.titulo}</Breadcrumbs.Current>
@@ -588,6 +612,7 @@ function Cabecalho({ aoPesquisar }: { aoPesquisar: () => void }) {
             </>
           )}
         </Breadcrumbs>
+        )}
       </div>
       <div className="flex items-center gap-1">
         <Tooltip content={T.topo.perguntarIa} render={<Button variant="ghost" className="h-8" aria-label={T.topo.perguntarIa} icon={<Ic nome="ia" tamanho={16} peso="fill" className="-translate-y-px text-kumo-subtle" />} onClick={() => window.dispatchEvent(new Event(EVENTO_ASSISTENTE))}><span className="hidden md:inline">{T.topo.perguntarIa}</span></Button>} />
@@ -671,6 +696,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <main className="sem-barra min-h-0 flex-1 overflow-y-auto">{children}</main>
             <EsbatidoGlobal />
             <AtalhosGlobais aoPesquisar={alternarPesquisa} />
+            <AparenciaPessoal />
             <AssistentePainel />
             <Rodape />
           </div>

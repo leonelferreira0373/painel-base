@@ -4,6 +4,7 @@
 import { Banner } from "@cloudflare/kumo";
 import type { ReactNode } from "react";
 import { TelaPainel } from "./Moldura";
+import { Frase } from "../Frase";
 
 interface Secao {
   titulo: string;
@@ -33,7 +34,7 @@ function Documento({ titulo, atualizado, secoes }: { titulo: string; atualizado:
             <h2 className="text-xl font-semibold text-kumo-default">
               {i + 1}. {s.titulo}
             </h2>
-            <div className="mt-3 flex flex-col gap-3 text-sm leading-6 text-kumo-default">{s.texto.map((t, j) => (typeof t === "string" ? <p key={j}>{t}</p> : <div key={j}>{t}</div>))}</div>
+            <div className="mt-3 flex flex-col gap-3 text-sm leading-6 text-kumo-default">{s.texto.map((t, j) => (typeof t === "string" ? <p key={j}><Frase>{t}</Frase></p> : <div key={j}>{t}</div>))}</div>
           </section>
         ))}
       </article>

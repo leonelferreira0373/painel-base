@@ -2,6 +2,7 @@
 "use client";
 
 import { Button, DropdownMenu, Empty, Input, LayerCard, Pagination, Table, Tooltip } from "@cloudflare/kumo";
+import { MenuCartao, SeparadorDeMenu } from "./Flutuantes";
 import { caminho } from "@/dados/estrutura";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -14,9 +15,8 @@ import type { Celula, TipoColuna } from "@/lib/tipos";
 import { DICA_TIPO } from "@/dados/dicas";
 import { CorpoDica, Dica } from "./Dica";
 import { Esbatido, EsqueletoTabela } from "./Estados";
+import { ControlosDePaginacao } from "./Paginacao";
 import { Ic, ICONES } from "./Icones";
-
-const ROTULOS_PAGINACAO = { navigation: "Paginação", firstPage: "Primeira página", previousPage: "Página anterior", nextPage: "Página seguinte", lastPage: "Última página", pageNumber: "Número da página", pageSize: "Linhas por página" };
 
 function Pesquisa({ valor, aoMudar }: { valor: string; aoMudar: (v: string) => void }) {
   return (
@@ -32,9 +32,9 @@ function Pesquisa({ valor, aoMudar }: { valor: string; aoMudar: (v: string) => v
 function Rodape({ pagina, porPagina, total, aoMudar }: { pagina: number; porPagina: number; total: number; aoMudar: (p: number) => void }) {
   return (
     <div className="flex items-center justify-between border-t border-kumo-hairline px-4 py-2.5">
-      <Pagination page={pagina + 1} setPage={(p: number) => aoMudar(p - 1)} perPage={porPagina} totalCount={total} labels={ROTULOS_PAGINACAO}>
+      <Pagination page={pagina + 1} setPage={(p: number) => aoMudar(p - 1)} perPage={porPagina} totalCount={total}>
         <Pagination.Info>{({ pageShowingRange, totalCount }) => <span className="text-sm text-kumo-subtle">{`${pageShowingRange} de ${formatar(totalCount ?? total)}`}</span>}</Pagination.Info>
-        <Pagination.Controls />
+        <ControlosDePaginacao pagina={pagina + 1} ultima={Math.max(Math.ceil(total / porPagina), 1)} aoMudar={(p) => aoMudar(p - 1)} />
       </Pagination>
     </div>
   );
@@ -180,7 +180,7 @@ function MenuColuna({ nome, tipo, temData, aoVisualizar, aoRemover }: { nome: st
         content={`Opções da coluna ${nome}`}
         render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" size="xs" icon={ICONES.mais3} aria-label={`Opções da coluna ${nome}`} className="rotate-90 text-kumo-subtle opacity-0 transition-opacity focus-visible:opacity-100 group-hover/cab:opacity-100 data-[popup-open]:opacity-100 [@media(hover:none)]:opacity-100" />} />}
       />
-      <DropdownMenu.Content collisionPadding={12}>
+      <MenuCartao>
         <DropdownMenu.Group>
         <DropdownMenu.Label>Visualizar</DropdownMenu.Label>
         <DropdownMenu.Item icon={<Ic nome="serie" />} disabled={!temData} onClick={() => aoVisualizar("linha")}>
@@ -196,11 +196,11 @@ function MenuColuna({ nome, tipo, temData, aoVisualizar, aoRemover }: { nome: st
           Rosca
         </DropdownMenu.Item>
         </DropdownMenu.Group>
-        <DropdownMenu.Separator />
+        <SeparadorDeMenu />
         <DropdownMenu.Item icon={<Ic nome="fechar" />} onClick={aoRemover}>
           Remover coluna
         </DropdownMenu.Item>
-      </DropdownMenu.Content>
+      </MenuCartao>
     </DropdownMenu>
   );
 }
@@ -218,13 +218,13 @@ function Campos({ colunas, ocultas, aoAlternar, aoMostrarTodas }: { colunas: str
           }
         />
       </Dica>
-      <DropdownMenu.Content collisionPadding={12} className="max-h-[340px] overflow-y-auto">
+      <MenuCartao className="max-h-[340px] overflow-y-auto">
         {ocultas.size > 0 && (
           <>
             <DropdownMenu.Item icon={<Ic nome="olho" />} onClick={aoMostrarTodas}>
               Mostrar todas
             </DropdownMenu.Item>
-            <DropdownMenu.Separator />
+            <SeparadorDeMenu />
           </>
         )}
         {colunas.map((c, i) => (
@@ -232,7 +232,7 @@ function Campos({ colunas, ocultas, aoAlternar, aoMostrarTodas }: { colunas: str
             {c}
           </DropdownMenu.Item>
         ))}
-      </DropdownMenu.Content>
+      </MenuCartao>
     </DropdownMenu>
   );
 }

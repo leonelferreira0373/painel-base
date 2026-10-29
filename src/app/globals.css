@@ -1,6 +1,8 @@
 @source "../../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
 @import "@cloudflare/kumo/styles";
 @import "tailwindcss";
+/* O tema escuro é o que o painel escolheu (data-mode no <html>), não o do sistema: sem isto as classes dark: do Kumo (etiquetas de estado, por exemplo) só mudavam quando o sistema estava escuro e ficavam brancas sobre branco. */
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
 
 :root,
 :host {
@@ -124,6 +126,18 @@ main.esbatido[data-baixo="1"] { --fb: 18px; }
   .esq { animation: none; }
 }
 
+/* A mão do rato em tudo o que se clica: o Tailwind 4 deixa os botões com a seta. Os componentes do Kumo que pedem outro cursor (cursor-default nos itens de menu, por exemplo) continuam a mandar, porque as classes de utilidade vencem esta regra de base. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
 /* Barras de scroll finas, como as da Cloudflare: polegar discreto (a cor de linha do tema), sem fundo e sem setas. Em @layer base para que os componentes que escondem a barra (.sem-barra, abas, barra lateral) a possam sobrepor. */
 @layer base {
   * {
@@ -132,15 +146,47 @@ main.esbatido[data-baixo="1"] { --fb: 18px; }
   }
 }
 
-/* Elevação dos popups: janelas, menus, listas e a pesquisa têm todos a sombra do menu do Kumo; no tema escuro é mais escura, porque a sombra clara não se vê sobre fundo escuro. */
+/* Elevação dos popups: janelas, menus, listas e a pesquisa têm todos a sombra do menu do Kumo (shadow-lg), lida do DOM do painel da Cloudflare. Não a aumente: com um anel de 1 px e esta sombra é o que a Cloudflare mostra, no tema claro e no escuro. */
 :root {
-  --elevacao-popup: 0 12px 32px -6px rgb(0 0 0 / 0.2), 0 4px 12px -4px rgb(0 0 0 / 0.14);
+  --elevacao-popup: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
-[data-mode="dark"] {
-  --elevacao-popup: 0 16px 32px -4px rgb(0 0 0 / 0.7), 0 6px 12px -4px rgb(0 0 0 / 0.55);
-}
+/* Todos os cartões flutuantes (janelas, menus, popups e a pesquisa) têm o mesmo anel e a mesma elevação: o seletor de contas é a referência. O cartão de uma lista (o Select) é o elemento que a contém, não a lista (que só rola). As listas dentro de um popup ou de uma janela (a da pesquisa) não são cartões: levam data-incorporado, ou já estão dentro de um dialog, e não têm sombra. */
 [role="dialog"],
 [role="menu"],
-[role="listbox"] {
-  --tw-shadow: var(--elevacao-popup);
+:not([role="dialog"] *):has(> [role="listbox"]:not([data-incorporado])) {
+  box-shadow:
+    0 0 0 1px var(--color-kumo-line),
+    var(--elevacao-popup) !important;
+}
+
+/* Um menu com os seus itens é UM só cartão: a sombra e o anel são do cartão, nunca de uma linha dentro dele (senão parecia um modal dentro de outro). A linha destacada (rato ou teclado) é só o fundo suave, como no seletor de contas, e não leva o anel de foco colorido do Kumo (a cor do acento). */
+[role="menuitem"][data-highlighted],
+[role="menuitemradio"][data-highlighted],
+[role="menuitemcheckbox"][data-highlighted],
+[role="option"][data-highlighted],
+[role="menuitem"]:focus-visible,
+[role="menuitemradio"]:focus-visible,
+[role="menuitemcheckbox"]:focus-visible {
+  background-color: var(--color-kumo-tint);
+  box-shadow: none !important;
+}
+
+/* O texto é sempre preto ou branco (a cor principal do tema), nunca azul: as ligações também, só se distinguem por serem sublinhadas ao passar o rato. */
+:root[data-mode] {
+  --text-color-kumo-link: var(--text-color-kumo-default);
+}
+
+/* As letras que o utilizador escolheu (Definições da conta → Aparência → Letra): sem escolha, herdam a letra do painel. */
+h1,
+h2,
+h3 {
+  font-family: var(--fonte-titulos, var(--font-sans));
+}
+.tabular-nums {
+  font-family: var(--fonte-numeros, inherit);
+}
+
+/* A pesquisa rápida não leva o anel azul de foco por baixo do campo: o campo já se vê pelo cursor e pela lupa. */
+[role="dialog"] div:has(> .kumo-input-placeholder) {
+  box-shadow: none !important;
 }

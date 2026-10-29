@@ -74,3 +74,18 @@ export function Contador({ valor, decimais = 0 }: { valor: number; decimais?: nu
   const texto = decimais > 0 ? v.toLocaleString("pt-PT", { minimumFractionDigits: decimais, maximumFractionDigits: decimais }) : formatar(Math.round(v));
   return <span className="br-num">{texto}</span>;
 }
+
+/** Gráfico de área sem eixos, da largura toda do cartão (os das estatísticas da análise, como os da Cloudflare). */
+export function AreaMini({ valores, altura = 60 }: { valores: number[]; altura?: number }) {
+  const max = Math.max(1, ...valores);
+  const n = Math.max(2, valores.length);
+  const x = (i: number) => (i / (n - 1)) * 100;
+  const y = (v: number) => 36 - (v / max) * 32;
+  const linha = valores.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(" ");
+  return (
+    <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="block w-full" style={{ height: altura }} aria-hidden>
+      <path d={`${linha} L100,40 L0,40 Z`} fill="var(--color-kumo-brand)" opacity="0.14" />
+      <path d={linha} fill="none" stroke="var(--color-kumo-brand)" strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}

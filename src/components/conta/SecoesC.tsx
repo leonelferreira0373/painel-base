@@ -10,6 +10,9 @@ import { useApp } from "@/lib/estado";
 import { Dica } from "../Dica";
 import { ICONES, Ic } from "../Icones";
 import { Cartao, Interruptor, Linha, LinhaCampo, haTempo } from "./Pecas";
+import { SeletorPersonalizavel } from "../SeletorPersonalizavel";
+import { REPETICAO, RESUMO } from "@/dados/personalizados";
+import { SeletorDeData, SeletorDeDataHora, SeletorDeHora } from "../SeletoresDeTempo";
 
 export function SecaoNotificacoes() {
   const { conta, mudar } = useConta();
@@ -24,8 +27,8 @@ export function SecaoNotificacoes() {
           <Interruptor marcado={conta.receberEmails} aoMudar={(v) => mudar({ receberEmails: v }, v ? "E-mails ligados" : "E-mails desligados")} rotulo="Receber e-mails do painel" />
         </Linha>
         <Linha titulo="Resumo por e-mail" dica="Um só e-mail com tudo o que aconteceu, em vez de um por pedido.">
-          <Select value={conta.resumo} onValueChange={(v) => mudar({ resumo: String(v) as "nunca" | "diario" | "semanal" }, "Frequência do resumo alterada")} aria-label="Resumo" disabled={!conta.receberEmails} className="w-40" items={{ nunca: "Nunca", diario: "Todos os dias", semanal: "Todas as semanas" }} />
-          {conta.resumo !== "nunca" && <Input type="time" aria-label="Hora do resumo" disabled={!conta.receberEmails} value={conta.horaResumo} onChange={(e) => mudar({ horaResumo: e.target.value })} className="w-28" />}
+          <SeletorPersonalizavel valor={conta.resumo} opcoes={RESUMO.opcoes} personalizado={RESUMO.personalizado} aoMudar={(v) => mudar({ resumo: v }, "Frequência do resumo alterada")} rotulo="Resumo" disabled={!conta.receberEmails} className="w-40" />
+          {conta.resumo !== "nunca" && <SeletorDeHora rotulo="Hora do resumo" disabled={!conta.receberEmails} valor={conta.horaResumo} aoMudar={(v) => mudar({ horaResumo: v })} className="w-28" />}
         </Linha>
       </Cartao>
 
@@ -69,8 +72,8 @@ export function SecaoNotificacoes() {
         {conta.silencio.ativo && (
           <LinhaCampo>
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Das" type="time" value={conta.silencio.de} onChange={(e) => mudar((c) => ({ silencio: { ...c.silencio, de: e.target.value } }))} />
-              <Input label="Às" type="time" value={conta.silencio.ate} onChange={(e) => mudar((c) => ({ silencio: { ...c.silencio, ate: e.target.value } }))} />
+              <SeletorDeHora label="Das" valor={conta.silencio.de} aoMudar={(v) => mudar((c) => ({ silencio: { ...c.silencio, de: v } }))} />
+              <SeletorDeHora label="Às" valor={conta.silencio.ate} aoMudar={(v) => mudar((c) => ({ silencio: { ...c.silencio, ate: v } }))} />
             </div>
           </LinhaCampo>
         )}
@@ -83,7 +86,7 @@ export function SecaoNotificacoes() {
         {conta.ausencia.ativa && (
           <LinhaCampo>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="Regresso em" type="date" value={conta.ausencia.ate} onChange={(e) => mudar((c) => ({ ausencia: { ...c.ausencia, ate: e.target.value } }))} />
+              <SeletorDeData label="Regresso em" valor={conta.ausencia.ate} aoMudar={(v) => mudar((c) => ({ ausencia: { ...c.ausencia, ate: v } }))} />
               <Select label="Delegar as aprovações a" value={conta.ausencia.delegar} onValueChange={(v) => mudar((c) => ({ ausencia: { ...c.ausencia, delegar: String(v) } }), "Pessoa delegada alterada")} items={Object.fromEntries(outras.map((f) => [f.id, `${f.pessoa} (${f.rotulo})`]))} />
             </div>
             <InputArea label="Mensagem automática" value={conta.ausencia.mensagem} onValueChange={(v) => mudar((c) => ({ ausencia: { ...c.ausencia, mensagem: v } }))} minRows={2} autoResize />
@@ -109,7 +112,8 @@ const segunda9 = () => {
   d.setHours(9, 0, 0, 0);
   return paraCampo(d);
 };
-const REPETICOES: Record<Repeticao, string> = { nao: "Não repetir", diario: "Todos os dias", semanal: "Todas as semanas", mensal: "Todos os meses" };
+/** O nome de uma repetição, fixa ou personalizada («De 3 em 3 dias»). */
+const nomeRepeticao = (r: string) => REPETICAO.opcoes[r] ?? REPETICAO.personalizado.mostrar(r);
 
 export function SecaoLembretes() {
   const { conta, mudar } = useConta();
@@ -134,8 +138,8 @@ export function SecaoLembretes() {
         <LinhaCampo>
           <Input label="O que quer lembrar" placeholder="Por exemplo, confirmar a recolha das 06:00" value={titulo} onChange={(e) => setTitulo(e.target.value)} />
           <div className="grid gap-4 sm:grid-cols-3">
-            <Input label="Quando" type="datetime-local" value={quando} onChange={(e) => setQuando(e.target.value)} error={passado ? "Escolha uma hora que ainda não passou." : undefined} />
-            <Select label="Repetir" value={repetir} onValueChange={(v) => setRepetir(String(v) as Repeticao)} items={REPETICOES} />
+            <SeletorDeDataHora label="Quando" valor={quando} aoMudar={setQuando} erro={passado ? "Escolha uma hora que ainda não passou." : undefined} />
+            <SeletorPersonalizavel label="Repetir" valor={repetir} opcoes={REPETICAO.opcoes} personalizado={REPETICAO.personalizado} aoMudar={(v) => setRepetir(v as Repeticao)} />
             <Select label="Avisar por" value={canal} onValueChange={(v) => setCanal(String(v) as "painel" | "email")} items={{ painel: "No painel", email: "No painel e por e-mail" }} />
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -172,7 +176,7 @@ export function SecaoLembretes() {
           <Empty size="sm" icon={<Ic nome="lembrete" tamanho={32} />} title="Sem lembretes" />
         ) : (
           ordenados.map((l) => (
-            <Linha key={l.id} titulo={<span className="inline-flex flex-wrap items-center gap-2">{l.titulo}{estado(l)}</span>} estado={`${new Date(l.quando).toLocaleString("pt-PT", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · ${REPETICOES[l.repetir].toLowerCase()} · ${l.canal === "email" ? "painel e e-mail" : "painel"}`}>
+            <Linha key={l.id} titulo={<span className="inline-flex flex-wrap items-center gap-2">{l.titulo}{estado(l)}</span>} estado={`${new Date(l.quando).toLocaleString("pt-PT", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · ${nomeRepeticao(l.repetir).toLowerCase()} · ${l.canal === "email" ? "painel e e-mail" : "painel"}`}>
               <Interruptor marcado={l.ativo} aoMudar={(v) => mudar((c) => ({ lembretes: c.lembretes.map((x) => (x.id === l.id ? { ...x, ativo: v, disparado: v ? false : x.disparado } : x)) }))} rotulo={`Ligar o lembrete ${l.titulo}`} />
               <Dica conteudo="Apagar o lembrete">
                 <Button variant="ghost" shape="square" icon={ICONES.lixo} aria-label="Apagar o lembrete" onClick={() => mudar((c) => ({ lembretes: c.lembretes.filter((x) => x.id !== l.id) }), `Lembrete apagado: ${l.titulo}`)} />

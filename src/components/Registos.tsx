@@ -2,6 +2,7 @@
 "use client";
 
 import { Button, Dialog, DropdownMenu, Input, Select, Tooltip } from "@cloudflare/kumo";
+import { MenuCartao } from "./Flutuantes";
 import { DICA_CAMPO } from "@/dados/dicas";
 import { useMemo, useState } from "react";
 import { AREAS } from "@/dados/estrutura";
@@ -44,9 +45,9 @@ function especificacao(g: DefGrafico, t: Tabela): GraficoSpec | null {
   return null;
 }
 
-function NovoRegisto({ def, aberto, aoMudar }: { def: DefRegistos; aberto: boolean; aoMudar: (v: boolean) => void }) {
+function NovoRegisto({ def, aberto, aoMudar, iniciais }: { def: DefRegistos; aberto: boolean; aoMudar: (v: boolean) => void; iniciais?: Record<string, string> }) {
   const { criar } = useApp();
-  const [v, setV] = useState<Record<string, string>>({});
+  const [v, setV] = useState<Record<string, string>>(iniciais ?? {});
   const valido = def.campos.filter((c) => c.obrigatorio).every((c) => (v[c.chave] ?? "").trim() !== "");
   return (
     <Dialog.Root open={aberto} onOpenChange={aoMudar}>
@@ -56,7 +57,7 @@ function NovoRegisto({ def, aberto, aoMudar }: { def: DefRegistos; aberto: boole
             e.preventDefault();
             if (!valido) return;
             criar(def.id, v);
-            setV({});
+            setV(iniciais ?? {});
             aoMudar(false);
           }}
         >
@@ -85,13 +86,15 @@ function NovoRegisto({ def, aberto, aoMudar }: { def: DefRegistos; aberto: boole
   );
 }
 
-export function Registos({ moduloId }: { moduloId: string }) {
+/** `filtro` mostra só as linhas com esse valor numa coluna (as páginas de uma entidade: os pedidos de um cliente) e preenche-o nos registos novos. */
+export function Registos({ moduloId, filtro, titulo }: { moduloId: string; filtro?: { chave: string; valor: string }; titulo?: string }) {
   const def = REGISTOS[moduloId];
   const { registos, funcao, pendentes, transitar } = useApp();
   const [novo, setNovo] = useState(false);
   const area = AREAS.find((a) => a.modulos.some((m) => m.id === moduloId));
   const editar = !!area && podeEditar(funcao, area.id, moduloId);
-  const linhas = registos[moduloId] ?? [];
+  const todas = registos[moduloId] ?? [];
+  const linhas = useMemo(() => (filtro ? todas.filter((l) => String(l[filtro.chave]) === filtro.valor) : todas), [todas, filtro]);
   const tabela = useMemo(() => tabelaDe(def, linhas), [def, linhas]);
   const graficos = useMemo(() => def.graficos.map((g) => ({ g, spec: especificacao(g, tabela) })).filter((x) => x.spec), [def, tabela]);
   const chaveEstado = def.estadoChave ?? "estado";
@@ -110,7 +113,7 @@ export function Registos({ moduloId }: { moduloId: string }) {
             disponiveis.length === 0 ? null : (
               <DropdownMenu>
                 <Tooltip content={`Ações de ${String(l.processo ?? l.id)}`} render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" size="sm" icon={ICONES.mais3} aria-label={`Ações de ${String(l.processo ?? l.id)}`} />} />} />
-                <DropdownMenu.Content collisionPadding={12}>
+                <MenuCartao>
                   {disponiveis.map((t) => {
                     const permitido = editar && t.funcoes.includes(funcao.id);
                     return (
@@ -119,7 +122,7 @@ export function Registos({ moduloId }: { moduloId: string }) {
                       </DropdownMenu.Item>
                     );
                   })}
-                </DropdownMenu.Content>
+                </MenuCartao>
               </DropdownMenu>
             ),
         };
@@ -129,7 +132,7 @@ export function Registos({ moduloId }: { moduloId: string }) {
 
   return (
     <Pagina>
-      <Titulo titulo={def.titulo}>
+      <Titulo titulo={titulo ?? def.titulo}>
         {!editar && (
           <span className="inline-flex items-center gap-1.5 text-sm text-kumo-subtle">
             <Ic nome="cadeado" tamanho={14} />
@@ -152,7 +155,7 @@ export function Registos({ moduloId }: { moduloId: string }) {
         </div>
       )}
       <GrelhaRegistos colunas={def.colunas.map((c) => ({ rotulo: c.rotulo, numerica: c.tipo === "numero" }))} linhas={grelha} />
-      {editar && def.campos.length > 0 && <NovoRegisto def={def} aberto={novo} aoMudar={setNovo} />}
+      {editar && def.campos.length > 0 && <NovoRegisto def={def} aberto={novo} aoMudar={setNovo} iniciais={filtro ? { [filtro.chave]: filtro.valor } : undefined} />}
     </Pagina>
   );
 }

@@ -2,6 +2,7 @@
 "use client";
 
 import { Button, DatePicker, Input, Popover, Select } from "@cloudflare/kumo";
+import { PopupCartao } from "./Flutuantes";
 import { pt } from "react-day-picker/locale";
 import { useEffect, useState } from "react";
 import { Dica } from "./Dica";
@@ -177,9 +178,7 @@ export function SeletorPeriodo({ periodo, aoMudar }: { periodo: Periodo; aoMudar
           }
         />
       </Dica>
-      <Popover.Portal>
-        <Popover.Positioner collisionPadding={12} side="bottom" align="end">
-          <Popover.Popup className="w-[min(580px,calc(100vw-16px))] overflow-hidden p-0">
+      <PopupCartao alinhar="end" className="w-[min(580px,calc(100vw-16px))]">
             <div className="border-b border-kumo-hairline p-2">
               <Input
                 value={escrito}
@@ -247,9 +246,7 @@ export function SeletorPeriodo({ periodo, aoMudar }: { periodo: Periodo; aoMudar
                 Aplicar
               </Button>
             </div>
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
+          </PopupCartao>
     </Popover.Root>
   );
 }

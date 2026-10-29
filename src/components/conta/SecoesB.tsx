@@ -14,6 +14,8 @@ import { Esbatido } from "../Estados";
 import { ICONES, Ic } from "../Icones";
 import { CodigoDialog } from "./CodigoDialog";
 import { BotaoCopiar, Cartao, Confirmar, dataHora, descarregar, haTempo, Interruptor, Linha, LinhaCampo, mascarar, soData } from "./Pecas";
+import { SeletorPersonalizavel } from "../SeletorPersonalizavel";
+import { TEMPO_LIMITE, VALIDADE } from "@/dados/personalizados";
 
 function Janela({ aberto, aoMudar, titulo, children, largo = false }: { aberto: boolean; aoMudar: (v: boolean) => void; titulo: string; children: React.ReactNode; largo?: boolean }) {
   return (
@@ -218,7 +220,7 @@ export function SecaoSeguranca() {
           <Interruptor marcado={conta.alertaInicio} aoMudar={(v) => mudar({ alertaInicio: v }, v ? "Avisos de início de sessão ligados" : "Avisos de início de sessão desligados")} rotulo="Avisar-me de inícios de sessão novos" />
         </Linha>
         <Linha titulo="Terminar a sessão por inatividade" dica="Depois deste tempo sem fazer nada, o painel pede a palavra-passe outra vez.">
-          <Select value={conta.tempoLimite} onValueChange={(v) => mudar({ tempoLimite: String(v) as "15" | "60" | "480" | "nunca" }, "Tempo limite da sessão alterado")} aria-label="Tempo limite" className="w-44" items={{ "15": "Após 15 minutos", "60": "Após 1 hora", "480": "Após 8 horas", nunca: "Nunca" }} />
+          <SeletorPersonalizavel valor={conta.tempoLimite} opcoes={TEMPO_LIMITE.opcoes} personalizado={TEMPO_LIMITE.personalizado} aoMudar={(v) => mudar({ tempoLimite: v }, "Tempo limite da sessão alterado")} rotulo="Tempo limite" className="w-44" />
         </Linha>
         <Linha titulo="Pedir a palavra-passe em ações sensíveis" dica="Mudar o e-mail, apagar dados ou criar chaves de acesso pede a palavra-passe outra vez.">
           <Interruptor marcado={conta.senhaParaSensiveis} aoMudar={(v) => mudar({ senhaParaSensiveis: v })} rotulo="Pedir a palavra-passe em ações sensíveis" />
@@ -307,7 +309,7 @@ export function SecaoTokens() {
         >
           <div className="flex flex-col gap-4">
             <Input label="Nome" placeholder="Por exemplo, folha de cálculo do mês" value={nome} onChange={(e) => setNome(e.target.value)} />
-            <Select label="Validade" value={validade} onValueChange={(v) => setValidade(String(v))} items={{ "30": "30 dias", "90": "90 dias", "365": "1 ano", nunca: "Sem validade" }} />
+            <SeletorPersonalizavel label="Validade" valor={validade} opcoes={VALIDADE.opcoes} personalizado={VALIDADE.personalizado} aoMudar={setValidade} />
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">O que pode fazer</span>
               {AMBITOS.map((a) => (

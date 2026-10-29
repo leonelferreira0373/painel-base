@@ -1,10 +1,11 @@
 // Peças comuns das definições da conta: cartão com linhas, linha com título e controlo, interruptor, janela de confirmação e formatos de data.
 "use client";
 
-import { Button, Dialog, Surface, Switch } from "@cloudflare/kumo";
+import { Button, Dialog, Input, Surface, Switch } from "@cloudflare/kumo";
 import { useEffect, useState, type ReactNode } from "react";
 import { Dica, DicaInfo } from "../Dica";
 import { ICONES } from "../Icones";
+import { Pilula } from "../Frase";
 
 export function Cartao({ titulo, dica, acoes, children, perigo = false }: { titulo: string; dica?: string; acoes?: ReactNode; children: ReactNode; perigo?: boolean }) {
   return (
@@ -46,7 +47,7 @@ export function Interruptor({ marcado, aoMudar, rotulo, desativado }: { marcado:
   return <Switch checked={marcado} onCheckedChange={aoMudar} aria-label={rotulo} disabled={desativado} />;
 }
 
-/** Janela de confirmação para ações que mudam ou apagam algo. */
+/** A janela modal das ações do painel: confirmar algo que muda ou apaga, ou pedir um valor (`children` é o campo; `desativado` segura o botão de ação até o valor servir). */
 export function Confirmar({
   aberto,
   aoMudar,
@@ -56,6 +57,8 @@ export function Confirmar({
   perigo = false,
   aoConfirmar,
   escrever,
+  children,
+  desativado = false,
 }: {
   aberto: boolean;
   aoMudar: (v: boolean) => void;
@@ -66,6 +69,10 @@ export function Confirmar({
   aoConfirmar: () => void;
   /** Palavra que a pessoa tem de escrever para confirmar. */
   escrever?: string;
+  /** Conteúdo próprio entre o texto e os botões (por exemplo, um campo). */
+  children?: ReactNode;
+  /** Desativa o botão de ação. */
+  desativado?: boolean;
 }) {
   const [digitado, setDigitado] = useState("");
   const pode = !escrever || digitado.trim().toUpperCase() === escrever.toUpperCase();
@@ -83,17 +90,18 @@ export function Confirmar({
           <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
         </div>
         <div className="text-sm text-kumo-default">{texto}</div>
+        {children && <div className="mt-4">{children}</div>}
         {escrever && (
           <label className="mt-4 flex flex-col gap-1.5 text-xs text-kumo-subtle">
-            Escreva {escrever} para confirmar
-            <input value={digitado} onChange={(e) => setDigitado(e.target.value)} className="h-9 rounded-lg bg-kumo-base px-3 text-sm text-kumo-default ring ring-kumo-line outline-none focus:ring-kumo-brand" autoComplete="off" />
+            Escreva <Pilula>{escrever}</Pilula> para confirmar
+            <Input aria-label="Palavra de confirmação" value={digitado} onChange={(e) => setDigitado(e.target.value)} autoComplete="off" />
           </label>
         )}
         <div className="mt-6 flex justify-end gap-2">
           <Dialog.Close render={(props) => <Button {...props} variant="secondary">Cancelar</Button>} />
           <Button
             variant={perigo ? "destructive" : "primary"}
-            disabled={!pode}
+            disabled={!pode || desativado}
             onClick={() => {
               aoConfirmar();
               setDigitado("");
@@ -135,39 +143,7 @@ export function mascarar(email: string): string {
 /** Código de seis dígitos para a simulação (em produção iria por e-mail ou por SMS). */
 export const codigoSimulado = () => String(Math.floor(100000 + Math.random() * 900000));
 
-/** Copia para a área de transferência, se o navegador deixar. */
-/** Botão de copiar: sem avisos flutuantes, o próprio botão passa a visto (copiou) ou a triângulo de aviso (não conseguiu), com a dica a explicar. */
-export function BotaoCopiar({ texto, rotulo, dica = "Copiar", tamanho = "base", variante = "secondary", quadrado = false }: { texto: string; rotulo?: string; dica?: string; tamanho?: "xs" | "sm" | "base"; variante?: "ghost" | "secondary"; quadrado?: boolean }) {
-  const [resultado, setResultado] = useState<"ok" | "erro" | null>(null);
-  useEffect(() => {
-    if (!resultado) return;
-    const t = window.setTimeout(() => setResultado(null), 2200);
-    return () => window.clearTimeout(t);
-  }, [resultado]);
-  const icone = resultado === "ok" ? ICONES.certo : resultado === "erro" ? ICONES.aviso : ICONES.copiar;
-  const copiarTexto = async () => setResultado((await copiar(texto)) ? "ok" : "erro");
-  const mensagem = resultado === "ok" ? "Copiado" : resultado === "erro" ? "Não foi possível copiar para a área de transferência" : dica;
-  return (
-    <Dica conteudo={mensagem}>
-      {quadrado ? (
-        <Button variant={variante} size={tamanho} shape="square" icon={icone} aria-label={mensagem} onClick={copiarTexto} />
-      ) : (
-        <Button variant={variante} size={tamanho} icon={icone} onClick={copiarTexto}>
-          {rotulo}
-        </Button>
-      )}
-    </Dica>
-  );
-}
-
-export async function copiar(texto: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(texto);
-    return true;
-  } catch {
-    return false;
-  }
-}
+export { BotaoCopiar, copiar } from "../Copiar";
 
 export function descarregar(nome: string, conteudo: string, tipo = "text/plain") {
   const url = URL.createObjectURL(new Blob([conteudo], { type: `${tipo};charset=utf-8` }));

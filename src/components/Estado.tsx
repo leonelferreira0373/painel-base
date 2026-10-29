@@ -14,7 +14,7 @@ const NEGATIVO = new Set(["Cancelada", "Recusada", "Falhou", "Bloqueado", "Suspe
 const ATENCAO = new Set(["Stock baixo", "Pendente", "Pedida", "Em fila"]);
 
 /** A cor do ponto de cada variante (a pill é sempre branca no tema claro e escura no escuro). */
-const PONTO = { success: "bg-green-500 dark:bg-green-400", error: "bg-red-500 dark:bg-red-400", warning: "bg-amber-500 dark:bg-amber-400", neutral: "bg-neutral-400 dark:bg-neutral-500" } as const;
+const PONTO = { success: "bg-kumo-success", error: "bg-kumo-danger", warning: "bg-kumo-warning", neutral: "bg-neutral-400 dark:bg-neutral-500" } as const;
 
 /** Estado de um registo, com a mesma etiqueta com ponto que a Cloudflare usa para «Active», e uma dica com o significado e o passo seguinte. */
 export function Estado({ valor, modulo }: { valor: string; modulo?: string }) {

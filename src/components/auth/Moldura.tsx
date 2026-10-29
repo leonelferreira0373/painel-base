@@ -2,6 +2,7 @@
 "use client";
 
 import { Button, Dialog, DropdownMenu, LinkButton, LinkProvider } from "@cloudflare/kumo";
+import { MenuCartao } from "../Flutuantes";
 import NextLink from "next/link";
 import { forwardRef, useState, type ComponentProps, type ReactNode } from "react";
 import { ICONES } from "../Icones";
@@ -30,10 +31,10 @@ export function Lingua({ soIcone = false }: { soIcone?: boolean }) {
           )
         }
       />
-      <DropdownMenu.Content collisionPadding={12}>
+      <MenuCartao>
         <DropdownMenu.Item selected>Português</DropdownMenu.Item>
         <DropdownMenu.Item disabled>English</DropdownMenu.Item>
-      </DropdownMenu.Content>
+      </MenuCartao>
     </DropdownMenu>
   );
 }

@@ -3,6 +3,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SIGNIFICADO_ESTADO } from "./dicas";
+import { ANALISE, paisDe } from "./analise";
+import { CONTEXTO, entidadesDe, slugDe } from "./contexto";
 import { AREAS, caminho } from "./estrutura";
 import { REGISTOS } from "./modulos";
 import { MODULO_NOTIFICACOES } from "./notificacoes";
@@ -110,5 +112,51 @@ describe("página inicial", () => {
     }
     expect(DICA_CARTAO[CARTAO_ANEL.id]).toBeTruthy();
     expect(idsDeModulos.has(AVISO_VISAO.modulo)).toBe(true);
+  });
+});
+
+describe("contexto (o cliente aberto)", () => {
+  const def = REGISTOS[CONTEXTO.registos];
+  it("o módulo das entidades existe e tem as colunas de nome e de estado", () => {
+    expect(def, `REGISTOS["${CONTEXTO.registos}"]`).toBeDefined();
+    const colunas = def.colunas.map((c) => c.chave);
+    expect(colunas).toContain(CONTEXTO.chaveNome);
+    expect(colunas).toContain(CONTEXTO.chaveEstado);
+  });
+  it("«Voltar» aponta para um módulo do menu", () => {
+    expect(caminhos.has(caminho(CONTEXTO.voltar.area, CONTEXTO.voltar.modulo))).toBe(true);
+  });
+  it("as entidades têm endereços únicos", () => {
+    const slugs = entidadesDe(def.semente()).map((e) => e.slug);
+    expect(new Set(slugs).size).toBe(slugs.length);
+    expect(slugDe("Operadora do Bloco 17")).toBe("operadora-do-bloco-17");
+  });
+  it("as páginas filtradas apontam para módulos e colunas que existem", () => {
+    expect(new Set(CONTEXTO.paginas.map((p) => p.id)).size).toBe(CONTEXTO.paginas.length);
+    for (const p of CONTEXTO.paginas) {
+      if (!p.registos || !p.filtro) continue;
+      expect(REGISTOS[p.registos], `página «${p.id}»: módulo «${p.registos}»`).toBeDefined();
+      expect(REGISTOS[p.registos].colunas.some((c) => c.chave === p.filtro), `página «${p.id}»: coluna «${p.filtro}»`).toBe(true);
+    }
+  });
+});
+
+describe("análise do contexto", () => {
+  const fonte = REGISTOS[ANALISE.fonte];
+  it("as colunas que usa existem na fonte", () => {
+    expect(fonte, `REGISTOS["${ANALISE.fonte}"]`).toBeDefined();
+    const colunas = fonte.colunas.map((c) => c.chave);
+    for (const k of [ANALISE.campoData, ANALISE.campoEstado, ANALISE.campoEntidade, ...ANALISE.filtros.map((f) => f.chave)]) expect(colunas, `coluna «${k}»`).toContain(k);
+  });
+  it("os estados das estatísticas e do gráfico existem no fluxo", () => {
+    const estados = new Set(ANALISE.estados as readonly string[]);
+    for (const e of ANALISE.estatisticas) for (const x of e.estados ?? []) expect(estados.has(x), `estatística «${e.id}»: estado «${x}»`).toBe(true);
+  });
+  it("cada linha tem sempre o mesmo país, de entre os do mapa", () => {
+    const nomes = new Set(ANALISE.mapa.paises.map((p) => p.nome as string));
+    for (const l of fonte.semente().slice(0, 40)) {
+      expect(nomes.has(paisDe(l))).toBe(true);
+      expect(paisDe(l)).toBe(paisDe(l));
+    }
   });
 });

@@ -2,6 +2,7 @@
 "use client";
 
 import { Badge, Banner, Button, Dialog, Input, InputArea, Select } from "@cloudflare/kumo";
+import { PersonalizarAparencia } from "./Personalizar";
 import { useEffect, useRef, useState } from "react";
 import { AREAS } from "@/dados/estrutura";
 import { FORMATOS_DATA, FUSOS } from "@/dados/conta";
@@ -13,6 +14,8 @@ import { Avatar } from "../Avatar";
 import { ICONES, Ic } from "../Icones";
 import { CodigoDialog } from "./CodigoDialog";
 import { Cartao, codigoSimulado, emailValido, Interruptor, Linha, LinhaCampo, mascarar } from "./Pecas";
+import { SeletorPersonalizavel } from "../SeletorPersonalizavel";
+import { FORMATO_DATA, FUSO } from "@/dados/personalizados";
 
 const itens = (lista: { id: string; rotulo: string }[]) => Object.fromEntries(lista.map((o) => [o.id, o.rotulo]));
 
@@ -73,8 +76,8 @@ export function SecaoPerfil() {
           <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
           <InputArea label="Assinatura dos e-mails" labelTooltip="Entra no fim dos e-mails que o painel envia em seu nome." value={assinatura} onValueChange={setAssinatura} minRows={2} autoResize />
           <div className="grid gap-4 sm:grid-cols-3">
-            <Select label="Fuso horário" value={fuso} onValueChange={(v) => setFuso(String(v))} items={itens(FUSOS)} />
-            <Select label="Formato da data" value={formato} onValueChange={(v) => setFormato(String(v))} items={itens(FORMATOS_DATA)} />
+            <SeletorPersonalizavel label="Fuso horário" valor={fuso} opcoes={itens(FUSOS)} personalizado={FUSO.personalizado} aoMudar={setFuso} />
+            <SeletorPersonalizavel label="Formato da data" valor={formato} opcoes={itens(FORMATOS_DATA)} personalizado={FORMATO_DATA.personalizado} aoMudar={setFormato} />
             <Select label="A semana começa à" value={semana} onValueChange={(v) => setSemana(String(v))} items={{ segunda: "Segunda-feira", domingo: "Domingo" }} />
           </div>
           <div className="flex justify-end gap-2">
@@ -155,6 +158,7 @@ export function SecaoAparencia() {
         </Linha>
       </Cartao>
 
+      <PersonalizarAparencia />
     </>
   );
 }

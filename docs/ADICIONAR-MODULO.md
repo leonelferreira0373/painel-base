@@ -176,6 +176,33 @@ Só se nenhuma peça existente serve:
 
 ---
 
+## 13. O contexto aberto (cliente) e a sua análise
+
+1. **`src/dados/contexto.ts`:** o módulo das entidades (`registos`), as colunas de nome e de estado, «Voltar a…» e as páginas (a primeira é a análise; as outras mostram um módulo de registos filtrado por uma coluna).
+2. **`src/dados/analise.ts`:** a fonte das linhas, as colunas de data, estado e entidade, as estatísticas (`estados` e `pior`), os filtros, as etapas, o que o painel de um país mostra e os países do mapa.
+3. Os endereços, o seletor do cabeçalho, a barra lateral, os recentes e a página saem sozinhos. `npm test` valida as colunas e os módulos referidos.
+
+---
+
+## 14. Cartões arrastáveis num ecrã novo
+
+Monte os cartões com `GrelhaOrdenavel`, com uma `chave` própria para o ecrã (a ordem fica guardada por conta):
+
+```tsx
+<GrelhaOrdenavel chave="vendas" className="grid gap-4 sm:grid-cols-2" itens={[{ id: "a", conteudo: <MeuCartao /> }, { id: "b", className: "sm:col-span-2", conteudo: <Outro /> }]} />
+```
+
+Um cartão ocultado passa `conteudo: false`. Não escreva arrastar-e-largar à mão.
+
+---
+
+## 15. Uma cor ou uma letra personalizável nova
+
+- **Cor:** acrescente-a a `CORES` em `src/dados/aparencia.ts` (rótulo, descrição, grupo e a cor de origem em cada tema), o seu id ao tipo `CorId` e, em `src/lib/aparencia.ts`, as variáveis do Kumo que ela altera (com as cores de que depende). O ecrã de aparência e a pré-visualização mostram-na sozinhos.
+- **Letra:** acrescente-a a `LETRAS` e a `LetraId`; em `variaveisDeLetras` dê-lhe a variável CSS e use-a no CSS. Novas famílias vão em `TIPOS_DE_LETRA` (só letras que já vêm no aparelho).
+
+---
+
 ## 10. Mudar de produto (identidade)
 
 Ao criar um painel novo a partir deste:

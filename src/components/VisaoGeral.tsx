@@ -2,6 +2,8 @@
 "use client";
 
 import { Banner, Button, DropdownMenu, Meter, Tooltip } from "@cloudflare/kumo";
+import { GrelhaOrdenavel } from "./GrelhaOrdenavel";
+import { MenuCartao } from "./Flutuantes";
 import { DICA_CARTAO } from "@/dados/dicas";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -13,60 +15,13 @@ import { T } from "@/dados/textos";
 import { AVISO_VISAO, CARTAO_ANEL, CARTOES_SERIE, LISTA_RECENTES, LISTAS_VISAO } from "@/dados/visao";
 import type { Ponto } from "@/lib/analysis/series";
 import { useApp } from "@/lib/estado";
+import { serie, serieHoras } from "@/lib/serie-registos";
 import { lerRecentes } from "@/lib/recentes";
 import { Dica } from "./Dica";
 import { Grafico, type GraficoSpec } from "./graficos/Graficos";
 import { Ic, ICONES, type Icone } from "./Icones";
 import { HOJE, intervaloDe, PERIODO_PREDEFINIDO, SeletorPeriodo, type Periodo } from "./Periodo";
 import { BotaoIcone, CartaoMetrica, Pagina, Secao, type TipoCartao } from "./ui";
-
-function dias(n: number, fim: string): string[] {
-  const base = Date.parse(fim);
-  return Array.from({ length: n }, (_, i) => new Date(base - (n - 1 - i) * 86_400_000).toISOString().slice(0, 10));
-}
-
-function serie(linhas: Linha[], campo: string, n: number, fim: string): { pontos: Ponto[]; total: number; anterior: number } {
-  const contagem = new Map<string, number>();
-  for (const l of linhas) contagem.set(String(l[campo]), (contagem.get(String(l[campo])) ?? 0) + 1);
-  const atuais = dias(n, fim);
-  const fimAnterior = new Date(Date.parse(atuais[0]) - 86_400_000).toISOString().slice(0, 10);
-  const anteriores = dias(n, fimAnterior);
-  const pontos = atuais.map((d) => ({ chave: d, rotulo: d, valor: contagem.get(d) ?? 0, n: contagem.get(d) ?? 0 }));
-  return { pontos, total: pontos.reduce((s, p) => s + p.valor, 0), anterior: anteriores.reduce((s, d) => s + (contagem.get(d) ?? 0), 0) };
-}
-
-/** A tabela só guarda o dia de cada pedido: a hora vem de um perfil de horário de trabalho, sempre a mesma para o mesmo pedido. */
-const PERFIL_HORA = [1, 1, 1, 1, 1, 2, 4, 8, 12, 14, 14, 12, 9, 10, 13, 14, 12, 10, 7, 5, 3, 2, 1, 1];
-const SOMA_PERFIL = PERFIL_HORA.reduce((a, b) => a + b, 0);
-const mistura = (t: string, sal: number) => {
-  let h = 2166136261 ^ sal;
-  for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619);
-  return ((h >>> 0) % 100000) / 100000;
-};
-function instante(l: Linha, campo: string): number {
-  const dia = Date.parse(String(l[campo]));
-  let alvo = mistura(String(l.id), 7) * SOMA_PERFIL;
-  let hora = 0;
-  for (; hora < 23 && alvo >= PERFIL_HORA[hora]; hora++) alvo -= PERFIL_HORA[hora];
-  return dia + hora * 3_600_000 + Math.floor(mistura(String(l.id), 13) * 60) * 60_000;
-}
-
-function serieHoras(linhas: Linha[], campo: string, horas: number, fim: string): { pontos: Ponto[]; total: number; anterior: number } {
-  const { ini, fim: ate } = intervaloDe({ dias: 1, horas, fim, rotulo: "" });
-  const passo = (horas <= 1 ? 5 : horas <= 6 ? 15 : horas <= 12 ? 30 : 60) * 60_000;
-  const duracao = ate.getTime() - ini.getTime();
-  const instantes = linhas.map((l) => instante(l, campo));
-  const contar = (de: number, a: number) => instantes.filter((t) => t >= de && t < a).length;
-  const n = Math.max(2, Math.round(duracao / passo));
-  const pontos: Ponto[] = Array.from({ length: n }, (_, i) => {
-    const de = ini.getTime() + i * passo;
-    const valor = contar(de, de + passo);
-    const d = new Date(de);
-    const chave = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}T${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
-    return { chave, rotulo: chave, valor, n: valor };
-  });
-  return { pontos, total: pontos.reduce((a, p) => a + p.valor, 0), anterior: contar(ini.getTime() - duracao, ini.getTime()) };
-}
 
 const SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const ORDEM_GRUPOS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo", "Madrugada", "Manhã", "Tarde", "Noite"];
@@ -108,7 +63,7 @@ function Lista({ titulo, href, itens, aoOcultar }: { titulo: string; href?: stri
         )}
         <DropdownMenu>
           <Tooltip content={`Opções: ${titulo}`} render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" size="xs" icon={ICONES.mais3} aria-label={`Opções: ${titulo}`} className="text-kumo-subtle" />} />} />
-          <DropdownMenu.Content collisionPadding={12}>
+          <MenuCartao>
             {href && (
               <DropdownMenu.LinkItem href={href} icon={<Ic nome="olho" />} render={<Link href={href} />}>
                 Ver tudo
@@ -117,7 +72,7 @@ function Lista({ titulo, href, itens, aoOcultar }: { titulo: string; href?: stri
             <DropdownMenu.Item icon={<Ic nome="fechar" />} onClick={aoOcultar}>
               Ocultar
             </DropdownMenu.Item>
-          </DropdownMenu.Content>
+          </MenuCartao>
         </DropdownMenu>
       </div>
       {itens.length === 0 && <span className="py-3 text-sm text-kumo-subtle">{T.geral.semDados}</span>}
@@ -240,6 +195,7 @@ export function VisaoGeral() {
           aoMudarPeriodo={(novo) => mudarPeriodoCartao(id, novo)}
           tipo={tipo}
           aoMudarTipo={(t) => setTipos((o) => ({ ...o, [id]: t }))}
+          exportar={{ nome: titulo.toLowerCase().replace(/\s+/g, "-"), titulo, colunas: ["Data", "Valor"], linhas: g.pontos.map((p) => [p.rotulo, p.valor]) }}
           carregando={!pronto || !!aCarregar[id]}
           alturaEsqueleto={altura}
         >
@@ -292,23 +248,25 @@ export function VisaoGeral() {
             <SeletorPeriodo periodo={periodo} aoMudar={mudarPeriodo} />
             <DropdownMenu>
               <Tooltip content="Adicionar métrica ou lista que ocultou" render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" icon={ICONES.mais} aria-label="Adicionar métrica" />} />} />
-              <DropdownMenu.Content collisionPadding={12}>
+              <MenuCartao>
                 {escondidos.length === 0 && <DropdownMenu.Item disabled>Todos os cartões estão visíveis</DropdownMenu.Item>}
                 {escondidos.map((e) => (
                   <DropdownMenu.Item key={e.id} icon={<Ic nome="mais" />} onClick={() => mostrar(e.id)}>
                     {e.titulo}
                   </DropdownMenu.Item>
                 ))}
-              </DropdownMenu.Content>
+              </MenuCartao>
             </DropdownMenu>
             <BotaoIcone dica="Atualizar tudo" icone="atualizar" aoClicar={() => atualizar()} />
           </>
         }
       >
-        <div className="grid gap-4 lg:grid-cols-2">{CARTOES_SERIE.filter((c) => c.linha === 1).map((c) => cartao(c.id, c.titulo, c.href, c.altura))}</div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {CARTOES_SERIE.filter((c) => c.linha === 2).map((c) => cartao(c.id, c.titulo, c.href, c.altura))}
-          {visivel(CARTAO_ANEL.id) && (
+        <GrelhaOrdenavel
+          chave="inicio"
+          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+          itens={[
+          ...CARTOES_SERIE.map((c) => ({ id: c.id, className: c.linha === 1 ? "sm:col-span-2" : undefined, conteudo: cartao(c.id, c.titulo, c.href, c.altura) })),
+          { id: CARTAO_ANEL.id, conteudo: visivel(CARTAO_ANEL.id) && (
             <CartaoMetrica key={`${CARTAO_ANEL.id}-${versoes[CARTAO_ANEL.id] ?? 0}`} titulo={CARTAO_ANEL.titulo} valor={`${dados.taxa} %`} dica={DICA_CARTAO[CARTAO_ANEL.id]} href={CARTAO_ANEL.href} aoAtualizar={() => atualizar(CARTAO_ANEL.id)} aoRemover={() => ocultar(CARTAO_ANEL.id)} carregando={!pronto || !!aCarregar[CARTAO_ANEL.id]} anel>
               <div className="mt-3 flex flex-col gap-4">
                 <Meter trackClassName="h-2.5" label={CARTAO_ANEL.rotuloMedidor} value={dados.taxa} max={100} />
@@ -322,8 +280,9 @@ export function VisaoGeral() {
                 </div>
               </div>
             </CartaoMetrica>
-          )}
-        </div>
+          ) },
+          ]}
+        />
       </Secao>
     </Pagina>
   );

@@ -1,6 +1,19 @@
 // Todos os textos visíveis da interface, arrumados por página e secção, para que nenhum componente tenha português escrito no código.
 
 export const T = {
+  paginacao: {
+    navegacao: "Paginação",
+    primeira: "Primeira página",
+    anterior: "Página anterior",
+    numero: "Número da página",
+    seguinte: "Página seguinte",
+    ultima: "Última página",
+    dicaPrimeira: "Ir para a primeira página.",
+    dicaAnterior: "Voltar à página anterior.",
+    dicaNumero: "Escreva o número da página e prima Enter para ir lá.",
+    dicaSeguinte: "Avançar para a página seguinte.",
+    dicaUltima: "Ir para a última página.",
+  },
   meta: {
     titulo: "Painel base",
     descricao: "Painel de administração em estilo Cloudflare (Kumo, Next.js e Tailwind), com análise de dados no navegador.",
@@ -12,7 +25,7 @@ export const T = {
     perguntarIa: "Perguntar à IA",
     recentes: "Recentes",
     dicasTitulo: "Dicas de pesquisa",
-    dicasPesquisa: ["Escreva parte do nome de uma página para a encontrar.", "Escreva «conta» para ir às definições da conta.", "Altere o atalho desta pesquisa em Definições da conta → Atalhos."],
+    dicasPesquisa: ["Escreva parte do nome de uma página para a encontrar.", "Escreva «conta» para ir às definições da conta.", "Altere o atalho desta pesquisa em Definições da conta > Atalhos."],
     navegar: "para navegar",
     escolher: "para escolher",
     notificacoes: "Notificações",

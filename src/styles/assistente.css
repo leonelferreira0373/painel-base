@@ -1,7 +1,9 @@
 /* O assistente de IA (módulo ai-chat) com as cores do painel: o módulo só lê as variáveis --aia-*. O botão redondo do módulo fica escondido, porque o botão «Perguntar à IA» do cabeçalho é que abre o assistente. */
 :root {
-  --aia-azul: var(--color-kumo-brand);
-  --aia-amarelo: var(--color-kumo-warning);
+  /* O texto é sempre preto ou branco (a cor principal do tema), nunca azul: o módulo usa esta variável para o texto e para os fundos, por isso o assistente fica a preto e branco, como o resto do painel. */
+  --aia-azul: var(--text-color-kumo-default);
+  /* No módulo, o «amarelo» é a cor de realce ao passar o rato (fundo sólido com o texto na cor principal): aqui é um cinzento suave, não um amarelo. */
+  --aia-amarelo: var(--color-kumo-tint);
   --aia-cinza: var(--text-color-kumo-subtle);
   --aia-branco: var(--color-kumo-base);
   --aia-vermelho: var(--color-kumo-danger);
@@ -22,4 +24,18 @@
 .aia-ponto {
   background: var(--_cor, var(--aia-verde)) !important;
   box-shadow: none !important;
+}
+/* Sem ninguém online, o ponto de estado é âmbar (o realce do módulo já não o é). */
+.aia-avatar-vivo[data-modo="offline"] .aia-vivo {
+  --_cor: var(--color-kumo-warning);
+}
+/* O painel do assistente é um cartão flutuante como os outros: o mesmo anel e a mesma elevação. */
+#aia-painel {
+  box-shadow:
+    0 0 0 1px var(--color-kumo-line),
+    var(--elevacao-popup) !important;
+}
+/* A seta do botão de enviar é branca sobre o fundo escuro do tema claro; no tema escuro o fundo é claro e a seta passa a preta. */
+:root[data-mode="dark"] .aia {
+  --chat-seta: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E");
 }

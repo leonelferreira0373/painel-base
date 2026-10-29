@@ -45,6 +45,8 @@ scripts/          verificação de padrões e cópia de ativos
 - Os textos de interface repetidos ou longos vivem em `src/dados/textos.ts`, as dicas em `src/dados/dicas.ts`, o menu em `src/dados/estrutura.ts`. Os rótulos que só aparecem num sítio podem ficar no componente.
 - Português natural de empresa: títulos curtos, sem pontos de exclamação, sem «afinar por excesso». Nomes reais de produtos e de sistemas.
 - Nada de legendas por baixo de títulos.
+- **Os mesmos dados têm sempre a mesma representação.** Um termo que se escreve ou se lê como valor escreve-se «assim» no texto e sai como pill cinzento, sem aspas; um caminho entre ecrãs escreve-se `Definições da conta > Atalhos` e sai com chevrons SVG. Quem os desenha é `<Frase>` (`src/components/Frase.tsx`): nunca desenhe um pill à mão nem escreva o glifo «→».
+- O texto é sempre preto ou branco (a cor principal do tema), nunca azul, ligações incluídas.
 - Datas e números com `toLocaleString("pt-PT")`; dinheiro em euros salvo indicação em contrário.
 
 ## 6. React e Next
@@ -91,6 +93,9 @@ scripts/          verificação de padrões e cópia de ativos
 | `html-em-texto` | `dangerouslySetInnerHTML`, `innerHTML =` |
 | `cor-fixa` | `#rrggbb`, `rgb()`, `hsl()` em código (exceto gráficos, PDF, cor da barra do navegador e logótipos) |
 | `console` | `console.log` / `console.debug` |
+| `controlo-nativo` | `type="time"`, `date`, `datetime-local`, `month`, `week`, `color`, `range`, `number` e `<select>`: o aspeto muda de sistema para sistema (use os seletores do painel) |
+| `input-cru` | `<input>` e `<textarea>` à mão (use o `Input` do Kumo, ou `CampoDePesquisa` dentro dos cartões flutuantes; exceção: o campo de palavra-passe e os de ficheiro escondidos) |
+| `seta-glifo` | o glifo «→» em código (use `A > B` com `<Frase>`; exceção: a tecla seta de `dados/atalhos.ts`) |
 | `comentario-inicial` | ficheiro de código sem comentário na primeira linha |
 | `nome-proibido` | palavras listadas em `scripts/padroes.json` (por exemplo, nomes de clientes que nunca devem aparecer) |
 

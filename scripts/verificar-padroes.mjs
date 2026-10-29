@@ -13,8 +13,12 @@ const EXCECOES = {
     ["src/components/graficos/", "o ECharts só aceita cores literais; as cores do tema escuro vêm de `paraEscuro`"],
     ["src/lib/export/pdf.ts", "o PDF é sempre claro"],
     ["src/lib/tema.ts", "a cor da barra do navegador não aceita variáveis CSS"],
+    ["src/dados/aparencia.ts", "as cores de origem de cada tema são os dados que o utilizador personaliza, não estilos"],
     ["src/app/layout.tsx", "`themeColor` do navegador não aceita variáveis CSS"],
+    ["src/components/SeletorDeCor.tsx", "um seletor de cor desenha as cores que se escolhem"],
   ],
+  inputCru: [["src/components/auth/CampoSenha.tsx", "o campo de palavra-passe tem o botão «Mostrar» dentro do campo, que o Input do Kumo não permite"]],
+  setaGlifo: [["src/dados/atalhos.ts", "é a tecla «seta para a direita» do teclado, não um caminho entre ecrãs"]],
   htmlEmTexto: [["src/app/layout.tsx", "o script do tema tem de correr antes de pintar; com next/script só corre depois do JavaScript e o tema piscava"]],
   base64: [["src/lib/extract/", "ler anexos em base64 de e-mails (.eml) faz parte do formato"], ["src/lib/analysis/", "testes que montam e-mails com anexos"]],
 };
@@ -65,6 +69,12 @@ for (const { abs, rel } of ficheiros) {
     if (codigo && !excecao(EXCECOES.coresFixas, rel) && !/<path\s+fill="#[0-9a-fA-F]{3,8}"/.test(l) && /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|\brgba?\(|\bhsla?\(/.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l)) aviso(rel, n, "cor-fixa", "use as cores do tema (text-kumo-*, bg-kumo-*, ring-kumo-*) em vez de uma cor fixa");
     // 5. Sem rasto de depuração.
     if (codigo && /\bconsole\.(log|debug)\(/.test(l)) aviso(rel, n, "console", "tire o console.log");
+    // 8. Nada do glifo «→» no texto da interface: os caminhos entre ecrãs escrevem-se «A > B» e passam por <Frase>, que desenha o chevron SVG.
+    if (codigo && !excecao(EXCECOES.setaGlifo, rel) && !/^\s*(\/\/|\*|\/\*)/.test(l) && /→/.test(l.replace(/\s\/\/.*$/, ""))) aviso(rel, n, "seta-glifo", "não escreva «→»; escreva «A > B» e mostre o texto com <Frase> (chevron SVG)");
+    // 10. Nada de <input> nem <textarea> à mão: use o Input/InputArea do Kumo (ou CampoDePesquisa dentro de cartões). Os de ficheiro escondidos são a exceção, porque o navegador só abre o seletor de ficheiros por eles.
+    if (codigo && !/^\s*(\/\/|\*|\/\*)/.test(l) && /<(input|textarea)[\s>]/.test(l) && !/type="file"/.test(l) && !excecao(EXCECOES.inputCru, rel)) aviso(rel, n, "input-cru", "use o Input do Kumo (ou CampoDePesquisa); não escreva <input> à mão");
+    // 9. Nada de controlos nativos do navegador (hora, data, cor, setas do número, select): o aspeto muda de sistema para sistema. Há seletores próprios em src/components.
+    if (codigo && !/^\s*(\/\/|\*|\/\*)/.test(l) && /type="(time|date|datetime-local|month|week|color|range|number)"|<select[\s>]/.test(l)) aviso(rel, n, "controlo-nativo", "controlo nativo do navegador; use SeletorDeHora, SeletorDeData, SeletorDeDataHora, EscolhaDeCor, Select do Kumo ou um campo de texto com inputMode");
     // 6. Sem nomes proibidos (por exemplo, de clientes).
     for (const p of proibidas) if (l.toLowerCase().includes(p.toLowerCase())) aviso(rel, n, "nome-proibido", `contém «${p}»`);
   });
