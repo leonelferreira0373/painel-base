@@ -24,6 +24,8 @@ export interface Transferencia {
   ligacao?: string;
   /** O conteúdo, se é texto até 1 MB: fica para ler e copiar. */
   texto?: string;
+  /** O ficheiro recebido, tal como chegou (só chega a quem pede `aoConcluir`, para o guardar). */
+  blob?: Blob;
   inicio: number;
   fim?: number;
 }
@@ -115,8 +117,10 @@ interface Entrada {
 export interface OpcoesDoPar {
   /** Os ficheiros que chegam descarregam-se logo (os de texto não). */
   descarregar?: boolean;
-  /** Chamado quando uma transferência acaba (para registar na atividade). */
+  /** Chamado quando uma transferência acaba (para registar na atividade e guardar o que chegou). */
   aoConcluir?: (t: Transferencia) => void;
+  /** Chamado quando um ficheiro começa a chegar: devolve a razão para o recusar, ou nada para o aceitar. Um ficheiro recusado não se recebe e quem o envia é avisado. */
+  aoChegar?: (ficheiro: { nome: string; tamanho: number; mime: string; peerId: string }) => string | null | undefined;
   /** O código fica sempre o mesmo neste navegador (o do painel). Quem só abre a página de receber não o guarda, para não tomar o código de outro separador. */
   guardarCodigo?: boolean;
 }
@@ -138,7 +142,7 @@ export interface ResultadoDoPar {
   esquecer: (id: string) => void;
 }
 
-export function usarPar({ descarregar = true, aoConcluir, guardarCodigo = true }: OpcoesDoPar = {}): ResultadoDoPar {
+export function usarPar({ descarregar = true, aoConcluir, aoChegar, guardarCodigo = true }: OpcoesDoPar = {}): ResultadoDoPar {
   const parRef = useRef<Peer | null>(null);
   const abertasRef = useRef<Map<string, DataConnection>>(new Map());
   const pendentesRef = useRef<Map<string, DataConnection>>(new Map());
@@ -150,6 +154,8 @@ export function usarPar({ descarregar = true, aoConcluir, guardarCodigo = true }
   descarregarRef.current = descarregar;
   const concluirRef = useRef(aoConcluir);
   concluirRef.current = aoConcluir;
+  const chegarRef = useRef(aoChegar);
+  chegarRef.current = aoChegar;
 
   const [meuId, setMeuId] = useState<string | null>(null);
   const [estado, setEstado] = useState<EstadoDoPar>("a-ligar");
@@ -201,6 +207,18 @@ export function usarPar({ descarregar = true, aoConcluir, guardarCodigo = true }
           return;
         }
         if (msg.type === "meta") {
+          const motivo = chegarRef.current?.({ nome: msg.name, tamanho: msg.size, mime: msg.mime, peerId });
+          if (motivo) {
+            // recusado: aparece na lista como falhado, e o outro lado é avisado para parar
+            const agora = Date.now();
+            setTransferencias((prev) => [...prev, { id: msg.id, peerId, sentido: "recebido", nome: msg.name, tamanho: msg.size, mime: msg.mime, bytes: 0, estado: "falhou", erro: motivo, inicio: agora, fim: agora }]);
+            try {
+              abertasRef.current.get(peerId)?.send(JSON.stringify({ type: "cancel", id: msg.id } satisfies MsgCancelar));
+            } catch {
+              /* a ligação fechou entretanto */
+            }
+            return;
+          }
           entradasRef.current.set(`${peerId}:${msg.id}`, { meta: msg, blocos: [], recebidos: 0 });
           correnteRef.current.set(peerId, msg.id);
           setTransferencias((prev) => [...prev, { id: msg.id, peerId, sentido: "recebido", nome: msg.name, tamanho: msg.size, mime: msg.mime, bytes: 0, estado: "a-decorrer", inicio: Date.now() }]);
@@ -233,7 +251,7 @@ export function usarPar({ descarregar = true, aoConcluir, guardarCodigo = true }
           const fim = Date.now();
           const feito = (extra: Partial<Transferencia>) => {
             mudarTransferencia(msg.id, { estado: "concluido", bytes: e.meta.size, ligacao: url, fim, ...extra });
-            concluir({ id: msg.id, peerId, sentido: "recebido", nome: e.meta.name, tamanho: e.meta.size, mime: e.meta.mime, bytes: e.meta.size, estado: "concluido", ligacao: url, inicio: fim, fim, ...extra });
+            concluir({ id: msg.id, peerId, sentido: "recebido", nome: e.meta.name, tamanho: e.meta.size, mime: e.meta.mime, bytes: e.meta.size, estado: "concluido", ligacao: url, blob, inicio: fim, fim, ...extra });
           };
           if (texto && e.meta.size <= LIMITE_DO_TEXTO) blob.text().then((t) => feito({ texto: t }), () => feito({}));
           else feito({});

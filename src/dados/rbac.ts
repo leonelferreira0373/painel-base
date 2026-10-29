@@ -58,8 +58,30 @@ export const FUNCOES: Funcao[] = [
   },
 ];
 
+// As funções personalizadas (as dos convites com interruptores) guardam-se neste navegador e existem depois de o convite ser aceite.
+const CHAVE_PERSONALIZADAS = "painel.funcoes-personalizadas";
+
+export function lerFuncoesPersonalizadas(): Funcao[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const v = JSON.parse(window.localStorage.getItem(CHAVE_PERSONALIZADAS) ?? "[]") as unknown;
+    return Array.isArray(v) ? (v as Funcao[]).filter((f) => f && typeof f.id === "string" && f.areas && typeof f.areas === "object") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function guardarFuncaoPersonalizada(f: Funcao): void {
+  const outras = lerFuncoesPersonalizadas().filter((x) => x.id !== f.id);
+  try {
+    window.localStorage.setItem(CHAVE_PERSONALIZADAS, JSON.stringify([...outras, f]));
+  } catch {
+    /* sem armazenamento */
+  }
+}
+
 export function funcaoPorId(id: string): Funcao {
-  return FUNCOES.find((f) => f.id === id) ?? FUNCOES[0];
+  return FUNCOES.find((f) => f.id === id) ?? lerFuncoesPersonalizadas().find((f) => f.id === id) ?? FUNCOES[0];
 }
 
 export function podeVer(f: Funcao, areaId: string, moduloId?: string): boolean {

@@ -3,9 +3,12 @@
 
 import { reciclar } from "@/lib/reciclagem";
 import { Badge, Banner, Button, Checkbox, Dialog, Empty, Input, Meter, Select } from "@cloudflare/kumo";
-import { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import { useEffect, useState } from "react";
 import { AMBITOS } from "@/dados/conta";
-import { codigoTemporal, regrasSenha, segredoDe, senhaValida } from "@/lib/auth";
+import { regrasSenha, senhaValida } from "@/lib/auth";
+import { apagarChaveDoNavegador, chaveSeguraDisponivel, criarChaveDoNavegador, idsDasChavesNesteNavegador } from "@/lib/chave-do-navegador";
+import { codigoTotp, destinosDoCodigo, gerarSegredoTotp, segredoEmGrupos, urlOtpAuth } from "@/lib/seguranca-conta";
 import { identificador, useConta } from "@/lib/conta";
 import { useApp } from "@/lib/estado";
 import { CampoSenha } from "../auth/CampoSenha";
@@ -114,23 +117,38 @@ function CodigosRecuperacao({ codigos, aoFechar }: { codigos: string[] | null; a
   );
 }
 
-function ChaveDeAcesso({ aberto, aoMudar }: { aberto: boolean; aoMudar: (v: boolean) => void }) {
+function NovaChaveDoNavegador({ aberto, aoMudar }: { aberto: boolean; aoMudar: (v: boolean) => void }) {
   const { mudar } = useConta();
-  const [nome, setNome] = useState("Este dispositivo");
+  const { avisar } = useApp();
+  const [nome, setNome] = useState("Este navegador");
+  const [aCriar, setACriar] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  useEffect(() => {
+    if (aberto) (setNome("Este navegador"), setErro(null));
+  }, [aberto]);
   return (
-    <Janela aberto={aberto} aoMudar={aoMudar} titulo="Adicionar chave de acesso">
+    <Janela aberto={aberto} aoMudar={aoMudar} titulo="Criar uma chave segura">
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          mudar((c) => ({ chavesAcesso: [...c.chavesAcesso, { id: identificador(), nome: nome.trim() || "Chave de acesso", criada: new Date().toISOString() }] }), `Chave de acesso «${nome.trim()}» adicionada`);
-          aoMudar(false);
+          setACriar(true);
+          setErro(null);
+          try {
+            const k = await criarChaveDoNavegador(nome);
+            mudar((c) => ({ chavesNavegador: [...c.chavesNavegador, k] }), `Chave segura do navegador «${k.nome}» criada`);
+            avisar("Chave segura criada neste navegador");
+            aoMudar(false);
+          } catch (x) {
+            setErro(x instanceof Error ? x.message : "Não foi possível criar a chave.");
+          }
+          setACriar(false);
         }}
       >
-        <p className="mb-4 text-sm text-kumo-default">Entra com a impressão digital, o rosto ou o bloqueio do aparelho, sem escrever a palavra-passe. Dê-lhe um nome para a reconhecer depois.</p>
-        <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
+        <p className="mb-4 text-sm text-kumo-default">Cria um par de chaves neste navegador: a parte privada fica aqui, sem poder ser lida nem copiada, e a conta guarda só a parte pública e a impressão do navegador. Para entrar, o navegador assina um desafio e a conta confere a assinatura.</p>
+        <Input label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} error={erro ?? undefined} />
         <div className="mt-6 flex justify-end gap-2">
           <Dialog.Close render={(props) => <Button {...props} variant="secondary">Cancelar</Button>} />
-          <Button type="submit" variant="primary" disabled={!nome.trim()}>
+          <Button type="submit" variant="primary" loading={aCriar} disabled={!nome.trim()}>
             Criar chave
           </Button>
         </div>
@@ -139,9 +157,40 @@ function ChaveDeAcesso({ aberto, aoMudar }: { aberto: boolean; aoMudar: (v: bool
   );
 }
 
+function LinhaDaChaveDoNavegador({ seguraOk, aqui, aoAdicionar, aoTirar }: { seguraOk: boolean; aqui: string[]; aoAdicionar: () => void; aoTirar: (id: string) => void }) {
+  const { conta } = useConta();
+  return (
+    <>
+      {conta.chavesNavegador.length === 0 && <Linha titulo={seguraOk ? "Ainda não tem chaves do navegador" : "Precisa de uma ligação segura"} estado={seguraOk ? undefined : "Abra o painel por https (ou localhost) para criar e usar chaves do navegador."} />}
+      {conta.chavesNavegador.map((k) => (
+        <Linha
+          key={k.id}
+          titulo={
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <Ic nome="chave" tamanho={16} className="text-kumo-subtle" />
+              {k.nome}
+              {aqui.includes(k.id) && <Badge variant="success">Este navegador</Badge>}
+            </span>
+          }
+          estado={`Impressão ${segredoEmGrupos(k.impressao.slice(0, 12))} · criada a ${soData(k.criada)}${k.ultimoUso ? ` · usada ${haTempo(k.ultimoUso)}` : ""}`}
+        >
+          <Button variant="ghost" icon={ICONES.lixo} onClick={() => aoTirar(k.id)}>
+            Remover
+          </Button>
+        </Linha>
+      ))}
+      <div className="border-t border-kumo-hairline px-4 py-3">
+        <Button variant="secondary" icon={ICONES.mais} disabled={!seguraOk} onClick={aoAdicionar}>
+          Criar uma chave neste navegador
+        </Button>
+      </div>
+    </>
+  );
+}
+
 export function SecaoSeguranca() {
   const { conta, mudar } = useConta();
-  const { funcao, avisar } = useApp();
+  const { avisar } = useApp();
   const [senha, setSenha] = useState(false);
   const [reporSenha, setReporSenha] = useState(false);
   const [ativar, setAtivar] = useState(false);
@@ -150,13 +199,15 @@ export function SecaoSeguranca() {
   const [novosCodigos, setNovosCodigos] = useState(false);
   const [chave, setChave] = useState(false);
   const [tirarChave, setTirarChave] = useState<string | null>(null);
-  const segredo = segredoDe(funcao.id)
-    .replace(/[^a-z0-9]/g, "")
-    .toUpperCase()
-    .padEnd(16, "X")
-    .slice(0, 16)
-    .match(/.{4}/g)!
-    .join(" ");
+  const [segredo, setSegredo] = useState("");
+  const [soCodigo, setSoCodigo] = useState(false);
+  const [seguraOk, setSeguraOk] = useState(false);
+  const [aqui, setAqui] = useState<string[]>([]);
+  useEffect(() => {
+    setSeguraOk(chaveSeguraDisponivel());
+    void idsDasChavesNesteNavegador().then(setAqui);
+  }, [conta.chavesNavegador]);
+  const destinos = destinosDoCodigo(conta);
   const outras = conta.sessoes.filter((s) => !s.atual);
 
   return (
@@ -172,9 +223,18 @@ export function SecaoSeguranca() {
         </Linha>
       </Cartao>
 
-      <Cartao titulo="Verificação em dois passos" dica="Além da palavra-passe, pede um código de seis dígitos que muda a cada 30 segundos.">
+      <Cartao titulo="Como entra" dica="Com «só código», a conta não tem palavra-passe: cada entrada pede um código de seis dígitos, que chega ao e-mail da conta e, se deixar, aos contactos de recuperação (Definições da conta, E-mail e telefone). Cada pessoa escolhe para a sua conta.">
+        <Linha titulo="Entrar só com um código de uso único" estado={conta.modoDeEntrada === "so-codigo" ? "Ativo: a conta não pede palavra-passe." : "Desligado: entra com e-mail e palavra-passe."}>
+          <Interruptor marcado={conta.modoDeEntrada === "so-codigo"} aoMudar={(v) => (v ? setSoCodigo(true) : mudar({ modoDeEntrada: "senha" }, "Voltou a entrar com palavra-passe"))} rotulo="Entrar só com um código de uso único" />
+        </Linha>
+        <Linha titulo="Enviar os códigos também para os contactos de recuperação" estado={`Vão para ${destinos.map((d) => d.mascara).join(", ")}`}>
+          <Interruptor marcado={conta.codigosTambemParaRecuperacao} aoMudar={(v) => mudar({ codigosTambemParaRecuperacao: v }, v ? "Os códigos vão também para os contactos de recuperação" : "Os códigos vão só para o e-mail da conta")} rotulo="Enviar os códigos também para os contactos de recuperação" />
+        </Linha>
+      </Cartao>
+
+      <Cartao titulo="Verificação em dois passos" dica="Além da palavra-passe, pede um código de seis dígitos que muda a cada 30 segundos, da sua aplicação autenticadora (Google Authenticator, Microsoft Authenticator, Authy ou outra).">
         <Linha titulo="Aplicação autenticadora" estado={conta.doisFatores ? "Ativa: pede um código sempre que inicia sessão." : "Desligada: só pede a palavra-passe."}>
-          <Interruptor marcado={conta.doisFatores} aoMudar={(v) => (v ? setAtivar(true) : setDesligar(true))} rotulo="Verificação em dois passos" />
+          <Interruptor marcado={conta.doisFatores} aoMudar={(v) => (v ? (setSegredo(gerarSegredoTotp()), setAtivar(true)) : setDesligar(true))} rotulo="Verificação em dois passos" />
         </Linha>
         <Linha titulo="Códigos de recuperação" dica="Servem para entrar se perder a aplicação autenticadora. Cada um só funciona uma vez." estado={conta.doisFatores ? `${conta.codigosRecuperacao} por usar` : "Disponíveis depois de ativar os dois passos."}>
           <Button variant="secondary" disabled={!conta.doisFatores} onClick={() => setNovosCodigos(true)}>
@@ -183,15 +243,8 @@ export function SecaoSeguranca() {
         </Linha>
       </Cartao>
 
-      <Cartao titulo="Chaves de acesso" dica="Entram com a impressão digital, o rosto ou o bloqueio do aparelho, e não podem ser roubadas por um site falso." acoes={<Button size="sm" variant="secondary" icon={ICONES.mais} onClick={() => setChave(true)}>Adicionar</Button>}>
-        {conta.chavesAcesso.length === 0 && <Linha titulo="Ainda não tem chaves de acesso" />}
-        {conta.chavesAcesso.map((c) => (
-          <Linha key={c.id} titulo={c.nome} estado={`Criada em ${soData(c.criada)}`}>
-            <Button variant="ghost" icon={ICONES.lixo} onClick={() => setTirarChave(c.id)}>
-              Remover
-            </Button>
-          </Linha>
-        ))}
+      <Cartao titulo="Chave segura do navegador" dica="Entra sem palavra-passe com uma chave que só existe neste navegador (par de chaves ECDSA P-256 guardado pela Web Crypto, sem poder ser lido). A conta guarda a parte pública e a impressão do navegador: se o navegador mudar, a chave deixa de servir. Só funciona em ligações seguras (https).">
+        <LinhaDaChaveDoNavegador seguraOk={seguraOk} aqui={aqui} aoAdicionar={() => setChave(true)} aoTirar={setTirarChave} />
       </Cartao>
 
       <Cartao titulo="Sessões abertas" dica="Os aparelhos onde a conta está aberta agora. Termine os que não reconhece." acoes={outras.length > 0 ? <Button size="sm" variant="secondary" onClick={() => mudar((c) => ({ sessoes: c.sessoes.filter((s) => s.atual) }), "Todas as outras sessões terminadas")}>Terminar todas as outras</Button> : undefined}>
@@ -234,25 +287,54 @@ export function SecaoSeguranca() {
         aberto={ativar}
         aoMudar={setAtivar}
         titulo="Ative a verificação em dois passos"
-        texto="Abra a aplicação autenticadora, adicione uma conta com esta chave e escreva o código que ela mostra."
+        texto="Leia o código QR com a aplicação autenticadora (ou escreva a chave) e escreva o código de seis dígitos que ela mostra."
         extra={
-          <div className="mt-4 flex items-center justify-between gap-2 rounded-lg bg-kumo-tint px-3 py-2">
-            <code className="text-sm font-medium tracking-wider">{segredo}</code>
-            <BotaoCopiar texto={segredo.replace(/\s/g, "")} dica="Copiar a chave" variante="ghost" tamanho="sm" quadrado />
-          </div>
+          segredo ? (
+            <div className="mt-4 flex flex-col items-center gap-3">
+              <div className="rounded-xl bg-white p-3 ring ring-kumo-line">
+                <QRCodeSVG value={urlOtpAuth("Painel", conta.email, segredo)} size={168} level="M" />
+              </div>
+              <div className="flex w-full items-center justify-between gap-2 rounded-lg bg-kumo-tint px-3 py-2">
+                <code className="min-w-0 break-all text-sm font-medium tracking-wider">{segredoEmGrupos(segredo)}</code>
+                <BotaoCopiar texto={segredo} dica="Copiar a chave" variante="ghost" tamanho="sm" quadrado />
+              </div>
+            </div>
+          ) : null
         }
-        codigo={() => codigoTemporal(segredoDe(funcao.id))}
+        codigo={() => codigoTotp(segredo || "AAAAAAAAAAAAAAAA")}
+        chave="dois-passos-ativar"
         rotuloAcao="Ativar"
         aoConfirmar={() => {
-          mudar({ doisFatores: true, codigosRecuperacao: 8 }, "Verificação em dois passos ativada");
+          mudar({ doisFatores: true, segredoTotp: segredo, codigosRecuperacao: 8 }, "Verificação em dois passos ativada");
           setCodigos(gerarCodigos());
         }}
       />
-      <Confirmar aberto={desligar} aoMudar={setDesligar} titulo="Desligar a verificação em dois passos" perigo texto="A conta passa a pedir só a palavra-passe e os códigos de recuperação deixam de valer." rotuloAcao="Desligar" aoConfirmar={() => mudar({ doisFatores: false, codigosRecuperacao: 0 }, "Verificação em dois passos desligada")} />
+      <Confirmar aberto={desligar} aoMudar={setDesligar} titulo="Desligar a verificação em dois passos" perigo texto="A conta passa a pedir só a palavra-passe e os códigos de recuperação deixam de valer." rotuloAcao="Desligar" aoConfirmar={() => mudar({ doisFatores: false, segredoTotp: undefined, codigosRecuperacao: 0 }, "Verificação em dois passos desligada")} />
       <Confirmar aberto={novosCodigos} aoMudar={setNovosCodigos} titulo="Gerar novos códigos" texto="Os códigos que tem agora deixam de funcionar." rotuloAcao="Gerar" aoConfirmar={() => (mudar({ codigosRecuperacao: 8 }, "Códigos de recuperação gerados de novo"), setCodigos(gerarCodigos()))} />
       <CodigosRecuperacao codigos={codigos} aoFechar={() => setCodigos(null)} />
-      <ChaveDeAcesso aberto={chave} aoMudar={setChave} />
-      <Confirmar aberto={!!tirarChave} aoMudar={(v) => !v && setTirarChave(null)} titulo="Remover a chave de acesso" perigo texto="Deixa de poder entrar com ela." rotuloAcao="Remover" aoConfirmar={() => mudar((c) => ({ chavesAcesso: c.chavesAcesso.filter((x) => x.id !== tirarChave) }), "Chave de acesso removida")} />
+      <NovaChaveDoNavegador aberto={chave} aoMudar={setChave} />
+      <Confirmar
+        aberto={!!tirarChave}
+        aoMudar={(v) => !v && setTirarChave(null)}
+        titulo="Remover a chave do navegador"
+        perigo
+        texto="Deixa de poder entrar com ela. Se for a chave deste navegador, a parte privada também se apaga daqui."
+        rotuloAcao="Remover"
+        aoConfirmar={() => {
+          const id = tirarChave;
+          if (!id) return;
+          void apagarChaveDoNavegador(id);
+          mudar((c) => ({ chavesNavegador: c.chavesNavegador.filter((x) => x.id !== id) }), "Chave segura do navegador removida");
+        }}
+      />
+      <Confirmar
+        aberto={soCodigo}
+        aoMudar={setSoCodigo}
+        titulo="Entrar só com um código"
+        texto={<>A conta deixa de pedir palavra-passe: cada entrada pede um código de seis dígitos enviado para {destinos.map((d, i) => <span key={d.valor}>{i > 0 ? ", " : ""}<b>{d.mascara}</b></span>)}. Confirme que tem acesso a estes contactos antes de continuar.</>}
+        rotuloAcao="Ativar"
+        aoConfirmar={() => mudar({ modoDeEntrada: "so-codigo" }, "A conta passou a entrar só com um código de uso único")}
+      />
     </>
   );
 }
@@ -272,7 +354,7 @@ export function SecaoTokens() {
     <>
       <Cartao titulo="Chaves de acesso pessoais" dica="Servem para ligar outras aplicações à sua conta, com as permissões e a validade que escolher. A chave completa só aparece uma vez." acoes={<Button size="sm" variant="primary" icon={ICONES.mais} onClick={() => (setNome(""), setAmbitos(["ler"]), setValidade("90"), setCriar(true))}>Criar chave</Button>}>
         {conta.tokens.length === 0 ? (
-          <Empty size="sm" icon={<Ic nome="chave" tamanho={32} />} title="Ainda não criou nenhuma chave" />
+          <Empty size="sm" className="rounded-none border-0 bg-transparent" icon={<Ic nome="chave" tamanho={32} />} title="Ainda não criou nenhuma chave" />
         ) : (
           conta.tokens.map((t) => (
             <Linha

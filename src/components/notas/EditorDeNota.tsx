@@ -2,10 +2,11 @@
 "use client";
 
 import { Button, Dialog, DropdownMenu, Input, Select, Tooltip } from "@cloudflare/kumo";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { registar } from "@/lib/atividade";
 import { localParaIso, isoParaLocal, amanhaAsNove } from "@/lib/email";
 import { guardarAnexo, lerAnexo, mudarProtecao, removerAnexo, tamanhoEmPalavras } from "@/lib/notas-anexos";
+import { criarRecuperacao, guardarNoCofre, lerDoCofre, tirarDoCofre } from "@/lib/notas-recuperacao";
 import {
   anexosUsados,
   cifrarConteudo,
@@ -21,6 +22,7 @@ import {
   textoDeHtml,
   type AlvoDeNota,
   type AnexoDaNota,
+  type ChaveDeNota,
   type CorDeNota,
   type LembreteDaNota,
   type Nota,
@@ -32,8 +34,17 @@ import { Ic, ICONES, type Icone } from "../Icones";
 import { SeletorDeDataHora } from "../SeletoresDeTempo";
 import { useEmails } from "../super/EmailPecas";
 
+/** Um botão da barra de ferramentas da nota: só o ícone, com a dica na nossa interface. */
+function BotaoDaBarra({ rotulo, className, children, ...p }: { rotulo: string; className?: string; children: ReactNode } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "title" | "children" | "className">) {
+  return (
+    <Tooltip content={rotulo} side="top" render={<button type="button" aria-label={rotulo} className={className} {...p} />}>
+      {children}
+    </Tooltip>
+  );
+}
+
 /** Põe a `src` (ou o `href` de um ficheiro) dos elementos do texto que apontam para ficheiros guardados. Devolve os endereços para os libertar. */
-export async function resolverAnexos(raiz: HTMLElement, chave?: CryptoKey): Promise<string[]> {
+export async function resolverAnexos(raiz: HTMLElement, chave?: ChaveDeNota): Promise<string[]> {
   const urls: string[] = [];
   for (const el of raiz.querySelectorAll<HTMLElement>("[data-anexo]")) {
     const id = el.getAttribute("data-anexo");
@@ -68,7 +79,9 @@ export interface PropsDoEditor {
   alvo: AlvoDeNota;
   quem: Quem;
   /** A nota que se muda (já aberta, com o conteúdo à vista) ou nada, numa nota nova. */
-  inicial?: { nota: Nota; corpo: string; anexos: AnexoDaNota[]; chave?: CryptoKey; senha?: string };
+  inicial?: { nota: Nota; corpo: string; anexos: AnexoDaNota[]; chave?: ChaveDeNota; senha?: string; titulo?: string };
+  /** O título da nota, que se escreve no cabeçalho da janela (por cima do editor). */
+  titulo: string;
   aoGuardar: () => void;
   aoCancelar: () => void;
 }
@@ -79,7 +92,7 @@ const horaAgora = () => {
   return `${cinco(d.getHours())}.${cinco(d.getMinutes())}`;
 };
 
-export function EditorDeNota({ alvo, quem, inicial, aoGuardar, aoCancelar }: PropsDoEditor) {
+export function EditorDeNota({ alvo, quem, inicial, titulo, aoGuardar, aoCancelar }: PropsDoEditor) {
   const editor = useRef<HTMLDivElement>(null);
   const ficheiros = useRef<HTMLInputElement>(null);
   const selecao = useRef<Range | null>(null);
@@ -87,6 +100,7 @@ export function EditorDeNota({ alvo, quem, inicial, aoGuardar, aoCancelar }: Pro
   const gravador = useRef<MediaRecorder | null>(null);
   const emails = useEmails();
   const original = inicial?.nota;
+  const [oculta, setOculta] = useState(!!original?.oculta);
   const [cor, setCor] = useState<CorDeNota>(original?.cor ?? "amarelo");
   const [para, setPara] = useState<string[]>(original?.para ?? []);
   const [outroEmail, setOutroEmail] = useState("");
@@ -209,6 +223,11 @@ export function EditorDeNota({ alvo, quem, inicial, aoGuardar, aoCancelar }: Pro
   const membrosPorAdicionar = useMemo(() => Object.fromEntries(MEMBROS.filter((m) => !para.includes(m.nome)).map((m) => [m.nome, `${m.nome} · ${m.funcao}`])), [para]);
   const adicionarPara = (v: string) => v && !para.some((p) => p.toLowerCase() === v.toLowerCase()) && setPara([...para, v]);
   const emailValido = (t: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(t.trim());
+  /** O e-mail que está por juntar entra na lista, e o convite fecha. */
+  const enviarConvite = () => {
+    if (emailValido(outroEmail)) (adicionarPara(outroEmail.trim()), setOutroEmail(""));
+    setPainel(null);
+  };
 
   const guardar = async () => {
     const el = editor.current;
@@ -240,16 +259,26 @@ export function EditorDeNota({ alvo, quem, inicial, aoGuardar, aoCancelar }: Pro
         corpo,
         texto: textoDeHtml(corpo),
         anexos,
+        ...(titulo.trim() ? { titulo: titulo.trim() } : {}),
+        ...(oculta ? { oculta: true } : {}),
       };
       if (protegida) {
         const mesmaSenha = !!original?.cifra && senha === inicial?.senha;
-        const { cifra, chave } = await cifrarConteudo({ corpo: nota.corpo, texto: nota.texto, anexos }, senha, mesmaSenha && original?.cifra ? Uint8Array.from(atob(original.cifra.sal), (c) => c.charCodeAt(0)) : undefined);
+        const { cifra, chave } = await cifrarConteudo({ corpo: nota.corpo, texto: nota.texto, anexos, ...(nota.titulo ? { titulo: nota.titulo } : {}) }, senha, mesmaSenha && original?.cifra ? Uint8Array.from(atob(original.cifra.sal), (c) => c.charCodeAt(0)) : undefined);
+        // a palavra-passe fica também cifrada com uma chave de recuperação, que vai para o cofre (só o e-mail da conta a pode pedir)
+        let recuperacao = original?.recuperacao;
+        if (!(mesmaSenha && recuperacao && lerDoCofre(nota.id))) {
+          const r = await criarRecuperacao(senha);
+          recuperacao = r.recuperacao;
+          guardarNoCofre(nota.id, r.chave);
+        }
         for (const a of anexos) {
           const jaCifrado = !!original?.cifra && !novos.current.has(a.id);
           if (!jaCifrado || !mesmaSenha) await mudarProtecao(a.id, jaCifrado ? inicial?.chave : undefined, chave);
         }
-        nota = { ...nota, corpo: "", texto: "", anexos: [], cifra };
+        nota = { ...nota, titulo: undefined, corpo: "", texto: "", anexos: [], cifra, recuperacao };
       } else if (original?.cifra && inicial?.chave) {
+        tirarDoCofre(nota.id);
         for (const a of anexos) if (!novos.current.has(a.id)) await mudarProtecao(a.id, inicial.chave, undefined);
       }
       await guardarNota(nota);
@@ -278,6 +307,7 @@ export function EditorDeNota({ alvo, quem, inicial, aoGuardar, aoCancelar }: Pro
     para.length ? `Para ${para.join(", ")}` : null,
     duracao === "data" ? "Expira numa data" : duracao !== "nunca" ? `Expira ${DURACOES[duracao].rotulo.toLowerCase()}` : null,
     protegida ? "Com palavra-passe" : null,
+    oculta ? "Conteúdo oculto" : null,
     lembretes.length ? `${lembretes.length} ${lembretes.length === 1 ? "lembrete" : "lembretes"}` : null,
   ].filter(Boolean);
   return (
@@ -287,24 +317,24 @@ export function EditorDeNota({ alvo, quem, inicial, aoGuardar, aoCancelar }: Pro
           {/* as ferramentas ficam numa só linha, com scroll horizontal (e desvanecimento nas pontas) em vez de se amontoarem */}
           <div className="sem-barra -m-1 flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto p-1 [&>*]:shrink-0" role="toolbar" aria-label="Formatação">
             {FERRAMENTAS.map((f) => (
-              <button key={f.id} type="button" title={f.rotulo} aria-label={f.rotulo} onMouseDown={(e) => e.preventDefault()} onClick={() => comando(f.comando, f.valor)} className={botaoDaBarra}>
+              <BotaoDaBarra key={f.id} rotulo={f.rotulo} onMouseDown={(e) => e.preventDefault()} onClick={() => comando(f.comando, f.valor)} className={botaoDaBarra}>
                 <Ic nome={f.icone} tamanho={16} />
-              </button>
+              </BotaoDaBarra>
             ))}
-            <button type="button" title="Sublinhado" aria-label="Sublinhado" onMouseDown={(e) => e.preventDefault()} onClick={() => comando("underline")} className={`${botaoDaBarra} text-sm font-semibold underline`}>
+            <BotaoDaBarra rotulo="Sublinhado" onMouseDown={(e) => e.preventDefault()} onClick={() => comando("underline")} className={`${botaoDaBarra} text-sm font-semibold underline`}>
               S
-            </button>
-            <button type="button" title="Ligação" aria-label="Ligação" onMouseDown={(e) => (guardarSelecao(), e.preventDefault())} onClick={() => setLigacao(ligacao === null ? "https://" : null)} className={botaoDaBarra}>
+            </BotaoDaBarra>
+            <BotaoDaBarra rotulo="Ligação" onMouseDown={(e) => (guardarSelecao(), e.preventDefault())} onClick={() => setLigacao(ligacao === null ? "https://" : null)} className={botaoDaBarra}>
               <Ic nome="link" tamanho={16} />
-            </button>
-            <button type="button" title="Juntar ficheiros" aria-label="Juntar ficheiros" onMouseDown={(e) => (guardarSelecao(), e.preventDefault())} onClick={() => ficheiros.current?.click()} className={botaoComTexto}>
-              <Ic nome="pasta" tamanho={16} />
-              Ficheiro
-            </button>
-            <button type="button" title={aGravar === null ? "Gravar áudio" : "Parar a gravação"} aria-label={aGravar === null ? "Gravar áudio" : "Parar a gravação"} onMouseDown={(e) => (guardarSelecao(), e.preventDefault())} onClick={gravar} className={`${botaoComTexto} ${aGravar !== null ? "bg-black/10 dark:bg-white/15" : ""}`}>
-              <span aria-hidden className={`size-2.5 rounded-full ${aGravar !== null ? "animate-pulse bg-red-600" : "bg-current"}`} />
-              {aGravar === null ? "Áudio" : `A gravar ${cronometro}`}
-            </button>
+            </BotaoDaBarra>
+            <BotaoDaBarra rotulo="Juntar ficheiros" onMouseDown={(e) => (guardarSelecao(), e.preventDefault())} onClick={() => ficheiros.current?.click()} className={botaoDaBarra}>
+              <Ic nome="anexo" tamanho={16} />
+            </BotaoDaBarra>
+            {/* o microfone fica um ícone; só enquanto grava acrescenta o tempo (e a dica passa a «Parar a gravação») */}
+            <BotaoDaBarra rotulo={aGravar === null ? "Gravar áudio" : "Parar a gravação"} onMouseDown={(e) => (guardarSelecao(), e.preventDefault())} onClick={gravar} className={aGravar === null ? botaoDaBarra : `${botaoComTexto} bg-black/10 dark:bg-white/15`}>
+              <Ic nome="microfone" tamanho={16} className={aGravar !== null ? "animate-pulse text-red-600" : undefined} />
+              {aGravar !== null && <span className="tabular-nums">{cronometro}</span>}
+            </BotaoDaBarra>
             <input ref={ficheiros} type="file" multiple className="hidden" onChange={(e) => (e.target.files && void juntar([...e.target.files]), (e.target.value = ""))} />
           </div>
           <DropdownMenu>
@@ -321,10 +351,13 @@ export function EditorDeNota({ alvo, quem, inicial, aoGuardar, aoCancelar }: Pro
                 </SubMenuCartao>
               </DropdownMenu.Sub>
               <DropdownMenu.Item icon={<Ic nome="pessoas" />} onClick={() => setPainel("para")}>
-                Para quem…
+                Convite…
               </DropdownMenu.Item>
               <DropdownMenu.Item icon={<Ic nome="relogio" />} onClick={() => setPainel("expira")}>
                 Expira…
+              </DropdownMenu.Item>
+              <DropdownMenu.Item icon={<Ic nome={oculta ? "esconder" : "olho"} />} selected={oculta} onClick={() => setOculta(!oculta)}>
+                Ocultar o conteúdo
               </DropdownMenu.Item>
               <DropdownMenu.Item icon={<Ic nome="cadeado" />} onClick={() => setPainel("senha")}>
                 Palavra-passe…
@@ -374,7 +407,7 @@ export function EditorDeNota({ alvo, quem, inicial, aoGuardar, aoCancelar }: Pro
         <Dialog size="sm" className="p-5">
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
-              <Dialog.Title className="text-lg font-semibold">{painel === "para" ? "Nota · Para quem" : painel === "expira" ? "Nota · Expira" : painel === "senha" ? "Nota · Palavra-passe" : "Nota · Lembretes por e-mail"}</Dialog.Title>
+              <Dialog.Title className="text-lg font-semibold">{painel === "para" ? "Nota · Convite" : painel === "expira" ? "Nota · Expira" : painel === "senha" ? "Nota · Palavra-passe" : "Nota · Lembretes por e-mail"}</Dialog.Title>
               <Dialog.Close render={(p) => <Button {...p} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
             </div>
 
@@ -393,18 +426,12 @@ export function EditorDeNota({ alvo, quem, inicial, aoGuardar, aoCancelar }: Pro
                 </div>
                 <Select aria-label="Escolher um membro" value="__escolher__" onValueChange={(v) => String(v) !== "__escolher__" && adicionarPara(String(v))} items={{ __escolher__: "Escolher um membro…", ...membrosPorAdicionar }} />
                 <form
-                  className="flex items-center gap-2"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (emailValido(outroEmail)) (adicionarPara(outroEmail.trim()), setOutroEmail(""));
+                    enviarConvite();
                   }}
                 >
-                  <div className="min-w-0 flex-1">
-                    <Input aria-label="Ou um e-mail" placeholder="Ou um e-mail" value={outroEmail} onChange={(e) => setOutroEmail(e.target.value)} autoComplete="off" className="w-full" />
-                  </div>
-                  <Button type="submit" variant="secondary" disabled={!emailValido(outroEmail)}>
-                    Juntar
-                  </Button>
+                  <Input aria-label="Ou um e-mail" placeholder="Ou um e-mail" value={outroEmail} onChange={(e) => setOutroEmail(e.target.value)} autoComplete="off" className="w-full" />
                 </form>
               </div>
             )}
@@ -458,9 +485,15 @@ export function EditorDeNota({ alvo, quem, inicial, aoGuardar, aoCancelar }: Pro
             )}
 
             <div className="flex justify-end">
-              <Button variant="primary" onClick={() => setPainel(null)}>
-                Concluído
-              </Button>
+              {painel === "para" ? (
+                <Button variant="primary" disabled={para.length === 0 && !emailValido(outroEmail)} onClick={enviarConvite}>
+                  Enviar convite
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={() => setPainel(null)}>
+                  Concluído
+                </Button>
+              )}
             </div>
           </div>
         </Dialog>

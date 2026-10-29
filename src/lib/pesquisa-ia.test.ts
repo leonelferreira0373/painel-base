@@ -4,7 +4,7 @@ import { devePerguntarAIa, LIMITES_DA_PESQUISA, mensagensDaPesquisa, pedidoValid
 const paginas: PaginaPesquisavel[] = [
   { id: "conta/atalhos", rotulo: "Atalhos", area: "Definições da conta", descricao: "As combinações de teclas para abrir a pesquisa, a barra lateral e outras ações.", palavras: "teclado, teclas, navegar, navegação" },
   { id: "conta/aparencia", rotulo: "Aparência", area: "Definições da conta", descricao: "Tema claro ou escuro, movimento, dicas e a barra lateral.", palavras: "tema, escuro, claro, cores" },
-  { id: "dev/firewall", rotulo: "Firewall", area: "Developer tools", descricao: "Ligar ou desligar o firewall, o limite de pedidos e as regras de IP.", palavras: "bloquear ip, ataques, segurança" },
+  { id: "dev/firewall", rotulo: "Firewall", area: "Ferramentas de programador", descricao: "Ligar ou desligar o firewall, o limite de pedidos e as regras de IP.", palavras: "bloquear ip, ataques, segurança" },
   { id: "painel/modulos", rotulo: "Módulos e pacotes", area: "Painel", descricao: "Escolher o pacote do negócio e ligar ou desligar cada área e módulo.", palavras: "ligar, desligar, ativar, hotel, táxi, loja" },
   { id: "pagamentos/metricas", rotulo: "Visão geral", area: "Pagamentos", descricao: "Volume, número de pagamentos e ticket médio.", palavras: "dinheiro, receitas, vendas" },
 ];

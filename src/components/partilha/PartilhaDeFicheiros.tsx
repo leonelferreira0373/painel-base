@@ -1,23 +1,39 @@
 // Conteúdo > Enviar ficheiros: as funções do SnapShare dentro do painel. Liga este navegador a outro aparelho (telemóvel, computador, tablet) por um código, uma ligação ou um QR e envia ficheiros, imagens e texto direitos de um para o outro por WebRTC, sem servidor no meio e sem conta. Quem recebe abre a ligação do painel (sem entrar) ou a do SnapShare.
 "use client";
 
-import { Button, Input } from "@cloudflare/kumo";
+import { Button, Input, Select } from "@cloudflare/kumo";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { caminho } from "@/dados/estrutura";
+import { FUNCOES } from "@/dados/rbac";
 import { registar } from "@/lib/atividade";
+import { guardarNaBiblioteca } from "@/lib/biblioteca-guardar";
+import { alternarFuncao, motivoDeRecusa, pastaValida, podeEnviar, podeReceber, POLITICA_DE_ORIGEM, politicaValida, type PoliticaDePartilha } from "@/lib/partilha-politica";
 import { avisoDeTamanho, formatarTamanho, ligacaoDoPar, nomeDoAparelho, plataformaDe } from "@/lib/partilha";
 import { ecraPodeFicarLigado, useCapturaDaPrancheta, useColarFicheiros, useEcraLigado, useLargarFicheiros, usePreferenciaDaPartilha } from "@/lib/partilha-navegador";
 import { guardarConfiguracaoDaPartilha, lerConfiguracaoDaPartilha, usarPar, type ConfiguracaoDaPartilha } from "@/lib/usar-par";
 import { useApp } from "@/lib/estado";
 import { useEditar } from "@/lib/permissao";
-import { Cartao, Confirmar, Interruptor, Linha } from "../conta/Pecas";
+import { Cartao, Confirmar, Interruptor, Linha, LinhaCampo } from "../conta/Pecas";
+import { useGuardado } from "@/lib/guardado";
 import { Vazio } from "../conteudo/ConteudoPecas";
 import { Pagina, Titulo } from "../ui";
 import { AvisoDeLargar, CampoDoCodigo, CodigoEQr, LeitorDeQr, ListaDeAparelhos, ListaDeTransferencias, ParesRecentes, ZonaDeEnvio } from "./PecasDaPartilha";
 
+const LIMITES = { "0": "Sem limite", "10": "10 MB", "50": "50 MB", "100": "100 MB", "500": "500 MB", "1024": "1 GB" };
+
 export function PartilhaDeFicheiros() {
-  const editar = useEditar();
-  const { avisar } = useApp();
-  const [descarregar, setDescarregar] = usePreferenciaDaPartilha("descarregar", true);
+  const router = useRouter();
+  const editarModulo = useEditar();
+  const { avisar, funcao } = useApp();
+  // quem pode enviar e receber, e o que se faz com o que chega: vale para todo o painel
+  const [guardada, setGuardada] = useGuardado<PoliticaDePartilha>("partilha-politica", POLITICA_DE_ORIGEM);
+  const politica = useMemo(() => politicaValida(guardada), [guardada]);
+  const [pasta, setPasta] = useState(politica.pasta);
+  useEffect(() => setPasta(politica.pasta), [politica.pasta]);
+  const editar = editarModulo && podeEnviar(politica, funcao.id);
+  const recebe = podeReceber(politica, funcao.id);
+  const [descarregar, setDescarregar] = usePreferenciaDaPartilha("descarregar", false);
   const [prancheta, setPrancheta] = usePreferenciaDaPartilha("prancheta", false);
   const [ecra, setEcra] = usePreferenciaDaPartilha("ecra", false);
   const [leitor, setLeitor] = useState(false);
@@ -27,8 +43,22 @@ export function PartilhaDeFicheiros() {
   useEffect(() => setBase(window.location.origin), []);
 
   const par = usarPar({
-    descarregar,
-    aoConcluir: (t) => registar("dados", `${t.sentido === "enviado" ? "Enviou" : "Recebeu"} «${t.nome}» (${formatarTamanho(t.tamanho)}) ${t.sentido === "enviado" ? "para" : "de"} ${nomeDoAparelho(t.peerId)}`),
+    descarregar: descarregar && recebe,
+    // o que a função não pode receber, ou passa do limite, ou é um programa, nem chega a entrar
+    aoChegar: (f) => motivoDeRecusa(politica, funcao.id, f),
+    aoConcluir: (t) => {
+      registar("dados", `${t.sentido === "enviado" ? "Enviou" : "Recebeu"} «${t.nome}» (${formatarTamanho(t.tamanho)}) ${t.sentido === "enviado" ? "para" : "de"} ${nomeDoAparelho(t.peerId)}`);
+      // o que chega fica guardado no painel, no gestor de ficheiros
+      if (t.sentido === "recebido" && t.blob && politica.guardarNaBiblioteca) {
+        void guardarNaBiblioteca(t.blob, t.nome, politica.pasta, t.mime).then(
+          (g) => {
+            registar("dados", `Guardou «${g.nome}» no gestor de ficheiros, na pasta «${g.pasta}»`);
+            avisar(`«${g.nome}» ficou guardado em Conteúdo › Gestor de ficheiros › ${g.pasta}`);
+          },
+          () => avisar(`Não foi possível guardar «${t.nome}» no painel`),
+        );
+      }
+    },
   });
   const abertos = par.aparelhos.filter((a) => a.estado === "aberto");
   const ligacao = par.meuId ? ligacaoDoPar(par.meuId, base) : "";
@@ -115,6 +145,7 @@ export function PartilhaDeFicheiros() {
 
         <div className="flex min-w-0 flex-col gap-6">
           <Cartao titulo="Enviar">
+            {!podeEnviar(politica, funcao.id) && <Linha titulo="Esta função não pode enviar ficheiros" estado="Quem gere o painel liga-lhe o envio em «Quem pode enviar e receber»." />}
             <ZonaDeEnvio aparelhosAbertos={abertos.length} aoEscolher={entregar} desativada={!editar} pendentes={pendentes.length} />
           </Cartao>
           <Cartao titulo={par.transferencias.length > 0 ? `Transferências (${par.transferencias.length})` : "Transferências"}>
@@ -128,9 +159,48 @@ export function PartilhaDeFicheiros() {
               vazio={<Vazio icone="bandeja" titulo="Ainda não houve transferências" texto="O que enviar ou receber aparece aqui, com o progresso e a velocidade." />}
             />
           </Cartao>
+          <Cartao titulo="Quem pode enviar e receber" dica="Cada função tem dois interruptores: enviar e receber. Quem não pode receber nem vê chegar o ficheiro (o outro aparelho é avisado); quem não pode enviar não tem a zona de envio. O que chega guarda-se no gestor de ficheiros do painel, na pasta que escolher. Vale para todo o painel.">
+            {FUNCOES.map((f) => (
+              <Linha key={f.id} titulo={f.pessoa} estado={f.rotulo}>
+                <label className="inline-flex items-center gap-2 text-sm text-kumo-subtle">
+                  Enviar
+                  <Interruptor marcado={podeEnviar(politica, f.id)} aoMudar={(v) => setGuardada(alternarFuncao(politica, "enviar", f.id, v))} rotulo={`${f.pessoa}: enviar`} desativado={!editarModulo} />
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm text-kumo-subtle">
+                  Receber
+                  <Interruptor marcado={podeReceber(politica, f.id)} aoMudar={(v) => setGuardada(alternarFuncao(politica, "receber", f.id, v))} rotulo={`${f.pessoa}: receber`} desativado={!editarModulo} />
+                </label>
+              </Linha>
+            ))}
+            <Linha titulo="Guardar no painel o que chega" dica="Cada ficheiro recebido fica no gestor de ficheiros (Conteúdo), na pasta abaixo, com o nome de origem; se já existir, ganha um número.">
+              <Interruptor marcado={politica.guardarNaBiblioteca} aoMudar={(v) => setGuardada({ ...politica, guardarNaBiblioteca: v })} rotulo="Guardar no painel o que chega" desativado={!editarModulo} />
+            </Linha>
+            <LinhaCampo>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  label="Pasta dos recebidos"
+                  value={pasta}
+                  disabled={!editarModulo || !politica.guardarNaBiblioteca}
+                  onChange={(e) => setPasta(e.target.value)}
+                  onBlur={() => (pastaValida(pasta) ? setGuardada({ ...politica, pasta: pasta.trim() }) : setPasta(politica.pasta))}
+                  error={pasta && !pastaValida(pasta) ? "Um nome sem barras nem símbolos." : undefined}
+                  autoComplete="off"
+                />
+                <Select label="Tamanho máximo" className="w-full min-w-0" value={String(politica.tamanhoMaximoMb)} disabled={!editarModulo} onValueChange={(v) => setGuardada({ ...politica, tamanhoMaximoMb: Number(v) })} items={LIMITES} />
+              </div>
+            </LinhaCampo>
+            <Linha titulo="Recusar programas e scripts" dica="Não deixa entrar ficheiros .exe, .bat, .sh, .apk e parecidos.">
+              <Interruptor marcado={politica.recusarProgramas} aoMudar={(v) => setGuardada({ ...politica, recusarProgramas: v })} rotulo="Recusar programas e scripts" desativado={!editarModulo} />
+            </Linha>
+            <Linha titulo="Os ficheiros recebidos">
+              <Button variant="secondary" onClick={() => router.push(caminho("conteudo", "biblioteca"))}>
+                Abrir o gestor de ficheiros
+              </Button>
+            </Linha>
+          </Cartao>
           <Cartao titulo="Opções">
-            <Linha titulo="Guardar sozinho o que chega" dica="Os ficheiros que recebe descarregam-se logo. O texto e as ligações ficam aqui, para ler e copiar.">
-              <Interruptor marcado={descarregar} aoMudar={setDescarregar} rotulo="Guardar sozinho o que chega" />
+            <Linha titulo="Descarregar também para este aparelho" dica="O que chega fica sempre guardado no painel (veja «Quem pode enviar e receber»). Com isto ligado, o ficheiro descarrega-se também para a pasta de transferências deste aparelho. O texto e as ligações ficam aqui, para ler e copiar.">
+              <Interruptor marcado={descarregar} aoMudar={setDescarregar} rotulo="Descarregar também para este aparelho" desativado={!recebe} />
             </Linha>
             <Linha titulo="Enviar o que copiar" dica="Quando volta a este separador, o que copiou (texto ou imagem) segue sozinho para os aparelhos ligados. O que já estava copiado ao ligar não segue.">
               <Interruptor marcado={prancheta} aoMudar={setPrancheta} rotulo="Enviar o que copiar" desativado={!editar} />

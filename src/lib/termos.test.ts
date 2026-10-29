@@ -14,7 +14,7 @@ describe("explicarTermo", () => {
     expect(e.conhecido).toBe(true);
     expect(e.tipo).toBe("Termo técnico");
     const p = explicarTermo("Registos DNS");
-    expect(p).toMatchObject({ tipo: "Página do painel", onde: "Developer tools", conhecido: true });
+    expect(p).toMatchObject({ tipo: "Página do painel", onde: "Ferramentas de programador", conhecido: true });
     expect(p.texto).toMatch(/BIND/);
   });
   it("explica as funções, os formatos e as definições da conta", () => {

@@ -1,4 +1,4 @@
-// Dados de demonstração do super painel (pagamentos, marketing e developer tools), determinísticos: o mesmo resultado em cada carregamento. Têm a forma exata das respostas do contrato das APIs (lib/api/contrato.ts), por isso trocar o simulado pelo servidor não muda nenhum ecrã.
+// Dados de demonstração do super painel (pagamentos, marketing e ferramentas de programador), determinísticos: o mesmo resultado em cada carregamento. Têm a forma exata das respostas do contrato das APIs (lib/api/contrato.ts), por isso trocar o simulado pelo servidor não muda nenhum ecrã.
 import { gerarIban } from "@/lib/iban";
 import { PROJETO } from "./projeto";
 import { CLIENTES, Sorteio } from "./semente";
@@ -111,6 +111,37 @@ export function gerarOrigens(): Origem[] {
   });
 }
 
+export interface PublicoDeMarketing {
+  /** O nome do país em português. */
+  paises: { pais: string; visitas: number }[];
+  dispositivos: { tipo: string; visitas: number }[];
+  /** As 24 horas do dia (0 a 23). */
+  horas: { hora: number; visitas: number }[];
+  /** As etapas do primeiro clique ao pedido, cada uma com os visitantes que lá chegaram. */
+  funil: { etapa: string; visitantes: number }[];
+}
+
+/** Quem visita o site: de que países, em que aparelhos, a que horas e até onde chega. */
+export function gerarPublico(): PublicoDeMarketing {
+  const s = new Sorteio(324);
+  const paises: [string, number][] = [["Angola", 46], ["Portugal", 14], ["Brasil", 8], ["Estados Unidos", 7], ["África do Sul", 5], ["Moçambique", 5], ["Reino Unido", 4], ["França", 3], ["Namíbia", 2], ["Emirados Árabes Unidos", 2], ["China", 2], ["Rússia", 1]];
+  const dispositivos: [string, number][] = [["Telemóvel", 62], ["Computador", 31], ["Tablet", 7]];
+  const total = 9800;
+  const horas = Array.from({ length: 24 }, (_, hora) => {
+    const manha = Math.exp(-(((hora - 10.5) / 2.8) ** 2));
+    const tarde = 0.8 * Math.exp(-(((hora - 15.5) / 2.4) ** 2));
+    const noite = 0.45 * Math.exp(-(((hora - 20.5) / 2) ** 2));
+    return { hora, visitas: Math.round(40 + 330 * (manha + tarde + noite) + s.entre(0, 22)) };
+  });
+  const funil = [["Abriram o site", 100], ["Viram os preços", 41], ["Abriram o pedido de proposta", 17], ["Enviaram o pedido", 6]] as const;
+  return {
+    paises: paises.map(([pais, peso]) => ({ pais, visitas: Math.round((total * peso) / 100) + s.entre(-20, 20) })),
+    dispositivos: dispositivos.map(([tipo, peso]) => ({ tipo, visitas: Math.round((total * peso) / 100) + s.entre(-30, 30) })),
+    horas,
+    funil: funil.map(([etapa, peso]) => ({ etapa, visitantes: Math.round((total * peso) / 100) })),
+  };
+}
+
 export function gerarPaginas(): PaginaQuente[] {
   const s = new Sorteio(322);
   return ["/", "/precos", "/servicos", "/servicos/consultoria", "/contactos", "/pedir-proposta", "/blog/como-escolher", "/sobre", "/blog/novidades", "/faq"].map((pagina, i) => ({ pagina, visitas: Math.round(4200 / (i + 1) + s.entre(40, 220)), tempoMedio: s.entre(18, 140), rejeicao: s.entre(18, 62) / 100, conversoes: Math.round((4200 / (i + 1)) * (s.entre(1, 8) / 100)) }));
@@ -153,7 +184,7 @@ export function gerarResumoMarketing(dias = 14): ResumoMarketing {
   return { visitas, visitantes: porDia.reduce((t, d) => t + d.visitantes, 0), paginasPorVisita: Math.round(media("paginasPorVisita") * 10) / 10, rejeicao: Math.round(media("rejeicao") * 100) / 100, conversoes: porDia.reduce((t, d) => t + d.conversoes, 0), porDia };
 }
 
-// ---------- developer tools ----------
+// ---------- ferramentas de programador ----------
 
 export interface TabelaBd {
   nome: string;

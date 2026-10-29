@@ -61,6 +61,7 @@ export function Vazio({ icone, titulo, texto, acao }: { icone: Icone; titulo: st
   return (
     <Empty
       size="sm"
+      className="rounded-none border-0 bg-transparent"
       icon={<Ic nome={icone} tamanho={32} />}
       title={titulo}
       contents={

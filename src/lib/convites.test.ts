@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cancelarConvite, conviteNovo, erroDoConvite, expirarConvites, reenviarConvite, responderAoConvite, totaisDeConvites } from "./convites";
+import { cancelarConvite, conviteNovo, erroDoConvite, expirarConvites, reenviarConvite, responderAoConvite, revogarConvite, totaisDeConvites } from "./convites";
 
 const agora = new Date("2026-10-29T10:00:00.000Z");
 const novo = (parcial = {}) => ({ ...conviteNovo("c1", { email: " Ana@Empresa.pt ", funcao: "admin", convidadoPor: "Leonel" }, agora), ...parcial });
@@ -34,7 +34,22 @@ describe("convites", () => {
     const outra = new Date("2026-12-01T09:00:00.000Z");
     expect(reenviarConvite(novo({ estado: "Expirado" }), outra)).toMatchObject({ estado: "Pendente", enviadoEm: outra.toISOString(), expiraEm: "2026-12-08T09:00:00.000Z" });
   });
+  it("um convite personalizado leva as permissões e mantém-nas ao reenviar", () => {
+    const permissoes = { dados: { ver: true, editar: false, fechados: ["x"] } };
+    const c = conviteNovo("c9", { email: "rui@empresa.pt", funcao: "pers-c9", convidadoPor: "Leonel", permissoes }, agora);
+    expect(c.permissoes).toEqual(permissoes);
+    expect(reenviarConvite({ ...c, estado: "Expirado" }, agora).permissoes).toEqual(permissoes);
+    expect(conviteNovo("c8", { email: "rui@empresa.pt", funcao: "admin", convidadoPor: "Leonel" }, agora)).not.toHaveProperty("permissoes");
+  });
+  it("só se revoga o acesso de quem aceitou, e o convite guarda o cargo", () => {
+    const aceite = revogarConvite(novo({ estado: "Aceite" }), agora);
+    expect(aceite).toMatchObject({ estado: "Revogado", revogadoEm: agora.toISOString() });
+    expect(revogarConvite(novo(), agora).estado).toBe("Pendente");
+    expect(revogarConvite(aceite, agora).estado).toBe("Revogado");
+    expect(conviteNovo("c7", { email: "rui@empresa.pt", funcao: "pers-c7", convidadoPor: "Leonel", cargo: "  Gestor de frota " }, agora).cargo).toBe("Gestor de frota");
+    expect(conviteNovo("c6", { email: "rui@empresa.pt", funcao: "admin", convidadoPor: "Leonel" }, agora)).not.toHaveProperty("cargo");
+  });
   it("conta por estado", () => {
-    expect(totaisDeConvites([novo(), novo({ estado: "Aceite" }), novo({ estado: "Aceite" }), novo({ estado: "Recusado" })])).toEqual({ Pendente: 1, Aceite: 2, Recusado: 1, Expirado: 0, Cancelado: 0 });
+    expect(totaisDeConvites([novo(), novo({ estado: "Aceite" }), novo({ estado: "Aceite" }), novo({ estado: "Recusado" })])).toEqual({ Pendente: 1, Aceite: 2, Recusado: 1, Expirado: 0, Cancelado: 0, Revogado: 0 });
   });
 });

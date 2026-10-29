@@ -9,6 +9,7 @@ import { FORMATOS_DATA, FUSOS } from "@/dados/conta";
 import { podeVer } from "@/dados/rbac";
 import { useConta } from "@/lib/conta";
 import { useApp } from "@/lib/estado";
+import { erroDoContacto, mascararContacto, type ContactoDeRecuperacao, type TipoDeContacto } from "@/lib/seguranca-conta";
 import { lerTelefone, paisPorFuso, telefoneDe } from "@/lib/telefone";
 import { useTema, type Tema } from "@/lib/tema";
 import { Avatar } from "../Avatar";
@@ -20,8 +21,9 @@ import { EscolhaDeCor } from "../SeletorDeCor";
 import { COR_DE_PARTIDA } from "@/lib/cores-graficos";
 import { coresDoAnel, definirCorDoAnel, useCorDoAnel } from "@/lib/ia-aparencia";
 import { ICONES, Ic } from "../Icones";
+import { BotaoIcone } from "../ui";
 import { CodigoDialog } from "./CodigoDialog";
-import { Cartao, codigoSimulado, emailValido, Interruptor, Linha, LinhaCampo, mascarar } from "./Pecas";
+import { Cartao, codigoSimulado, Confirmar, emailValido, Interruptor, Linha, LinhaCampo, mascarar } from "./Pecas";
 import { SeletorPersonalizavel } from "../SeletorPersonalizavel";
 import { FORMATO_DATA, FUSO } from "@/dados/personalizados";
 
@@ -266,6 +268,51 @@ function AlterarEmail({ aberto, aoMudar }: { aberto: boolean; aoMudar: (v: boole
   );
 }
 
+/** Juntar um e-mail ou um número de recuperação: a pessoa escolhe o tipo, escreve o contacto e depois confirma-o com um código. */
+function NovoContacto({ aberto, aoMudar, aoJuntar }: { aberto: boolean; aoMudar: (v: boolean) => void; aoJuntar: (c: ContactoDeRecuperacao) => void }) {
+  const { conta } = useConta();
+  const [tipo, setTipo] = useState<TipoDeContacto>("email");
+  const [valor, setValor] = useState("");
+  const [erroTel, setErroTel] = useState<string | null>(null);
+  useEffect(() => {
+    if (aberto) (setTipo("email"), setValor(""), setErroTel(null));
+  }, [aberto]);
+  const erro = erroDoContacto(tipo, valor, conta.recuperacao, conta.email) ?? (tipo === "telefone" ? erroTel : null);
+  return (
+    <Dialog.Root open={aberto} onOpenChange={aoMudar}>
+      <Dialog size="base" className="p-6">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (erro) return;
+            aoJuntar({ id: Math.random().toString(36).slice(2, 10), tipo, valor: valor.trim(), verificado: false });
+            aoMudar(false);
+          }}
+        >
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <Dialog.Title className="text-lg font-semibold">Juntar um contacto de recuperação</Dialog.Title>
+            <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
+          </div>
+          <div className="flex flex-col gap-4">
+            <Select label="Tipo" className="w-full min-w-0" value={tipo} onValueChange={(v) => (setTipo(String(v) as TipoDeContacto), setValor(""), setErroTel(null))} items={{ email: "E-mail", telefone: "Número de telefone" }} />
+            {tipo === "email" ? (
+              <Input label="E-mail" type="email" autoComplete="off" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="outro@exemplo.com" error={valor ? (erro ?? undefined) : undefined} />
+            ) : (
+              <CampoDeTelefone rotulo="Número" valor={valor} aoMudar={(v, e) => (setValor(v), setErroTel(e))} paisPorOmissao={paisPorFuso(conta.fuso)} />
+            )}
+          </div>
+          <div className="mt-6 flex justify-end gap-2">
+            <Dialog.Close render={(props) => <Button {...props} variant="secondary">Cancelar</Button>} />
+            <Button type="submit" variant="primary" disabled={!!erro || !valor.trim()}>
+              Enviar código
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+    </Dialog.Root>
+  );
+}
+
 export function SecaoContactos() {
   const { conta, mudar } = useConta();
   const { avisar } = useApp();
@@ -274,6 +321,10 @@ export function SecaoContactos() {
   const [telefone, setTelefone] = useState(conta.telefone);
   const [verTel, setVerTel] = useState(false);
   const [codigoTel, setCodigoTel] = useState(codigoSimulado());
+  const [novoContacto, setNovoContacto] = useState(false);
+  const [aVerificar, setAVerificar] = useState<ContactoDeRecuperacao | null>(null);
+  const [codigoContacto, setCodigoContacto] = useState(codigoSimulado());
+  const [tirar, setTirar] = useState<ContactoDeRecuperacao | null>(null);
   useEffect(() => {
     setRecuperacao(conta.emailRecuperacao);
     setTelefone(conta.telefone);
@@ -356,7 +407,51 @@ export function SecaoContactos() {
         </LinhaCampo>
       </Cartao>
 
+      <Cartao
+        titulo={`Contactos de recuperação${conta.recuperacao.length ? ` (${conta.recuperacao.length})` : ""}`}
+        dica="Mais e-mails e números, além do e-mail alternativo e do telefone acima. Os que estiverem verificados também recebem os códigos de uso único quando pedir um código para entrar ou para recuperar a conta (pode desligar isto em Segurança, «Como entra»)."
+        acoes={
+          <Button size="sm" variant="secondary" icon={ICONES.mais} onClick={() => setNovoContacto(true)}>
+            Adicionar
+          </Button>
+        }
+      >
+        {conta.recuperacao.length === 0 && <Linha titulo="Ainda não juntou nenhum contacto" />}
+        {conta.recuperacao.map((c) => (
+          <Linha
+            key={c.id}
+            titulo={
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <Ic nome={c.tipo === "email" ? "correio" : "telefone"} tamanho={16} className="text-kumo-subtle" />
+                <span className="break-all">{c.valor}</span>
+              </span>
+            }
+            estado={<Badge variant={c.verificado ? "success" : "warning"}>{c.verificado ? "Verificado" : "Por verificar"}</Badge>}
+          >
+            {!c.verificado && (
+              <Button variant="secondary" onClick={() => (setCodigoContacto(codigoSimulado()), setAVerificar(c))}>
+                Verificar
+              </Button>
+            )}
+            <BotaoIcone dica="Tirar este contacto" icone="lixo" tamanho="sm" aoClicar={() => setTirar(c)} />
+          </Linha>
+        ))}
+      </Cartao>
+
       <AlterarEmail aberto={aberto} aoMudar={setAberto} />
+      <NovoContacto aberto={novoContacto} aoMudar={setNovoContacto} aoJuntar={(c) => (mudar((x) => ({ recuperacao: [...x.recuperacao, c] }), `Contacto de recuperação juntado: ${c.valor}`), setCodigoContacto(codigoSimulado()), setAVerificar(c))} />
+      <CodigoDialog
+        aberto={!!aVerificar}
+        aoMudar={(v) => !v && setAVerificar(null)}
+        titulo="Verifique o contacto"
+        texto={aVerificar ? <>Enviámos um código para <b>{mascararContacto(aVerificar.tipo, aVerificar.valor)}</b>.</> : ""}
+        codigo={codigoContacto}
+        chave={aVerificar ? `contacto:${aVerificar.id}` : "contacto"}
+        aoReenviar={() => (setCodigoContacto(codigoSimulado()), avisar("Novo código enviado"))}
+        aoConfirmar={() => aVerificar && mudar((x) => ({ recuperacao: x.recuperacao.map((r) => (r.id === aVerificar.id ? { ...r, verificado: true } : r)) }), `Contacto de recuperação verificado: ${aVerificar.valor}`)}
+        rotuloAcao="Verificar"
+      />
+      <Confirmar aberto={!!tirar} aoMudar={(v) => !v && setTirar(null)} titulo="Tirar o contacto" perigo texto={tirar ? `«${tirar.valor}» deixa de receber os códigos de uso único e de servir para recuperar a conta.` : ""} rotuloAcao="Tirar" aoConfirmar={() => tirar && mudar((x) => ({ recuperacao: x.recuperacao.filter((r) => r.id !== tirar.id) }), `Contacto de recuperação tirado: ${tirar.valor}`)} />
       <CodigoDialog aberto={verTel} aoMudar={setVerTel} titulo="Verifique o número" texto={<>Enviámos um SMS para <b>{telefoneGuardado}</b>.</>} codigo={codigoTel} aoReenviar={() => (setCodigoTel(codigoSimulado()), avisar("Novo código enviado"))} aoConfirmar={() => mudar({ telefoneVerificado: true }, "Número de telefone verificado")} rotuloAcao="Verificar" />
     </>
   );

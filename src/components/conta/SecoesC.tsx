@@ -170,7 +170,7 @@ export function SecaoLembretes() {
 
       <Cartao titulo="Os meus lembretes">
         {ordenados.length === 0 ? (
-          <Empty size="sm" icon={<Ic nome="lembrete" tamanho={32} />} title="Sem lembretes" />
+          <Empty size="sm" className="rounded-none border-0 bg-transparent" icon={<Ic nome="lembrete" tamanho={32} />} title="Sem lembretes" />
         ) : (
           ordenados.map((l) => (
             <Linha key={l.id} titulo={<span className="inline-flex flex-wrap items-center gap-2">{l.titulo}{estado(l)}</span>} estado={`${new Date(l.quando).toLocaleString("pt-PT", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · ${nomeRepeticao(l.repetir).toLowerCase()} · ${l.canal === "email" ? "painel e e-mail" : "painel"}`}>

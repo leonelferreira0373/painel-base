@@ -4,7 +4,11 @@
 
 import { useSyncExternalStore } from "react";
 import { emailDe, FUNCOES } from "@/dados/rbac";
+import { assinarDesafio, chaveSeguraDisponivel, idsDasChavesNesteNavegador, impressaoDoNavegador, verificarAssinatura, type ChaveDoNavegador } from "./chave-do-navegador";
+import { aleatorios } from "./cripto";
+import { aoMudarAsRevogacoes, estaRevogado, MENSAGEM_DE_REVOGACAO } from "./acessos-revogados";
 import { tentarCodigo } from "./limite-tentativas";
+import { codigoTotp, destinosDoCodigo, gerarCodigoDeUso, VALIDADE_DO_CODIGO_MS, verificarTotp, type DestinoDoCodigo } from "./seguranca-conta";
 
 /** A chave do limite de tentativas do código de dois passos ao entrar (o ecrã lê a mesma para mostrar a espera). */
 export const CHAVE_DO_LIMITE_MFA = "mfa-entrada";
@@ -40,7 +44,10 @@ export const senhaValida = (s: string) => Object.values(regrasSenha(s)).every(Bo
 
 function lerBruto(): string {
   try {
-    return window.localStorage.getItem(CHAVE) ?? window.sessionStorage.getItem(CHAVE) ?? "";
+    const bruto = window.localStorage.getItem(CHAVE) ?? window.sessionStorage.getItem(CHAVE) ?? "";
+    // quem teve o acesso revogado não tem sessão, por mais aberta que estivesse: tudo o que depende dela fecha no mesmo instante
+    if (bruto && estaRevogado((JSON.parse(bruto) as Sessao).email)) return "";
+    return bruto;
   } catch {
     return "";
   }
@@ -55,6 +62,7 @@ function lerRegistados(): Sessao[] {
 const avisarMudanca = () => window.dispatchEvent(new Event(EVENTO));
 
 function guardar(s: Sessao, lembrar: boolean) {
+  if (estaRevogado(s.email)) return;
   try {
     window.localStorage.removeItem(CHAVE);
     window.sessionStorage.removeItem(CHAVE);
@@ -75,22 +83,48 @@ function sessaoPara(email: string, nomeRegisto?: string): Sessao {
   return { funcaoId: f.id, nome: registado?.nome ?? nomeRegisto ?? f.pessoa, email: e, desde: new Date().toISOString() };
 }
 
-const doisFatoresAtivo = (funcaoId: string) => {
+/** O que a conta guardou neste navegador (os dois passos, o modo de entrada, os contactos, as chaves). Em modo ligado é o servidor que sabe isto. */
+interface ContaGuardada {
+  doisFatores?: boolean;
+  segredoTotp?: string;
+  modoDeEntrada?: "senha" | "so-codigo";
+  chavesNavegador?: ChaveDoNavegador[];
+  email?: string;
+  emailRecuperacao?: string;
+  telefone?: string;
+  telefoneVerificado?: boolean;
+  recuperacao?: { id: string; tipo: "email" | "telefone"; valor: string; verificado: boolean }[];
+  codigosTambemParaRecuperacao?: boolean;
+}
+const lerContaGuardada = (funcaoId: string): ContaGuardada => {
   try {
-    return !!JSON.parse(window.localStorage.getItem(`painel.conta.${funcaoId}`) ?? "{}").doisFatores;
+    return JSON.parse(window.localStorage.getItem(`painel.conta.${funcaoId}`) ?? "{}") as ContaGuardada;
   } catch {
-    return false;
+    return {};
   }
 };
+const doisFatoresAtivo = (funcaoId: string) => !!lerContaGuardada(funcaoId).doisFatores;
 
-/** Código de seis dígitos que muda de 30 em 30 segundos, como o de uma aplicação autenticadora (na simulação, calculado aqui). */
-export function codigoTemporal(segredo: string, agora = Date.now()): string {
-  let h = 2166136261;
-  const t = `${segredo}:${Math.floor(agora / 30_000)}`;
-  for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619);
-  return String((h >>> 0) % 1_000_000).padStart(6, "0");
+/** O código de seis dígitos da aplicação autenticadora (TOTP, RFC 6238): muda de 30 em 30 segundos. */
+export const codigoTemporal = (segredo: string, agora = Date.now()): string => codigoTotp(segredo, agora);
+/** O segredo da aplicação autenticadora desta conta: o que a pessoa configurou, ou (contas antigas) um segredo fixo da simulação. */
+export const segredoDe = (funcaoId: string) => lerContaGuardada(funcaoId).segredoTotp || `seg-${funcaoId}`;
+
+/** Uma entrada à espera do segundo passo: o código da aplicação («totp») ou um código de uso único enviado («otp»). */
+interface Pendente {
+  sessao: Sessao;
+  lembrar: boolean;
+  tipo?: "totp" | "otp";
+  codigo?: string;
+  expira?: number;
 }
-export const segredoDe = (funcaoId: string) => `seg-${funcaoId}`;
+const lerPendente = (): Pendente | null => {
+  try {
+    return JSON.parse(window.sessionStorage.getItem(PENDENTE) ?? "null") as Pendente | null;
+  } catch {
+    return null;
+  }
+};
 
 export const auth = {
   /** POST /api/auth/login */
@@ -98,9 +132,12 @@ export const auth = {
     if (!emailValido(email)) return { ok: false, erro: "Introduza um e-mail válido." };
     if (!senha) return { ok: false, erro: "Introduza a palavra-passe." };
     const s = sessaoPara(email);
+    if (estaRevogado(s.email)) return { ok: false, erro: MENSAGEM_DE_REVOGACAO };
+    // as contas que entram só com um código não têm palavra-passe que valha
+    if (lerContaGuardada(s.funcaoId).modoDeEntrada === "so-codigo") return { ok: false, erro: "Esta conta entra só com um código de uso único. Use «Entrar com um código»." };
     if (doisFatoresAtivo(s.funcaoId)) {
       try {
-        window.sessionStorage.setItem(PENDENTE, JSON.stringify({ sessao: s, lembrar }));
+        window.sessionStorage.setItem(PENDENTE, JSON.stringify({ sessao: s, lembrar, tipo: "totp" } satisfies Pendente));
       } catch {
         /* sem armazenamento */
       }
@@ -109,13 +146,31 @@ export const auth = {
     guardar(s, lembrar);
     return { ok: true };
   },
+  /** POST /api/auth/otp: manda um código de uso único para o e-mail da conta (e, se a pessoa deixou, para os contactos de recuperação). */
+  pedirCodigoDeEntrada(email: string): RespostaAuth & { destinos?: DestinoDoCodigo[] } {
+    if (!emailValido(email)) return { ok: false, erro: "Introduza um e-mail válido." };
+    const s = sessaoPara(email);
+    if (estaRevogado(s.email)) return { ok: false, erro: MENSAGEM_DE_REVOGACAO };
+    const c = lerContaGuardada(s.funcaoId);
+    const destinos = destinosDoCodigo({ ...c, email: c.email ?? s.email });
+    try {
+      window.sessionStorage.setItem(PENDENTE, JSON.stringify({ sessao: s, lembrar: true, tipo: "otp", codigo: gerarCodigoDeUso(), expira: Date.now() + VALIDADE_DO_CODIGO_MS } satisfies Pendente));
+    } catch {
+      return { ok: false, erro: "Não foi possível guardar a entrada neste navegador." };
+    }
+    return { ok: true, codigo: true, destinos };
+  },
   /** POST /api/auth/mfa */
   confirmarCodigo(codigo: string): RespostaAuth {
     try {
-      const p = JSON.parse(window.sessionStorage.getItem(PENDENTE) ?? "null") as { sessao: Sessao; lembrar: boolean } | null;
+      const p = lerPendente();
       if (!p) return { ok: false, erro: "A entrada expirou. Comece outra vez." };
+      if (estaRevogado(p.sessao.email)) return { ok: false, erro: MENSAGEM_DE_REVOGACAO };
+      if (p.tipo === "otp" && p.expira && p.expira < Date.now()) return { ok: false, erro: "O código expirou. Peça outro." };
+      const escrito = codigo.replace(/\s/g, "");
       // cinco códigos errados fecham a entrada por um tempo que cresce de cada vez; durante o fecho, nem o código certo serve
-      const r = tentarCodigo(CHAVE_DO_LIMITE_MFA, codigo.replace(/\s/g, "") === codigoTemporal(segredoDe(p.sessao.funcaoId)));
+      const certo = p.tipo === "otp" ? escrito === p.codigo : verificarTotp(segredoDe(p.sessao.funcaoId), escrito);
+      const r = tentarCodigo(CHAVE_DO_LIMITE_MFA, certo);
       if (!r.ok) return { ok: false, erro: r.erro, espera: r.espera };
       guardar(p.sessao, p.lembrar);
       return { ok: true };
@@ -125,12 +180,48 @@ export const auth = {
   },
   /** O código certo neste momento para a entrada pendente (só existe na simulação). */
   codigoPendente(): string | null {
+    const p = lerPendente();
+    if (!p) return null;
+    return p.tipo === "otp" ? (p.codigo ?? null) : codigoTemporal(segredoDe(p.sessao.funcaoId));
+  },
+  /** Que código falta: o da aplicação autenticadora ou um enviado. */
+  tipoDaEntradaPendente(): "totp" | "otp" | null {
+    const p = lerPendente();
+    return p ? (p.tipo ?? "totp") : null;
+  },
+  /** Para onde foi o código de uso único da entrada pendente (os endereços já escondidos). */
+  destinosDaEntradaPendente(): DestinoDoCodigo[] {
+    const p = lerPendente();
+    if (!p) return [];
+    const c = lerContaGuardada(p.sessao.funcaoId);
+    return destinosDoCodigo({ ...c, email: c.email ?? p.sessao.email });
+  },
+  /** Entra com a chave segura deste navegador: assina um desafio aleatório e confere com a parte pública que a conta guardou. */
+  async entrarComChaveDoNavegador(email: string, lembrar = true): Promise<RespostaAuth> {
+    if (!emailValido(email)) return { ok: false, erro: "Introduza um e-mail válido." };
+    if (!chaveSeguraDisponivel()) return { ok: false, erro: "As chaves do navegador só funcionam numa ligação segura (https)." };
+    const s = sessaoPara(email);
+    if (estaRevogado(s.email)) return { ok: false, erro: MENSAGEM_DE_REVOGACAO };
+    const conta = lerContaGuardada(s.funcaoId);
+    const aqui = await idsDasChavesNesteNavegador();
+    const chave = (conta.chavesNavegador ?? []).find((k) => aqui.includes(k.id));
+    if (!chave) return { ok: false, erro: "Este navegador não tem uma chave desta conta." };
+    if ((await impressaoDoNavegador()) !== chave.impressao) return { ok: false, erro: "Este navegador mudou desde que a chave foi criada. Entre de outra forma e crie a chave outra vez." };
+    const desafio = aleatorios(32);
     try {
-      const p = JSON.parse(window.sessionStorage.getItem(PENDENTE) ?? "null") as { sessao: Sessao } | null;
-      return p ? codigoTemporal(segredoDe(p.sessao.funcaoId)) : null;
+      if (!(await verificarAssinatura(chave.publica, desafio, await assinarDesafio(chave.id, desafio)))) return { ok: false, erro: "A assinatura da chave não confere." };
     } catch {
-      return null;
+      return { ok: false, erro: "Não foi possível usar a chave deste navegador." };
     }
+    try {
+      const k = `painel.conta.${s.funcaoId}`;
+      const guardada = JSON.parse(window.localStorage.getItem(k) ?? "{}") as ContaGuardada;
+      window.localStorage.setItem(k, JSON.stringify({ ...guardada, chavesNavegador: (guardada.chavesNavegador ?? []).map((x) => (x.id === chave.id ? { ...x, ultimoUso: new Date().toISOString() } : x)) }));
+    } catch {
+      /* sem armazenamento */
+    }
+    guardar(s, lembrar);
+    return { ok: true };
   },
   temEntradaPendente(): boolean {
     try {
@@ -193,9 +284,11 @@ export const auth = {
 function subscrever(aoMudar: () => void) {
   window.addEventListener(EVENTO, aoMudar);
   window.addEventListener("storage", aoMudar);
+  const deixarDeOuvir = aoMudarAsRevogacoes(aoMudar);
   return () => {
     window.removeEventListener(EVENTO, aoMudar);
     window.removeEventListener("storage", aoMudar);
+    deixarDeOuvir();
   };
 }
 

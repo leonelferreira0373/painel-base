@@ -18,7 +18,6 @@ import {
   MODELOS,
   modeloPorId,
   novoToken,
-  RECURSOS,
   resumoDasPermissoes,
   rodarToken,
   ROTULO_DO_ESTADO,
@@ -37,6 +36,7 @@ import { ItemPerguntarComMais } from "../ItensDeMenuComMais";
 import { Dica } from "../Dica";
 import { Estado } from "../Estado";
 import { ICONES, Ic } from "../Icones";
+import { InterruptoresDoToken } from "./InterruptoresDoToken";
 import { MenuCartao, SeparadorDeMenu } from "../Flutuantes";
 import { Pilula } from "../Pilula";
 import { SeletorDeDataHora } from "../SeletoresDeTempo";
@@ -301,7 +301,6 @@ function MenuDoToken({ t, agora, aoEditar, aoRodar, aoRevogar, aoApagar }: { t: 
 
 // ---------- criar e mudar ----------
 
-const ACESSOS = { ler: "Ler", editar: "Editar" };
 const MODOS_DE_IP = { sem: "Sem filtro: qualquer endereço", incluir: "Só estes endereços", excluir: "Todos menos estes" };
 
 function JanelaDoToken({ token, modelo, aoFechar, aoGuardar }: { token: TokenDaApi | null; modelo?: string; aoFechar: () => void; aoGuardar: (f: Formulario, atual: TokenDaApi | null) => Promise<void> }) {
@@ -310,9 +309,6 @@ function JanelaDoToken({ token, modelo, aoFechar, aoGuardar }: { token: TokenDaA
   const rascunho = rascunhoDe(f, token);
   const erro = erroDoRascunho(rascunho);
   const pedidos = endpointsPermitidos(rascunho.permissoes).length;
-  const itensDeArea = { "*": "Todas as áreas", ...Object.fromEntries(RECURSOS.map((r) => [r.area, r.rotuloDaArea])) };
-  const itensDeModulo = (area: string) => ({ "*": "Todos os módulos", ...Object.fromEntries((RECURSOS.find((r) => r.area === area)?.modulos ?? []).map((m) => [m.id, m.rotulo])) });
-  const mudarPermissao = (i: number, parte: Partial<PermissaoDeToken>) => setF((x) => ({ ...x, modelo: "personalizado", permissoes: x.permissoes.map((p, j) => (j === i ? { ...p, ...parte } : p)) }));
   const itensDeValidade = token ? { manter: token.expira ? `Manter (até ${soData(token.expira)})` : "Manter (sem validade)", ...VALIDADE.opcoes } : VALIDADE.opcoes;
   const itensDeModelo = { personalizado: "Personalizado", ...Object.fromEntries(MODELOS.map((m) => [m.id, m.rotulo])) };
   return (
@@ -323,7 +319,7 @@ function JanelaDoToken({ token, modelo, aoFechar, aoGuardar }: { token: TokenDaA
           <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pb-4">
-          <Input label="Nome do token" value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} placeholder="Ex.: agente de IA" autoComplete="off" />
+          <Input label="Nome do token" value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} placeholder="Ex.: Claude Code" autoComplete="off" />
           {!token && (
             <Select
               label="Começar de um modelo"
@@ -336,27 +332,7 @@ function JanelaDoToken({ token, modelo, aoFechar, aoGuardar }: { token: TokenDaA
             />
           )}
 
-          <div className="flex flex-col gap-2">
-            <span className="text-base font-medium text-kumo-default">Permissões</span>
-            {f.permissoes.map((p, i) => (
-              // cada permissão é uma caixa de duas colunas iguais: área e módulo em cima, acesso e «Tirar» em baixo (num só rego os quatro não cabiam e os seletores sobrepunham-se)
-              <div key={i} className="grid grid-cols-1 gap-2 rounded-lg p-2 ring ring-kumo-line sm:grid-cols-[repeat(2,minmax(0,1fr))]">
-                <Select aria-label="Área" className="w-full" value={p.area} onValueChange={(v) => mudarPermissao(i, { area: String(v), modulo: "*" })} items={itensDeArea} />
-                <Select aria-label="Módulo" className="w-full" value={p.modulo} disabled={p.area === "*"} onValueChange={(v) => mudarPermissao(i, { modulo: String(v) })} items={p.area === "*" ? { "*": "Todos os módulos" } : itensDeModulo(p.area)} />
-                <Select aria-label="Acesso" className="w-full" value={p.acesso} onValueChange={(v) => mudarPermissao(i, { acesso: String(v) as PermissaoDeToken["acesso"] })} items={ACESSOS} />
-                <div className="flex min-w-0 items-center sm:justify-end">
-                  <Button variant="ghost" icon={ICONES.fechar} disabled={f.permissoes.length === 1} onClick={() => setF({ ...f, modelo: "personalizado", permissoes: f.permissoes.filter((_, j) => j !== i) })}>
-                    Tirar permissão
-                  </Button>
-                </div>
-              </div>
-            ))}
-            <div>
-              <Button variant="secondary" icon={ICONES.mais} onClick={() => setF({ ...f, modelo: "personalizado", permissoes: [...f.permissoes, { area: RECURSOS[0]?.area ?? "*", modulo: "*", acesso: "ler" }] })}>
-                Adicionar permissão
-              </Button>
-            </div>
-          </div>
+          <InterruptoresDoToken permissoes={f.permissoes} aoMudar={(permissoes) => setF((x) => ({ ...x, modelo: "personalizado", permissoes }))} />
 
           <div className="flex flex-col gap-2">
             <Select label="Filtro de endereços IP" value={f.modoIp} onValueChange={(v) => setF({ ...f, modoIp: String(v) as ModoDeIp })} items={MODOS_DE_IP} />

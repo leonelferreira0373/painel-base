@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { BotaoCopiar } from "./Copiar";
 import { Ic } from "./Icones";
 
-export function LinhaOrdenada({ conteudo: nomeEmElementos, nome, valor, proporcao, copiar = nome, ativa = false, aoPassar, aoAbrir, rotulo }: { /** O nome desenhado à medida (pills, por exemplo); `nome` fica para a dica e para copiar. */ conteudo?: ReactNode; nome: string; valor: ReactNode; proporcao: number; copiar?: string; ativa?: boolean; aoPassar?: () => void; aoAbrir?: () => void; rotulo?: string }) {
+export function LinhaOrdenada({ conteudo: nomeEmElementos, nome, valor, proporcao, copiar = nome, ativa = false, aoPassar, aoAbrir, rotulo, larguraDoValor = "min-w-14" }: { /** A largura mínima da coluna do valor (uma classe), para as barras começarem todas no mesmo sítio quando o valor é longo. */ larguraDoValor?: string; /** O nome desenhado à medida (pills, por exemplo); `nome` fica para a dica e para copiar. */ conteudo?: ReactNode; nome: string; valor: ReactNode; proporcao: number; copiar?: string; ativa?: boolean; aoPassar?: () => void; aoAbrir?: () => void; rotulo?: string }) {
   const conteudo = (
     <>
       <span className="min-w-0 flex-1 truncate font-medium text-kumo-default" title={nome}>
@@ -14,7 +14,7 @@ export function LinhaOrdenada({ conteudo: nomeEmElementos, nome, valor, proporca
       <span className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-kumo-tint">
         <span className="block h-full rounded-full bg-kumo-brand" style={{ width: `${Math.min(100, Math.max(0, proporcao))}%` }} />
       </span>
-      <span className="min-w-8 shrink-0 text-right tabular-nums text-kumo-strong">{valor}</span>
+      <span className={`${larguraDoValor} shrink-0 text-right tabular-nums text-kumo-strong`}>{valor}</span>
       {aoAbrir && <Ic nome="seta" tamanho={12} className="shrink-0 text-kumo-subtle" />}
     </>
   );

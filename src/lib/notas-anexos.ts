@@ -2,7 +2,7 @@
 "use client";
 
 import { guardar, remover, todos } from "./armazem";
-import { cifrarBytes, decifrarBytes, novoIdDeNota, type AnexoDaNota } from "./notas";
+import { cifrarBytes, decifrarBytes, novoIdDeNota, type AnexoDaNota, type ChaveDeNota } from "./notas";
 
 export interface RegistoDeAnexo extends AnexoDaNota {
   blob?: Blob;
@@ -10,7 +10,7 @@ export interface RegistoDeAnexo extends AnexoDaNota {
 }
 
 /** Guarda um ficheiro (cifrado, se há chave) e devolve o que a nota guarda dele. */
-export async function guardarAnexo(ficheiro: Blob, nome: string, chave?: CryptoKey): Promise<AnexoDaNota> {
+export async function guardarAnexo(ficheiro: Blob, nome: string, chave?: ChaveDeNota): Promise<AnexoDaNota> {
   const meta: AnexoDaNota = { id: `a${novoIdDeNota()}`, nome: nome.slice(0, 160), tipo: ficheiro.type || "application/octet-stream", tamanho: ficheiro.size };
   const registo: RegistoDeAnexo = chave ? { ...meta, cifrado: await cifrarBytes(chave, await ficheiro.arrayBuffer()) } : { ...meta, blob: ficheiro };
   await guardar<RegistoDeAnexo>("anexos", registo);
@@ -18,7 +18,7 @@ export async function guardarAnexo(ficheiro: Blob, nome: string, chave?: CryptoK
 }
 
 /** O ficheiro guardado; `null` se não existe ou se a chave não o abre. */
-export async function lerAnexo(id: string, chave?: CryptoKey): Promise<Blob | null> {
+export async function lerAnexo(id: string, chave?: ChaveDeNota): Promise<Blob | null> {
   const r = (await todos<RegistoDeAnexo>("anexos")).find((x) => x.id === id);
   if (!r) return null;
   if (r.blob) return r.blob;
@@ -28,7 +28,7 @@ export async function lerAnexo(id: string, chave?: CryptoKey): Promise<Blob | nu
 }
 
 /** Põe um ficheiro às claras ou cifrado (quando a nota ganha ou perde a palavra-passe). */
-export async function mudarProtecao(id: string, de?: CryptoKey, para?: CryptoKey): Promise<void> {
+export async function mudarProtecao(id: string, de?: ChaveDeNota, para?: ChaveDeNota): Promise<void> {
   const r = (await todos<RegistoDeAnexo>("anexos")).find((x) => x.id === id);
   if (!r) return;
   const blob = await lerAnexo(id, de);

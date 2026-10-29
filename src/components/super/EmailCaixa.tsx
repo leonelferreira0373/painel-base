@@ -4,16 +4,18 @@
 import { Button, Input, Select } from "@cloudflare/kumo";
 import { useMemo, useState } from "react";
 import { identificador } from "@/lib/conta";
+import { analisarContactos, contactoDe, metricasDeContactos, type EstadoDeContacto } from "@/lib/email-contactos";
 import { dataNaLista, emailNovo, encaminhar, enviarEmail, agendarEmail, nomeDe, pesquisarEmails, responderA, type Email, type PastaDeEmail, type RascunhoDeEmail } from "@/lib/email";
 import { useEditar } from "@/lib/permissao";
 import { Cartao, Confirmar } from "../conta/Pecas";
 import { Estado } from "../Estado";
 import { Frase } from "../Frase";
 import { Ic, ICONES } from "../Icones";
-import { BotaoIcone, Pagina, Titulo } from "../ui";
+import { BotaoIcone, Pagina } from "../ui";
 import { Vazio } from "../conteudo/ConteudoPecas";
 import { REMETENTE_DE_ORIGEM } from "@/dados/email";
-import { Compor, useEmails, useFilaSimulada } from "./EmailPecas";
+import { PilulaDeEstado } from "../PilulaDeEstado";
+import { Compor, FaixaDeNumeros, FiltroPorEstado, useEmails, useFilaSimulada } from "./EmailPecas";
 import { AvisoDeApi } from "./SuperPecas";
 
 const FILTROS: Record<PastaDeEmail, Record<string, string>> = {
@@ -32,16 +34,28 @@ export function CaixaDeEmail({ pasta }: { pasta: "recebidos" | "enviados" }) {
   const agora = useFilaSimulada({ emails });
   const [texto, setTexto] = useState("");
   const [filtro, setFiltro] = useState("todas");
+  const [estados, setEstados] = useState<EstadoDeContacto[]>([]);
   const [aberto, setAberto] = useState<string | null>(null);
   const [compor, setCompor] = useState<RascunhoDeEmail | null>(null);
   const [apagar, setApagar] = useState<Email | null>(null);
 
   const daPasta = useMemo(() => emails.itens.filter((e) => e.pasta === pasta), [emails.itens, pasta]);
+  // o estado de cada pessoa (urgente, quente, lead, atendido…) tira-se de todas as mensagens
+  const contactos = useMemo(() => (agora ? analisarContactos(emails.itens, agora) : {}), [emails.itens, agora]);
+  const metricas = useMemo(() => metricasDeContactos(contactos, emails.itens), [contactos, emails.itens]);
   const lista = useMemo(
     () =>
-      pesquisarEmails(daPasta, texto).filter((e) => (filtro === "por-ler" ? !e.lido : filtro === "estrela" ? e.estrela : filtro === "problemas" ? e.estado === "Falhou" || e.estado === "Devolvido" : true)),
-    [daPasta, texto, filtro],
+      pesquisarEmails(daPasta, texto)
+        .filter((e) => (filtro === "por-ler" ? !e.lido : filtro === "estrela" ? e.estrela : filtro === "problemas" ? e.estado === "Falhou" || e.estado === "Devolvido" : true))
+        .filter((e) => estados.length === 0 || (contactoDe(e, contactos)?.estados ?? []).some((s) => estados.includes(s))),
+    [daPasta, texto, filtro, estados, contactos],
   );
+  // quantas mensagens desta caixa têm cada estado (para o filtro)
+  const contagens = useMemo(() => {
+    const c: Partial<Record<EstadoDeContacto, number>> = {};
+    for (const e of daPasta) for (const s of contactoDe(e, contactos)?.estados ?? []) c[s] = (c[s] ?? 0) + 1;
+    return c;
+  }, [daPasta, contactos]);
   const porLer = daPasta.filter((e) => !e.lido).length;
   const atual = aberto ? daPasta.find((e) => e.id === aberto) ?? null : null;
 
@@ -57,22 +71,46 @@ export function CaixaDeEmail({ pasta }: { pasta: "recebidos" | "enviados" }) {
 
   return (
     <Pagina largo>
-      <Titulo titulo={TITULOS[pasta]}>
-        {editar && (
-          <Button variant="primary" icon={ICONES.mais} onClick={() => setCompor({ para: "", assunto: "", corpo: "" })}>
-            Escrever
-          </Button>
-        )}
-      </Titulo>
+      {pasta === "recebidos" ? (
+        <FaixaDeNumeros
+          itens={[
+            { rotulo: "Recebidos", valor: daPasta.length, aoClicar: () => (setFiltro("todas"), setEstados([])), ativo: filtro === "todas" && estados.length === 0 },
+            { rotulo: "Por ler", valor: porLer, aoClicar: () => setFiltro("por-ler"), ativo: filtro === "por-ler" },
+            { rotulo: "Urgente", valor: metricas.urgentes, aoClicar: () => setEstados(["urgente"]), ativo: estados.length === 1 && estados[0] === "urgente" },
+            { rotulo: "Leads", valor: metricas.leads, aoClicar: () => setEstados(["lead", "quente"]), ativo: estados.includes("lead") },
+          ]}
+        />
+      ) : (
+        <FaixaDeNumeros
+          itens={[
+            { rotulo: "Enviados", valor: daPasta.length, aoClicar: () => (setFiltro("todas"), setEstados([])), ativo: filtro === "todas" && estados.length === 0 },
+            { rotulo: "Abertos", valor: daPasta.filter((e) => e.estado === "Aberto").length },
+            { rotulo: "Problemas", valor: daPasta.filter((e) => e.estado === "Falhou" || e.estado === "Devolvido").length, aoClicar: () => setFiltro("problemas"), ativo: filtro === "problemas" },
+            { rotulo: "Leads", valor: metricas.leads, aoClicar: () => setEstados(["lead", "quente"]), ativo: estados.includes("lead") },
+          ]}
+        />
+      )}
       <AvisoDeApi erro={emails.erro} aoTentar={emails.recarregar} />
       <div className="grid gap-4 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] lg:items-start">
         {/* no telemóvel a lista e a mensagem alternam; no PC estão lado a lado */}
         <div className={`min-w-0 ${atual ? "hidden lg:block" : ""}`}>
-          <Cartao titulo={`${TITULOS[pasta]}${daPasta.length ? ` (${daPasta.length}${pasta === "recebidos" && porLer ? `, ${porLer} por ler` : ""})` : ""}`}>
+          <Cartao
+            titulo={TITULOS[pasta]}
+            acoes={
+              editar ? (
+                <Button className="max-lg:hidden" size="sm" variant="primary" icon={ICONES.mais} onClick={() => setCompor({ para: "", assunto: "", corpo: "" })}>
+                  Escrever
+                </Button>
+              ) : undefined
+            }
+          >
             <div className="flex flex-col gap-2 border-b border-kumo-hairline p-3 sm:flex-row">
               <Input aria-label="Pesquisar mensagens" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Pesquisar" autoComplete="off" className="w-full" />
-              <div className="sm:w-40 sm:shrink-0">
-                <Select aria-label="Mostrar" value={filtro} onValueChange={(v) => setFiltro(String(v))} items={FILTROS[pasta]} />
+              <div className="flex items-center gap-2 sm:shrink-0">
+                <FiltroPorEstado escolhidos={estados} aoMudar={setEstados} contagens={contagens} />
+                <div className="min-w-0 flex-1 sm:w-40 sm:flex-none">
+                  <Select aria-label="Mostrar" value={filtro} onValueChange={(v) => setFiltro(String(v))} items={FILTROS[pasta]} className="w-full" />
+                </div>
               </div>
             </div>
             {!agora || emails.aCarregar ? (
@@ -88,7 +126,13 @@ export function CaixaDeEmail({ pasta }: { pasta: "recebidos" | "enviados" }) {
                       <span aria-hidden className={`mt-2 size-2 shrink-0 rounded-full ${naoLido ? "bg-kumo-brand" : "bg-transparent"}`} />
                       <span className="min-w-0 flex-1">
                         <span className="flex items-baseline justify-between gap-2">
-                          <span className={`truncate text-sm text-kumo-default ${naoLido ? "font-semibold" : "font-medium"}`}>{pasta === "recebidos" ? nomeDe(e.de) : e.para}</span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className={`truncate text-sm text-kumo-default ${naoLido ? "font-semibold" : "font-medium"}`}>{pasta === "recebidos" ? nomeDe(e.de) : e.para}</span>
+                            {(() => {
+                              const c = contactoDe(e, contactos);
+                              return c ? <PilulaDeEstado estado={c.principal} motivo={c.motivo} /> : null;
+                            })()}
+                          </span>
                           <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-kumo-subtle tabular-nums">
                             {e.estrela && <Ic nome="estrela" tamanho={12} peso="fill" />}
                             {dataNaLista(e.data, agora)}
@@ -159,7 +203,14 @@ export function CaixaDeEmail({ pasta }: { pasta: "recebidos" | "enviados" }) {
         </div>
       </div>
 
-      <Compor inicial={compor} aoFechar={() => setCompor(null)} aoEnviar={enviar} />
+      {editar && (
+        <div className="pointer-events-none sticky bottom-3 z-20 flex justify-end lg:hidden">
+          <Button className="pointer-events-auto shadow-lg" size="lg" variant="primary" icon={ICONES.mais} onClick={() => setCompor({ para: "", assunto: "", corpo: "" })}>
+            Escrever
+          </Button>
+        </div>
+      )}
+      <Compor inicial={compor} aoFechar={() => setCompor(null)} aoEnviar={enviar} contactos={contactos} />
       <Confirmar aberto={!!apagar} aoMudar={(v) => !v && setApagar(null)} titulo="Remover a mensagem" texto={apagar ? `«${apagar.assunto}» vai ser removida. Não se pode desfazer.` : ""} rotuloAcao="Remover" perigo aoConfirmar={() => apagar && (void emails.remover(apagar.id), setAberto(null))} />
     </Pagina>
   );

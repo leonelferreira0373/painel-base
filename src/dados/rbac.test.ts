@@ -5,7 +5,7 @@ import { FUNCOES, funcaoPorId, podeEditar, podeVer } from "./rbac";
 
 const AREAS_DO_SUPER = ["pagamentos", "marketing", "dev"];
 
-describe("permissões das áreas de pagamentos, marketing e developer tools", () => {
+describe("permissões das áreas de pagamentos, marketing e ferramentas de programador", () => {
   it("o administrador vê e altera as três áreas", () => {
     const admin = funcaoPorId("administrador");
     for (const a of AREAS_DO_SUPER) {
@@ -14,7 +14,7 @@ describe("permissões das áreas de pagamentos, marketing e developer tools", ()
     }
   });
 
-  it("há uma função que só vê pagamentos e developer tools, e altera o marketing", () => {
+  it("há uma função que só vê pagamentos e ferramentas de programador, e altera o marketing", () => {
     const analista = funcaoPorId("analista");
     expect(podeVer(analista, "pagamentos")).toBe(true);
     expect(podeEditar(analista, "pagamentos")).toBe(false);

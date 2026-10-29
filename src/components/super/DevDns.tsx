@@ -1,4 +1,4 @@
-// Developer tools > DNS: os registos da zona do site (A, AAAA, CNAME, MX, TXT, NS, SRV, CAA, PTR), criar, mudar e apagar, e importar e exportar a zona em BIND como a Cloudflare. Em modo simulado vivem no navegador; em modo ligado vêm do servidor (/v1/dev/dns/registos).
+// Ferramentas de programador > DNS: os registos da zona do site (A, AAAA, CNAME, MX, TXT, NS, SRV, CAA, PTR), criar, mudar e apagar, e importar e exportar a zona em BIND como a Cloudflare. Em modo simulado vivem no navegador; em modo ligado vêm do servidor (/v1/dev/dns/registos).
 "use client";
 
 import { Button, Input, Select } from "@cloudflare/kumo";

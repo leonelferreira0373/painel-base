@@ -41,7 +41,7 @@ import { Separadores } from "../ui";
 import { DocumentoNaTela } from "./ObjetosRicos";
 
 const VARIANTE: Record<EstadoDaPesquisa, "success" | "error" | "warning" | "neutral"> = { fila: "warning", "a pesquisar": "success", "em pausa": "warning", concluida: "success", falhou: "error", cancelada: "neutral" };
-const ICONE_DO_PASSO: Record<TipoDePasso, Icone> = { pensamento: "ia", pesquisa: "lupa", resultados: "lista", leitura: "globo", nota: "lembrete", correcao: "enviar", escrita: "artigo", erro: "aviso" };
+const ICONE_DO_PASSO: Record<TipoDePasso, Icone> = { pensamento: "ia", pesquisa: "lupa", resultados: "lista", leitura: "globo", nota: "nota", correcao: "enviar", escrita: "artigo", erro: "aviso" };
 const ROTULO_DO_PASSO: Record<TipoDePasso, string> = { pensamento: "A IA pensa", pesquisa: "Pesquisa", resultados: "Resultados", leitura: "Leitura", nota: "Nota", correcao: "A sua correção", escrita: "Escrita", erro: "Problema" };
 
 const hora = (iso: string) => new Date(iso).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });

@@ -15,7 +15,7 @@ import { useUrlsDeImagens, ZonaDeUpload } from "./ConteudoPecas";
 export const PASTA_DAS_IMAGENS = "Galeria";
 
 /** `ids` são as imagens deste campo (a primeira é a principal); `varias` diz se o campo aceita mais do que uma. */
-export function BlocoDeImagem({ local, ids, aoMudar, varias = false, vazio = "Sem imagem" }: { local: IdDeLocal; ids: string[]; aoMudar: (ids: string[]) => void; varias?: boolean; vazio?: string }) {
+export function BlocoDeImagem({ local, ids, aoMudar, varias = false, vazio = "Sem imagem", proporcao = "aspect-[4/3]" }: { local: IdDeLocal; ids: string[]; aoMudar: (ids: string[]) => void; varias?: boolean; vazio?: string; /** As classes da proporção (e da altura máxima) da imagem grande. */ proporcao?: string }) {
   const { itens, guardar } = useArmazem<ItemDaBiblioteca>("ficheiros");
   const imagens = useMemo(() => itens.filter(eImagem), [itens]);
   const urls = useUrlsDeImagens(imagens);
@@ -50,7 +50,7 @@ export function BlocoDeImagem({ local, ids, aoMudar, varias = false, vazio = "Se
     <ZonaDeUpload aceitar="image/*" multiplo={varias} aoEscolher={carregar} className="flex min-w-0 flex-col gap-3 p-4">
       {(abrir, aArrastar) => (
         <>
-          <div className={`relative grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-xl bg-kumo-tint ring transition-colors ${aArrastar ? "ring-kumo-brand" : "ring-kumo-line"}`}>
+          <div className={`relative grid ${proporcao} w-full place-items-center overflow-hidden rounded-xl bg-kumo-tint ring transition-colors ${aArrastar ? "ring-kumo-brand" : "ring-kumo-line"}`}>
             {item && urls.get(item.id) ? (
               <img src={urls.get(item.id)} alt={item.alt ?? item.nome} className="size-full object-contain" />
             ) : (

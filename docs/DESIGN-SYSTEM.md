@@ -188,7 +188,7 @@ Usa-se sempre o componente do Kumo; **nunca** um `<button>`, `<input>` ou `<sele
 
 - **Rotas do site**: nunca se mostra o endereço em bruto («/blog/como-escolher»), porque ninguém percebe o que é um «slug». Mostra-se o nome da página, um pill por pedaço e um chevron entre eles («Blog > Como escolher»; um botão dentro de uma página fica «Preços > Pedir proposta»). Desenha-se com `<Rota caminho="…" />` (`components/Frase.tsx`); numa tabela de registos a coluna leva `tipo: "rota"`; nos gráficos de rosca com `rotas: true` a legenda é do painel, em pills; num texto simples (eixo de um gráfico) usa-se `textoDaRota`. Os nomes vêm de `dados/paginas.ts` (um por pedaço de endereço, com acentos); o que lá não estiver fica por extenso («pedir-proposta» → «Pedir proposta»). Os endereços técnicos (`/api/…`, `/v1/…`, ficheiros) ficam como código: são para quem programa (`eRota` em `lib/rotas.ts` distingue-os).
 
-## 5l. O super painel: pagamentos, marketing e developer tools
+## 5l. O super painel: pagamentos, marketing e ferramentas de programador
 
 - **Dados vindos de um contrato**: nenhum ecrã inventa dados. Lê com `useApi` / `useColecao` (`src/lib/api/`): em modo simulado vem o gerador local (`dados/super-dados.ts`), em modo ligado vem do servidor, e o ecrã é o mesmo. O modo diz-se com **uma só etiqueta** (`AvisoDeApi`): «Dados de demonstração» ou «Ligado ao servidor», com a explicação na dica e, se falhar, o aviso com «Tentar de novo». Nunca um parágrafo por baixo do título.
 - **Cartão de estatística** (`Estatistica`, `super/SuperPecas.tsx`): o `CartaoEstatistica` com o gráfico da **série dos registos do ecrã** (`serie`, repartidos por intervalos de tempo com `lib/serie.ts`: `agrupar`, `contarPorIntervalo`, `somarPorIntervalo`, `mediaPorIntervalo`). Sem série, o gráfico é o que **se observou** do número enquanto o ecrã esteve aberto (`useSerie`); sem nenhum dos dois, o cartão fica só com o valor (`h-auto`). Todo o cartão com números tem de ter gráfico quando há de onde o tirar; sem números inventados.
@@ -220,7 +220,7 @@ Uma só base serve vários negócios (hotel, táxi, loja, vendas…): o que cada
 - **Só o Master Admin**: a área `painel` (módulos e predefinições) só existe para a função `master` (`dados/rbac.ts`).
 - **Área nova de um negócio**: acrescente-a a `dados/estrutura.ts` (com `secao`), dê-lhe `TUDO` ou `VER` em `dados/rbac.ts` e ponha-a nos pacotes que a querem. Os registos próprios vão num ficheiro como `dados/modulos-negocios.ts`, ligado em `dados/modulos.ts` (os identificadores dos módulos são únicos em todo o painel).
 
-## 5o. Implementações e GitHub (Developer tools)
+## 5o. Implementações e GitHub (Ferramentas de programador)
 
 - **Implementações** (`super/Implementacoes.tsx`, regras puras em `lib/implementacoes.ts`): as versões publicadas (`Ativa`, `Em teste`, `Pronta`, `Anterior`), o **teste A/B** (a versão B recebe de 1 a 99 % do tráfego, com a barra de tráfego), **promover** a B e **voltar a uma versão anterior** (rollback), que pede a frase `REVERTER <versão>`. O histórico regista cada passo.
 - **GitHub e conectores** (`super/GitHub.tsx`): o repositório (`dono/nome`) e o ramo, os últimos commits com o resultado dos testes, «Lançar» (cria uma versão `Pronta` em Implementações, só de commits cujos testes passaram) e os conectores com interruptor e «Testar».

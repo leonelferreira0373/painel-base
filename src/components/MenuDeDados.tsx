@@ -14,6 +14,7 @@ import { perguntarAIa } from "@/lib/ia-contexto";
 import { abrirNota } from "@/lib/notas";
 import { abrirAnalise } from "@/lib/pesquisa-profunda";
 import { IconeMorfico, useResultadoTemporario } from "./Copiar";
+import { useJanelasDoCartao } from "./DetalhesDoCartao";
 import { ItemCopiarComMais, ItemPerguntarComMais } from "./ItensDeMenuComMais";
 import { MenuCartao, SeparadorDeMenu, SubMenuCartao } from "./Flutuantes";
 import { Ic, ICONES } from "./Icones";
@@ -57,10 +58,16 @@ export function useJanelaDeCor(idDaCor?: string): { abrir: (e: Escopo) => void; 
     setEscrito(h);
   };
   const temEscolhas = Object.keys(escolhidas).length > 0;
+  // com a janela da cor aberta o resto do ecrã não escurece nem fica tapado: vê-se o gráfico a mudar (a regra está em globals.css)
+  useEffect(() => {
+    const raiz = document.documentElement;
+    raiz.classList.toggle("janela-de-cor", escopo !== null);
+    return () => raiz.classList.remove("janela-de-cor");
+  }, [escopo]);
   const janela = (
     <Dialog.Root open={escopo !== null} onOpenChange={(v) => !v && setEscopo(null)}>
-      <Dialog size="sm" className="p-5">
-        <div className="flex flex-col gap-4">
+      <Dialog size="sm" className="!fixed !bottom-3 !left-1/2 !top-auto w-[calc(100vw-1.5rem)] !-translate-x-1/2 p-4 sm:!left-auto sm:!right-4 sm:!translate-x-0 sm:w-[22rem]">
+        <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
             <Dialog.Title className="text-lg font-semibold">{escopo === "gama" ? "Cor de todos os gráficos" : elemento ? "Cor de um elemento" : "Cor deste gráfico"}</Dialog.Title>
             <Dialog.Close render={(p) => <Button {...p} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
@@ -206,12 +213,17 @@ export interface PropsDosItens {
   tipo?: "cartao" | "lista";
   /** Com o id da cor do gráfico o menu ganha «Mudar a cor». */
   idDaCor?: string;
+  /** O cartão tem gráfico mas não se pinta elemento a elemento (um mapa): sem «Mudar a cor». */
+  semCor?: boolean;
   aoOutraCor?: (e: Escopo) => void;
+  /** Abrem as janelas «Ver detalhes» e «Ver o mapa» (só se o cartão tem um gráfico que as permite). */
+  aoVerDetalhes?: () => void;
+  aoVerMapa?: () => void;
   /** Mostra o resultado de copiar (visto ou aviso) no botão do menu. */
   aoResultado: (ok: boolean) => void;
 }
 
-export function ItensDeKpi({ dados, estruturado, titulo, tipo = "cartao", idDaCor, aoOutraCor, aoResultado }: PropsDosItens) {
+export function ItensDeKpi({ dados, estruturado, titulo, tipo = "cartao", idDaCor, semCor = false, aoOutraCor, aoVerDetalhes, aoVerMapa, aoResultado }: PropsDosItens) {
   const pagina = usePathname() ?? "";
   const alvoDeNota = { tipo: "kpi" as const, chave: idDaCor ?? idDoGrafico(pagina, titulo), rotulo: titulo, pagina };
   const tabela = () => (dados ? estruturaDeTabela(dados, pagina) : undefined);
@@ -228,14 +240,24 @@ export function ItensDeKpi({ dados, estruturado, titulo, tipo = "cartao", idDaCo
   };
   return (
     <>
-      {idDaCor && aoOutraCor && <ItensDeCor idDaCor={idDaCor} aoOutraCor={aoOutraCor} />}
+      {aoVerDetalhes && (
+        <DropdownMenu.Item icon={<Ic nome="grafico" />} onClick={aoVerDetalhes}>
+          Ver detalhes
+        </DropdownMenu.Item>
+      )}
+      {aoVerMapa && (
+        <DropdownMenu.Item icon={<Ic nome="globo" />} onClick={aoVerMapa}>
+          Ver o mapa
+        </DropdownMenu.Item>
+      )}
+      {idDaCor && aoOutraCor && !semCor && <ItensDeCor idDaCor={idDaCor} aoOutraCor={aoOutraCor} />}
       {dados && (
         <DropdownMenu.Item icon={<Ic nome="transferir" />} onClick={() => abrirDados("exportar", { nome: dados.nome, titulo: dados.titulo, dados })}>
           Exportar…
         </DropdownMenu.Item>
       )}
       {(dados || estruturado) && <ItemCopiarComMais aoCopiar={copiarDados} aoImagem={dados ? async () => aoResultado(await copiarImagem(dados)) : undefined} />}
-      <DropdownMenu.Item icon={<Ic nome="lembrete" />} onClick={() => abrirNota(alvoDeNota)}>
+      <DropdownMenu.Item icon={<Ic nome="nota" />} onClick={() => abrirNota(alvoDeNota)}>
         Deixar nota
       </DropdownMenu.Item>
       <ItemPerguntarComMais
@@ -258,9 +280,10 @@ export function GatilhoDoMenu({ estado }: { estado: "ocioso" | "ok" | "erro" }) 
 }
 
 /** O menu completo de um KPI (os cartões de estatística e os de gráfico): cor, exportar, copiar, nota e IA. */
-export function MenuDoKpi(props: Omit<PropsDosItens, "aoResultado" | "aoOutraCor"> & { extra?: ReactNode }) {
+export function MenuDoKpi(props: Omit<PropsDosItens, "aoResultado" | "aoOutraCor" | "aoVerDetalhes" | "aoVerMapa"> & { extra?: ReactNode }) {
   const [estado, definir] = useResultadoTemporario();
   const cor = useJanelaDeCor(props.idDaCor);
+  const det = useJanelasDoCartao(props.idDaCor, props.titulo);
   const { extra, ...resto } = props;
   return (
     <>
@@ -268,10 +291,11 @@ export function MenuDoKpi(props: Omit<PropsDosItens, "aoResultado" | "aoOutraCor
         <GatilhoDoMenu estado={estado} />
         <MenuCartao>
           {extra}
-          <ItensDeKpi {...resto} aoOutraCor={cor.abrir} aoResultado={(ok) => definir(ok ? "ok" : "erro")} />
+          <ItensDeKpi {...resto} aoOutraCor={cor.abrir} aoVerDetalhes={det.aoVerDetalhes} aoVerMapa={det.aoVerMapa} aoResultado={(ok) => definir(ok ? "ok" : "erro")} />
         </MenuCartao>
       </DropdownMenu>
       {cor.janela}
+      {det.janelas}
     </>
   );
 }

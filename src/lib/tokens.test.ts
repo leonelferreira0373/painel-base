@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ENDPOINTS } from "./api/contrato";
-import { MODELOS, RECURSOS, acessoDoEndpoint, descreverPermissao, endpointsPermitidos, erroDoRascunho, estadoDoToken, impressaoDoToken, ipNaGama, ipOuGamaValido, ipPermitido, manifestoDeFerramentas, modeloPorId, novoToken, permitePedido, recursoDoEndpoint, resumoDasPermissoes, rodarToken, simplificarPermissoes, verificarToken, type PermissaoDeToken } from "./tokens";
+import { MODELOS, RECURSOS, acessoDoEndpoint, descreverPermissao, endpointsPermitidos, erroDoRascunho, estadoDoToken, impressaoDoToken, ipNaGama, mudarEditar, mudarLer, niveisDasPermissoes, permissoesDosNiveis, permissoesForaDosInterruptores, resumoDaArea, todosOsNiveis, chaveDoNivel, modulosDoRecurso, ipOuGamaValido, ipPermitido, manifestoDeFerramentas, modeloPorId, novoToken, permitePedido, recursoDoEndpoint, resumoDasPermissoes, rodarToken, simplificarPermissoes, verificarToken, type PermissaoDeToken } from "./tokens";
 
 const agora = new Date("2026-10-29T12:00:00.000Z");
 const ler = (area: string, modulo = "*"): PermissaoDeToken => ({ area, modulo, acesso: "ler" });
@@ -8,7 +8,7 @@ const editar = (area: string, modulo = "*"): PermissaoDeToken => ({ area, modulo
 
 describe("permissões", () => {
   it("escrevem-se em palavras e a lista mostra as duas primeiras e quantas mais", () => {
-    expect(descreverPermissao(editar("dev", "firewall"))).toBe("Developer tools · Firewall: Editar");
+    expect(descreverPermissao(editar("dev", "firewall"))).toBe("Ferramentas de programador · Firewall: Editar");
     expect(descreverPermissao(ler("*"))).toBe("Todas as áreas: Ler");
     expect(descreverPermissao(ler("pagamentos"))).toBe("Pagamentos · Todos os módulos: Ler");
     const r = resumoDasPermissoes([ler("pagamentos"), ler("marketing"), editar("dev", "dns")]);
@@ -137,5 +137,53 @@ describe("criar e verificar", () => {
     expect(r.segredo).not.toBe(segredo);
     expect(await verificarToken(segredo, [r.token], "203.0.113.5", agora)).toMatchObject({ ativo: false });
     expect(await verificarToken(r.segredo, [r.token], "203.0.113.5", agora)).toMatchObject({ ativo: true });
+  });
+});
+
+describe("as permissões como interruptores", () => {
+  // uma área com pelo menos dois módulos, qualquer que seja o projeto
+  const r = RECURSOS.find((x) => x.modulos.length >= 2)!;
+  const [m1, m2] = r.modulos;
+  const so = (area: string, ...mods: string[]) => mods.map((m) => chaveDoNivel(area, m));
+
+  it("tudo a ler ou a editar vira uma só permissão «*»", () => {
+    expect(permissoesDosNiveis(todosOsNiveis("ler"))).toEqual([{ area: "*", modulo: "*", acesso: "ler" }]);
+    expect(permissoesDosNiveis(todosOsNiveis("editar"))).toEqual([{ area: "*", modulo: "*", acesso: "editar" }]);
+    expect(permissoesDosNiveis(todosOsNiveis("nada"))).toEqual([]);
+  });
+  it("uma área toda a editar é uma só permissão; só um módulo é só esse módulo", () => {
+    const base = todosOsNiveis("nada");
+    const areaToda = mudarEditar(base, r.area, null, true);
+    expect(permissoesDosNiveis(areaToda)).toEqual([{ area: r.area, modulo: "*", acesso: "editar" }]);
+    const um = mudarLer(base, r.area, m1.id, true);
+    expect(permissoesDosNiveis(um)).toEqual([{ area: r.area, modulo: m1.id, acesso: "ler" }]);
+  });
+  it("ler tudo e editar um módulo dá «ler *» mais esse módulo", () => {
+    const n = mudarEditar(todosOsNiveis("ler"), r.area, m2.id, true);
+    expect(permissoesDosNiveis(n)).toEqual(expect.arrayContaining([{ area: "*", modulo: "*", acesso: "ler" }, { area: r.area, modulo: m2.id, acesso: "editar" }]));
+    expect(permissoesDosNiveis(n)).toHaveLength(2);
+  });
+  it("ida e volta: os níveis saem iguais depois de passarem pelas permissões", () => {
+    const n = mudarEditar(mudarLer(todosOsNiveis("nada"), r.area, m1.id, true), r.area, m2.id, true);
+    expect(niveisDasPermissoes(permissoesDosNiveis(n))).toEqual(n);
+    for (const p of MODELOS) expect(permissoesDosNiveis(niveisDasPermissoes(p.permissoes)).length).toBeGreaterThan(0);
+    for (const p of MODELOS) expect(endpointsPermitidos(permissoesDosNiveis(niveisDasPermissoes(p.permissoes))).map((e) => e.id)).toEqual(endpointsPermitidos(p.permissoes).map((e) => e.id));
+  });
+  it("desligar «ler» tira também o editar; ligar «editar» dá também o ler; desligar «editar» deixa o ler", () => {
+    const base = todosOsNiveis("nada");
+    expect(mudarEditar(base, r.area, m1.id, true)[chaveDoNivel(r.area, m1.id)]).toBe("editar");
+    expect(mudarEditar(mudarEditar(base, r.area, m1.id, true), r.area, m1.id, false)[chaveDoNivel(r.area, m1.id)]).toBe("ler");
+    expect(mudarLer(mudarEditar(base, r.area, m1.id, true), r.area, m1.id, false)[chaveDoNivel(r.area, m1.id)]).toBe("nada");
+    expect(mudarLer(mudarEditar(base, r.area, m1.id, true), r.area, m1.id, true)[chaveDoNivel(r.area, m1.id)]).toBe("editar");
+  });
+  it("conta os módulos que a área lê e edita", () => {
+    const n = mudarEditar(mudarLer(todosOsNiveis("nada"), r.area, m1.id, true), r.area, m2.id, true);
+    expect(resumoDaArea(n, r)).toEqual({ total: modulosDoRecurso(r).length, podeLer: 2, podeEditar: 1 });
+    expect(so(r.area, m1.id, m2.id).every((c) => n[c] !== "nada")).toBe(true);
+  });
+  it("o que os interruptores não mostram (uma área que já não existe) guarda-se como está", () => {
+    const antigas = [{ area: "area-antiga", modulo: "*", acesso: "ler" as const }];
+    expect(permissoesForaDosInterruptores([...antigas, ler("*")])).toEqual(antigas);
+    expect(permissoesDosNiveis(mudarLer(todosOsNiveis("nada"), r.area, null, true), antigas)).toEqual(expect.arrayContaining(antigas));
   });
 });

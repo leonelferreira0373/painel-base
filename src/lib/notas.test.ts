@@ -78,6 +78,10 @@ describe("quem vê e quando acaba", () => {
     const l = [nota({ id: "a", atualizada: "2026-10-29T09:00:00.000Z" }), nota({ id: "b", atualizada: "2026-10-29T11:00:00.000Z" }), nota({ id: "c", alvo: { tipo: "kpi", chave: "outro", rotulo: "x", pagina: "/" } })];
     expect(notasDoSitio(l, "pagamentos/metricas:volume").map((n) => n.id)).toEqual(["b", "a"]);
   });
+  it("as notas afixadas ficam no topo, e em cada grupo as mais recentes primeiro", () => {
+    const l = [nota({ id: "a", atualizada: "2026-10-29T09:00:00.000Z", afixada: true }), nota({ id: "b", atualizada: "2026-10-29T11:00:00.000Z" }), nota({ id: "c", atualizada: "2026-10-29T10:00:00.000Z", afixada: true }), nota({ id: "d", atualizada: "2026-10-29T12:00:00.000Z" })];
+    expect(notasDoSitio(l, "pagamentos/metricas:volume").map((n) => n.id)).toEqual(["c", "a", "d", "b"]);
+  });
   it("escreve-se em palavras", () => {
     expect(haTempo("2026-10-29T11:55:00.000Z", agora)).toBe("há 5 min");
     expect(haTempo("2026-10-29T09:00:00.000Z", agora)).toBe("há 3 h");

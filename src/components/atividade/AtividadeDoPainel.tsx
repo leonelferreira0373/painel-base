@@ -1,19 +1,23 @@
 // O registo de atividade do painel: cada sessão (quando entrou, o IP, o local, o navegador e o aparelho, quanto durou), tudo o que se fez em cada uma (páginas, cliques, definições ligadas e desligadas com o antes e o depois, campos, janelas, mensagens com a IA, tokens) e os convites (quem se convidou e se aceitou). Em modo simulado vem deste navegador; em modo ligado, do servidor.
 "use client";
 
-import { Button, Dialog, Input, InputArea, Select } from "@cloudflare/kumo";
+import { Button, Dialog, Input, InputArea, Popover } from "@cloudflare/kumo";
 import { useEffect, useMemo, useState } from "react";
-import { FUNCOES, funcaoPorId } from "@/dados/rbac";
+import { FUNCOES, funcaoPorId, guardarFuncaoPersonalizada } from "@/dados/rbac";
+import { funcaoDaMatriz } from "@/lib/permissoes";
+import { ConvidarPessoa, type DadosDoConvite } from "./ConvidarPessoa";
 import { useApi } from "@/lib/api/cliente";
 import { reciclar } from "@/lib/reciclagem";
 import { abrirDados, useFonteDeExportacao } from "@/lib/dados-da-pagina";
 import { useColecao } from "@/lib/api/colecao";
 import { apagarAtividade, duracaoDe, filtrarAcoes, lerAcoes, lerSessoes, registar, rotuloDoDispositivo, rotuloDoLocal, rotuloDoTipoDeAparelho, ROTULO_DO_TIPO, textoDaDuracao, useAtividade, type Acao, type Sessao, type TipoDeAcao } from "@/lib/atividade";
-import { cancelarConvite, conviteNovo, corpoDoConvite, erroDoConvite, expirarConvites, reenviarConvite, responderAoConvite, totaisDeConvites, type Convite, type EstadoDoConvite } from "@/lib/convites";
+import { cancelarConvite, conviteNovo, corpoDoConvite, erroDoConvite, expirarConvites, reenviarConvite, responderAoConvite, revogarConvite, totaisDeConvites, type Convite, type EstadoDoConvite } from "@/lib/convites";
 import { contagemPorDia, emailNovo, enviarEmail } from "@/lib/email";
 import { useEditar } from "@/lib/permissao";
+import { reporAcesso, revogarAcesso } from "@/lib/acessos-revogados";
 import { useSessao } from "@/lib/auth";
-import { Confirmar, Cartao } from "../conta/Pecas";
+import { Confirmar, Cartao, Interruptor } from "../conta/Pecas";
+import { PopupCartao } from "../Flutuantes";
 import { Vazio } from "../conteudo/ConteudoPecas";
 import { Estado } from "../Estado";
 import { Frase } from "../Frase";
@@ -31,7 +35,7 @@ function estadoDaSessao(s: Sessao, agora: number): { rotulo: string; variante: "
   return s.motivoDoFim === "inatividade" ? { rotulo: "Inativa", variante: "neutral" } : { rotulo: "Terminada", variante: "neutral" };
 }
 
-const ESTADO_DO_CONVITE: Record<EstadoDoConvite, "success" | "error" | "warning" | "neutral"> = { Pendente: "warning", Aceite: "success", Recusado: "error", Expirado: "neutral", Cancelado: "neutral" };
+const ESTADO_DO_CONVITE: Record<EstadoDoConvite, "success" | "error" | "warning" | "neutral"> = { Pendente: "warning", Aceite: "success", Recusado: "error", Expirado: "neutral", Cancelado: "neutral", Revogado: "error" };
 
 /** Uma ação em palavras: o texto e, se mudou alguma coisa, o antes e o depois. */
 function TextoDaAcao({ a }: { a: Acao }) {
@@ -209,38 +213,92 @@ function DetalheDaSessao({ sessao: s, acoes, agora }: { sessao: Sessao; acoes: A
 
 // ---------- a atividade ----------
 
-const TIPOS_DO_FILTRO: Record<string, string> = { todos: "Todos os tipos", ...ROTULO_DO_TIPO };
+/** Uma lista de itens com um interruptor cada: liga-se e desliga-se mais do que um ao mesmo tempo. */
+function FiltroDeItens({ titulo, itens, escolhidos, aoMudar }: { titulo: string; itens: { id: string; rotulo: string; contagem?: number }[]; escolhidos: string[]; aoMudar: (ids: string[]) => void }) {
+  return (
+    <Popover.Root>
+      <Popover.Trigger render={<Button variant="secondary" icon={ICONES.filtrar} className="w-full lg:w-auto">{`${titulo}${escolhidos.length ? ` (${escolhidos.length})` : ""}`}</Button>} />
+      <PopupCartao alinhar="start" className="w-[min(320px,calc(100vw-2rem))]">
+        <div className="flex max-h-[min(60dvh,420px)] flex-col overflow-y-auto p-1.5">
+          {itens.length === 0 && <span className="px-2.5 py-2 text-sm text-kumo-subtle">Nada para escolher.</span>}
+          {itens.map((i) => (
+            <label key={i.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2.5 py-2 hover:bg-kumo-tint">
+              <span className="min-w-0 truncate text-sm text-kumo-default">{i.rotulo}</span>
+              <span className="inline-flex shrink-0 items-center gap-2">
+                {i.contagem !== undefined && <span className="text-xs tabular-nums text-kumo-subtle">{i.contagem}</span>}
+                <Interruptor marcado={escolhidos.includes(i.id)} aoMudar={(v) => aoMudar(v ? [...escolhidos, i.id] : escolhidos.filter((x) => x !== i.id))} rotulo={`${titulo}: ${i.rotulo}`} />
+              </span>
+            </label>
+          ))}
+          <div className="flex justify-end border-t border-kumo-hairline p-1.5">
+            <Button variant="ghost" size="sm" disabled={escolhidos.length === 0} onClick={() => aoMudar([])}>
+              Limpar
+            </Button>
+          </div>
+        </div>
+      </PopupCartao>
+    </Popover.Root>
+  );
+}
+
+interface ResumoDaPessoa {
+  pessoa: string;
+  funcao: string;
+  acoes: number;
+  sessoes: number;
+  ultima: Acao | null;
+}
 
 function Atividade({ acoes, sessoes, sessaoPorId, erro }: { acoes: Acao[]; sessoes: Sessao[]; sessaoPorId: Map<string, Sessao>; erro: string | null }) {
   const [texto, setTexto] = useState("");
-  const [tipo, setTipo] = useState("todos");
-  const [sessao, setSessao] = useState("todas");
+  const [tipos, setTipos] = useState<string[]>([]);
+  const [pessoas, setPessoas] = useState<string[]>([]);
   const [quantas, setQuantas] = useState(100);
-  const lista = useMemo(() => filtrarAcoes(acoes, { texto, tipos: tipo === "todos" ? undefined : [tipo as TipoDeAcao], sessao: sessao === "todas" ? undefined : sessao }), [acoes, texto, tipo, sessao]);
-  const itensDeSessao = useMemo(() => ({ todas: "Todas as sessões", ...Object.fromEntries(sessoes.map((s) => [s.id, `${s.utilizador} · ${dataHora(s.inicio)}`])) }), [sessoes]);
+  const quem = (a: Acao) => sessaoPorId.get(a.sessao)?.utilizador ?? "—";
+  // a pesquisa e os tipos valem sempre; as pessoas escolhidas decidem se se vê o resumo ou tudo o que fizeram
+  const dosTipos = useMemo(() => filtrarAcoes(acoes, { texto, tipos: tipos.length ? (tipos as TipoDeAcao[]) : undefined }), [acoes, texto, tipos]);
+  const lista = useMemo(() => (pessoas.length ? dosTipos.filter((a) => pessoas.includes(quem(a))) : dosTipos), [dosTipos, pessoas, sessaoPorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const resumo = useMemo<ResumoDaPessoa[]>(() => {
+    const por = new Map<string, ResumoDaPessoa>();
+    for (const s of sessoes) if (!por.has(s.utilizador)) por.set(s.utilizador, { pessoa: s.utilizador, funcao: s.funcao, acoes: 0, sessoes: 0, ultima: null });
+    for (const s of sessoes) por.get(s.utilizador)!.sessoes += 1;
+    for (const a of dosTipos) {
+      const r = por.get(quem(a));
+      if (!r) continue;
+      r.acoes += 1;
+      if (!r.ultima || a.quando > r.ultima.quando) r.ultima = a;
+    }
+    return [...por.values()].sort((a, b) => (b.ultima?.quando ?? "").localeCompare(a.ultima?.quando ?? ""));
+  }, [sessoes, dosTipos, sessaoPorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const itensDeTipo = useMemo(() => Object.entries(ROTULO_DO_TIPO).map(([id, rotulo]) => ({ id, rotulo: String(rotulo), contagem: acoes.filter((a) => a.tipo === id).length })), [acoes]);
+  const itensDePessoa = useMemo(() => resumo.map((r) => ({ id: r.pessoa, rotulo: r.pessoa, contagem: r.acoes })), [resumo]);
+
   const colunas: ColunaSimples<Acao>[] = [
     { rotulo: "Quando", render: (a) => <span className="tabular-nums">{dataHora(a.quando)}</span> },
-    { rotulo: "Quem", filtro: (a) => sessaoPorId.get(a.sessao)?.utilizador ?? "—", render: (a) => sessaoPorId.get(a.sessao)?.utilizador ?? "—" },
+    { rotulo: "Quem", filtro: quem, render: quem },
     { rotulo: "Tipo", filtro: (a) => String(ROTULO_DO_TIPO[a.tipo]), render: (a) => <Estado valor={ROTULO_DO_TIPO[a.tipo]} variante="neutral" /> },
     { rotulo: "Ação", render: (a) => <TextoDaAcao a={a} /> },
     { rotulo: "Página", filtro: (a) => (a.caminho ? rotuloDaPagina(a.caminho) : "—"), render: (a) => (a.caminho ? rotuloDaPagina(a.caminho) : "—") },
   ];
+  const colunasDoResumo: ColunaSimples<ResumoDaPessoa>[] = [
+    { rotulo: "Pessoa", filtro: (r) => r.pessoa, render: (r) => <button type="button" onClick={() => setPessoas([r.pessoa])} className="font-medium hover:underline">{r.pessoa}</button> },
+    { rotulo: "Função", filtro: (r) => r.funcao, render: (r) => r.funcao },
+    { rotulo: "Ações", direita: true, render: (r) => inteiro(r.acoes) },
+    { rotulo: "Última ação", render: (r) => (r.ultima ? <span className="inline-flex flex-wrap items-center gap-x-2"><TextoDaAcao a={r.ultima} /><span className="tabular-nums text-kumo-subtle">{dataHora(r.ultima.quando)}</span></span> : "—") },
+  ];
+  const aVerTudo = pessoas.length > 0;
   return (
-    <Cartao titulo={`Ações${lista.length ? ` (${lista.length})` : ""}`}>
+    <Cartao titulo={aVerTudo ? `Ações${lista.length ? ` (${lista.length})` : ""}` : `Pessoas${resumo.length ? ` (${resumo.length})` : ""}`}>
       <div className="flex flex-col gap-2 border-b border-kumo-hairline p-3 lg:flex-row">
         <Input aria-label="Pesquisar na atividade" placeholder="Pesquisar nas ações, nos valores e nas páginas" value={texto} onChange={(e) => setTexto(e.target.value)} autoComplete="off" className="w-full" />
-        <div className="lg:w-48 lg:shrink-0">
-          <Select aria-label="Tipo de ação" value={tipo} onValueChange={(v) => setTipo(String(v))} items={TIPOS_DO_FILTRO} />
-        </div>
-        <div className="lg:w-64 lg:shrink-0">
-          <Select aria-label="Sessão" value={sessao} onValueChange={(v) => setSessao(String(v))} items={itensDeSessao} />
-        </div>
+        <FiltroDeItens titulo="Tipos" itens={itensDeTipo} escolhidos={tipos} aoMudar={setTipos} />
+        <FiltroDeItens titulo="Pessoas" itens={itensDePessoa} escolhidos={pessoas} aoMudar={setPessoas} />
       </div>
       {erro ? (
         <Vazio icone="aviso" titulo="Não foi possível ler o servidor" texto={erro} />
       ) : acoes.length === 0 ? (
         <Vazio icone="recentes" titulo="Ainda não há atividade" texto="Cada página aberta, clique, definição e mensagem fica aqui." />
-      ) : (
+      ) : aVerTudo ? (
         <>
           <TabelaSimples colunas={colunas} linhas={lista.slice(0, quantas)} chave={(a) => a.id} vazio="Nenhuma ação corresponde à pesquisa." />
           {lista.length > quantas && (
@@ -251,6 +309,8 @@ function Atividade({ acoes, sessoes, sessaoPorId, erro }: { acoes: Acao[]; sesso
             </div>
           )}
         </>
+      ) : (
+        <TabelaSimples colunas={colunasDoResumo} linhas={resumo} chave={(r) => r.pessoa} vazio="Ninguém corresponde à pesquisa." aoClicar={(r) => setPessoas([r.pessoa])} />
       )}
     </Cartao>
   );
@@ -263,12 +323,9 @@ function Convites({ editar }: { editar: boolean }) {
   const lista = useColecao<Convite>("/v1/painel/convites", "convites", []);
   const emails = useEmails();
   const [novo, setNovo] = useState(false);
-  const [email, setEmail] = useState("");
-  const [funcao, setFuncao] = useState(FUNCOES[2]?.id ?? FUNCOES[0].id);
-  const [mensagem, setMensagem] = useState("");
+  const [revogar, setRevogar] = useState<Convite | null>(null);
   const simulado = lista.modo !== "ligado";
   const quem = entrada?.nome || "Alguém da equipa";
-  const erro = erroDoConvite(email, funcao, lista.itens);
   const totais = totaisDeConvites(lista.itens);
 
   // em modo simulado os convites expiram sozinhos quando o prazo passa
@@ -288,29 +345,41 @@ function Convites({ editar }: { editar: boolean }) {
     return () => window.clearInterval(t);
   }, [simulado, lista.itens]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // um convite com um cargo novo leva o nome desse cargo; sem nome, «Personalizada»
+  const rotuloDaFuncao = (c: Convite) => c.cargo ?? (c.permissoes ? "Personalizada" : funcaoPorId(c.funcao).rotulo);
   const escreverEmail = (c: Convite) => {
     if (!simulado) return; // em modo ligado o servidor envia o e-mail
     const agora = new Date();
-    void emails.guardar(enviarEmail(emailNovo(`em-convite-${c.id}-${agora.getTime().toString(36)}`, { de: `Painel <nao-responder@painel.exemplo.com>`, para: c.email, assunto: "Foi convidado para o painel", corpo: corpoDoConvite(c, funcaoPorId(c.funcao).rotulo, "Painel") }, agora), agora));
+    void emails.guardar(enviarEmail(emailNovo(`em-convite-${c.id}-${agora.getTime().toString(36)}`, { de: `Painel <nao-responder@painel.exemplo.com>`, para: c.email, assunto: "Foi convidado para o painel", corpo: corpoDoConvite(c, rotuloDaFuncao(c), "Painel") }, agora), agora));
   };
 
-  const convidar = () => {
-    const c = conviteNovo(`cv-${Date.now().toString(36)}`, { email, funcao, convidadoPor: quem, mensagem }, new Date());
+  const convidar = (d: DadosDoConvite) => {
+    const id = `cv-${Date.now().toString(36)}`;
+    // um acesso personalizado cria, ao ser aceite, uma função só desta pessoa (`pers-…`); uma função pronta usa a que existe
+    const c = conviteNovo(id, { email: d.email, funcao: d.funcao ?? `pers-${id}`, convidadoPor: quem, mensagem: d.mensagem, ...(d.funcao ? {} : { permissoes: d.permissoes, cargo: d.cargo }) }, new Date());
     void lista.guardar(c);
     escreverEmail(c);
-    registar("convite", `Convidou «${c.email}» com a função «${funcaoPorId(funcao).rotulo}»`);
-    setNovo(false);
-    setEmail("");
-    setMensagem("");
+    registar("convite", `Convidou «${c.email}» com a função «${rotuloDaFuncao(c)}»`);
   };
   const responder = (c: Convite, aceite: boolean) => {
+    // aceitar um convite personalizado cria a função com os interruptores que lhe deram
+    if (aceite && c.permissoes) guardarFuncaoPersonalizada(funcaoDaMatriz(c.funcao, c.cargo ?? "Personalizada", c.email.split("@")[0], c.permissoes));
+    // voltar a aceitar um convite repõe o acesso que tinha sido revogado
+    if (aceite) reporAcesso(c.email);
     void lista.guardar(responderAoConvite(c, aceite, new Date()));
     registar("convite", `«${c.email}» ${aceite ? "aceitou" : "recusou"} o convite`);
   };
 
+  /** Revoga o acesso já: a lista dos acessos revogados muda neste instante, e a sessão e qualquer ação dessa pessoa fecham (em todos os separadores). */
+  const revogarJa = (c: Convite) => {
+    if (entrada?.email.toLowerCase() === c.email.toLowerCase()) return;
+    revogarAcesso(c.email, quem);
+    void lista.guardar(revogarConvite(c, new Date()));
+    registar("convite", `Revogou o acesso de «${c.email}»: a sessão e qualquer ação dessa pessoa ficaram bloqueadas`);
+  };
   const colunas: ColunaSimples<Convite>[] = [
     { rotulo: "Pessoa", render: (c) => <span className="font-medium">{c.email}</span> },
-    { rotulo: "Função", filtro: (c) => funcaoPorId(c.funcao).rotulo, render: (c) => funcaoPorId(c.funcao).rotulo },
+    { rotulo: "Cargo", filtro: rotuloDaFuncao, render: rotuloDaFuncao },
     { rotulo: "Convidado por", filtro: (c) => c.convidadoPor, render: (c) => c.convidadoPor },
     { rotulo: "Enviado", render: (c) => <span className="tabular-nums">{dataHora(c.enviadoEm)}</span> },
     { rotulo: "Resposta", render: (c) => (c.respondidoEm ? <span className="tabular-nums">{dataHora(c.respondidoEm)}</span> : c.estado === "Pendente" ? <span className="text-kumo-subtle">Até {dataHora(c.expiraEm)}</span> : "—") },
@@ -343,6 +412,11 @@ function Convites({ editar }: { editar: boolean }) {
                 Cancelar
               </Button>
             )}
+            {c.estado === "Aceite" && entrada?.email.toLowerCase() !== c.email.toLowerCase() && (
+              <Button size="sm" variant="ghost" onClick={() => setRevogar(c)}>
+                Revogar acesso
+              </Button>
+            )}
             {c.estado !== "Pendente" && c.estado !== "Aceite" && (
               <Button
                 size="sm"
@@ -368,7 +442,7 @@ function Convites({ editar }: { editar: boolean }) {
         <Estatistica titulo="Por responder" valor={inteiro(totais.Pendente)} numero={totais.Pendente} />
         <Estatistica titulo="Aceites" valor={inteiro(totais.Aceite)} numero={totais.Aceite} />
         <Estatistica titulo="Recusados" valor={inteiro(totais.Recusado)} numero={totais.Recusado} pior />
-        <Estatistica titulo="Expirados" valor={inteiro(totais.Expirado + totais.Cancelado)} numero={totais.Expirado + totais.Cancelado} pior />
+        <Estatistica titulo="Sem efeito" valor={inteiro(totais.Expirado + totais.Cancelado + totais.Revogado)} numero={totais.Expirado + totais.Cancelado + totais.Revogado} pior />
       </div>
       <Cartao
         titulo={`Convites${lista.itens.length ? ` (${lista.itens.length})` : ""}`}
@@ -382,14 +456,8 @@ function Convites({ editar }: { editar: boolean }) {
       >
         {lista.itens.length === 0 ? <Vazio icone="correio" titulo="Ainda não convidou ninguém" texto="Convide uma pessoa por e-mail e escolha a função que ela recebe ao aceitar." /> : <TabelaSimples colunas={colunas} linhas={[...lista.itens].sort((a, b) => b.enviadoEm.localeCompare(a.enviadoEm))} chave={(c) => c.id} />}
       </Cartao>
-      <Confirmar aberto={novo} aoMudar={setNovo} titulo="Convidar uma pessoa" texto={null} rotuloAcao="Enviar convite" desativado={!!erro} aoConfirmar={convidar}>
-        <div className="flex flex-col gap-3">
-          <Input label="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nome@empresa.pt" autoComplete="off" autoFocus />
-          <Select label="Função" value={funcao} onValueChange={(v) => setFuncao(String(v))} items={Object.fromEntries(FUNCOES.map((f) => [f.id, f.rotulo]))} />
-          <InputArea label="Mensagem" value={mensagem} onValueChange={setMensagem} minRows={3} autoResize />
-          {email && erro && <p className="text-sm text-kumo-danger">{erro}</p>}
-        </div>
-      </Confirmar>
+      <ConvidarPessoa aberto={novo} aoMudar={setNovo} existentes={lista.itens} aoConvidar={convidar} />
+      <Confirmar aberto={!!revogar} aoMudar={(v) => !v && setRevogar(null)} titulo="Revogar o acesso" perigo texto={revogar ? `«${revogar.email}» perde o acesso agora: a sessão fecha-se e qualquer ação dessa pessoa fica bloqueada neste instante.` : ""} rotuloAcao="Revogar agora" aoConfirmar={() => revogar && revogarJa(revogar)} />
     </>
   );
 }

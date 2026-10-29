@@ -1,4 +1,4 @@
-// Peças comuns dos ecrãs do super painel (pagamentos, marketing e developer tools): estado guardado no navegador, tabela simples de uma linha por linha, o aviso do modo da API, o relógio do tempo real e os formatos de números.
+// Peças comuns dos ecrãs do super painel (pagamentos, marketing e ferramentas de programador): estado guardado no navegador, tabela simples de uma linha por linha, o aviso do modo da API, o relógio do tempo real e os formatos de números.
 "use client";
 
 import { Badge, Button, Table } from "@cloudflare/kumo";
@@ -140,7 +140,7 @@ export function AvisoDeApi({ erro, aoTentar }: { erro: string | null; aoTentar: 
         </Button>
       </div>
     );
-  const texto = ligacao.modo === "ligado" ? `Dados do servidor ${ligacao.base}.` : "Dados de demonstração, só neste navegador. Em Developer tools, «API e ligações», liga este painel ao seu servidor.";
+  const texto = ligacao.modo === "ligado" ? `Dados do servidor ${ligacao.base}.` : "Dados de demonstração, só neste navegador. Em Ferramentas de programador, «API e ligações», liga este painel ao seu servidor.";
   return (
     <Dica conteudo={texto}>
       <Badge variant={ligacao.modo === "ligado" ? "success" : "outline"}>{ligacao.modo === "ligado" ? "Ligado ao servidor" : "Dados de demonstração"}</Badge>

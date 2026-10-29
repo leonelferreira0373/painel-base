@@ -5,7 +5,8 @@ import { Banner, Button, Checkbox, Input } from "@cloudflare/kumo";
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { auth, CHAVE_DO_LIMITE_MFA, regrasSenha, senhaValida, useSessao } from "@/lib/auth";
+import { auth, CHAVE_DO_LIMITE_MFA, emailValido, regrasSenha, senhaValida, useSessao } from "@/lib/auth";
+import { chaveSeguraDisponivel, idsDasChavesNesteNavegador } from "@/lib/chave-do-navegador";
 import { formatarEspera, useLimiteDeTentativas } from "@/lib/limite-tentativas";
 import { toasts } from "@/lib/toasts";
 import { CampoOtp } from "../CampoOtp";
@@ -65,6 +66,24 @@ export function PaginaEntrar() {
   const [lembrar, setLembrar] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [aEntrar, setAEntrar] = useState(false);
+  const [temChave, setTemChave] = useState(false);
+  useEffect(() => {
+    if (chaveSeguraDisponivel()) void idsDasChavesNesteNavegador().then((ids) => setTemChave(ids.length > 0));
+  }, []);
+  const entrarComCodigo = () => {
+    setErro(null);
+    const r = auth.pedirCodigoDeEntrada(email);
+    if (!r.ok) return setErro(r.erro ?? "Não foi possível pedir o código.");
+    router.push(`/verificar/?seguinte=${encodeURIComponent(seguinte)}`);
+  };
+  const entrarComChave = async () => {
+    setErro(null);
+    setAEntrar(true);
+    const r = await auth.entrarComChaveDoNavegador(email, lembrar);
+    setAEntrar(false);
+    if (!r.ok) return setErro(r.erro ?? "Não foi possível entrar com a chave.");
+    router.replace(seguinte);
+  };
 
   const submeter = (e: FormEvent) => {
     e.preventDefault();
@@ -134,6 +153,22 @@ export function PaginaEntrar() {
             <Button type="submit" size="lg" variant="primary" className="w-full" loading={aEntrar} disabled={!email || !senha}>
               Iniciar sessão
             </Button>
+          </div>
+          <div className="mt-3 flex flex-col gap-2">
+            <Button type="button" size="lg" variant="secondary" className="w-full" disabled={!emailValido(email)} onClick={entrarComCodigo}>
+              <span className="inline-flex items-center gap-2">
+                <Ic nome="correio" tamanho={18} />
+                Entrar com um código
+              </span>
+            </Button>
+            {temChave && (
+              <Button type="button" size="lg" variant="secondary" className="w-full" loading={aEntrar} disabled={!emailValido(email)} onClick={() => void entrarComChave()}>
+                <span className="inline-flex items-center gap-2">
+                  <Ic nome="chave" tamanho={18} />
+                  Entrar com a chave deste navegador
+                </span>
+              </Button>
+            )}
           </div>
           <div className="mt-4 flex flex-col items-center gap-1.5">
             <span className="inline-flex items-center gap-1 text-base">
@@ -438,6 +473,8 @@ export function PaginaVerificar() {
     if (!limite.bloqueado) setErro((m) => (m?.startsWith("Demasiadas") ? null : m));
   }, [limite.bloqueado]);
   const certo = typeof window !== "undefined" ? auth.codigoPendente() : null;
+  const tipo = typeof window !== "undefined" ? auth.tipoDaEntradaPendente() : null;
+  const destinos = typeof window !== "undefined" && tipo === "otp" ? auth.destinosDaEntradaPendente() : [];
   const verificar = (escrito: string) => {
     if (limite.bloqueado || erroVisual) return;
     const r = auth.confirmarCodigo(escrito);
@@ -457,7 +494,7 @@ export function PaginaVerificar() {
     <TelaEntrada atalho={{ rotulo: "Voltar", href: "/entrar/" }}>
       <div className="mb-6 text-left">
         <h1 className="text-balance text-2xl font-semibold text-kumo-default">
-          <div className="text-center">Verificação em dois passos</div>
+          <div className="text-center">{tipo === "otp" ? "Código de uso único" : "Verificação em dois passos"}</div>
         </h1>
       </div>
       {!temEntrada ? (
@@ -465,11 +502,19 @@ export function PaginaVerificar() {
       ) : (
         <form onSubmit={submeter}>
           {frase && <Banner className="mb-4" variant="error" title={frase} />}
-          <p className="mb-4 text-sm text-kumo-subtle">Introduza o código de 6 dígitos da sua aplicação autenticadora.</p>
+          <p className="mb-4 text-sm text-kumo-subtle">
+            {tipo === "otp" ? (
+              <>
+                Enviámos um código de 6 dígitos para {destinos.map((d, i) => <span key={d.valor}>{i > 0 ? ", " : ""}<b>{d.mascara}</b></span>)}.
+              </>
+            ) : (
+              "Introduza o código de 6 dígitos da sua aplicação autenticadora."
+            )}
+          </p>
           {certo && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-lg bg-kumo-tint px-3 py-2 text-sm text-kumo-default">
               <span className="min-w-0">
-                Simulação: o código agora é <b className="whitespace-nowrap tabular-nums">{`${certo.slice(0, 3)} ${certo.slice(3)}`}</b>
+                Simulação: o código {tipo === "otp" ? "é" : "agora é"} <b className="whitespace-nowrap tabular-nums">{`${certo.slice(0, 3)} ${certo.slice(3)}`}</b>
               </span>
               <Button type="button" size="sm" variant="secondary" className="ml-auto" disabled={limite.bloqueado} onClick={() => (setErroVisual(false), setCodigo(certo))}>
                 Preencher

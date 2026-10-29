@@ -1,4 +1,4 @@
-// Os dados de demonstração das implementações, dos commits do GitHub e dos conectores (Developer tools). Têm a forma exata das respostas do contrato das APIs (lib/api/contrato.ts); em modo ligado vêm do servidor.
+// Os dados de demonstração das implementações, dos commits do GitHub e dos conectores (Ferramentas de programador). Têm a forma exata das respostas do contrato das APIs (lib/api/contrato.ts); em modo ligado vêm do servidor.
 import type { EstadoDeImplementacoes, Implementacao } from "@/lib/implementacoes";
 import { Sorteio } from "./semente";
 

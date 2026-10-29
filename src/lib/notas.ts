@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { FUNCOES } from "@/dados/rbac";
 import { chamar, lerLigacao } from "./api/cliente";
+import { aleatorios, cifrarAes, decifrarAes, derivarChaveAes, type ChaveAes } from "./cripto";
 import { registar } from "./atividade";
 import { emailNovo, agendarEmail, type Email } from "./email";
 import { reciclar } from "./reciclagem";
@@ -51,6 +52,8 @@ export interface LembreteDaNota {
 
 /** O que fica escondido numa nota com palavra-passe. */
 export interface ConteudoDaNota {
+  /** O título da nota (opcional). Numa nota com palavra-passe fica cifrado com o resto. */
+  titulo?: string;
   corpo: string;
   texto: string;
   anexos: AnexoDaNota[];
@@ -76,6 +79,12 @@ export interface Nota extends ConteudoDaNota {
   expira?: string;
   /** Com palavra-passe o conteúdo está aqui, cifrado, e `corpo`, `texto` e `anexos` ficam vazios. */
   cifra?: Cifra;
+  /** A palavra-passe cifrada com a chave de recuperação (que está no cofre): serve para a recuperar por e-mail. */
+  recuperacao?: { iv: string; dados: string };
+  /** O conteúdo só se vê depois de se carregar no olho. */
+  oculta?: boolean;
+  /** Fica no topo da lista. */
+  afixada?: boolean;
   lembretes: LembreteDaNota[];
 }
 
@@ -188,7 +197,8 @@ export function notaVisivel(n: Nota, q: Quem, agora: Date): boolean {
   return !expirou(n, agora) && paraMim(n, q);
 }
 
-export const notasDoSitio = (todas: Nota[], chave: string): Nota[] => todas.filter((n) => n.alvo.chave === chave).sort((a, b) => b.atualizada.localeCompare(a.atualizada));
+/** As notas de um sítio: as afixadas primeiro, e em cada grupo as mais recentes. */
+export const notasDoSitio = (todas: Nota[], chave: string): Nota[] => todas.filter((n) => n.alvo.chave === chave).sort((a, b) => Number(!!b.afixada) - Number(!!a.afixada) || b.atualizada.localeCompare(a.atualizada));
 
 /** «agora», «há 5 min», «há 2 h», «há 3 d». */
 export function haTempo(iso: string, agora = new Date()): string {
@@ -231,37 +241,37 @@ export const paraBase64 = (b: ArrayBuffer | Uint8Array): string => {
 };
 export const deBase64 = (t: string): Uint8Array => Uint8Array.from(atob(t), (c) => c.charCodeAt(0));
 
+/** A chave AES de uma nota: a do navegador ou, em ligações sem Web Crypto (http), a de JavaScript puro. */
+export type ChaveDeNota = ChaveAes;
+
 /** A chave AES derivada da palavra-passe (PBKDF2, 150 000 voltas) e do sal. */
-export async function derivarChave(senha: string, sal: Uint8Array): Promise<CryptoKey> {
-  const base = await crypto.subtle.importKey("raw", codificador.encode(senha), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey({ name: "PBKDF2", salt: sal as BufferSource, iterations: itens, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-}
+export const derivarChave = (senha: string, sal: Uint8Array): Promise<ChaveDeNota> => derivarChaveAes(senha, sal, itens);
 
-export const novoSal = (): Uint8Array => crypto.getRandomValues(new Uint8Array(16));
+export const novoSal = (): Uint8Array => aleatorios(16);
 
-export async function cifrarBytes(chave: CryptoKey, bytes: ArrayBuffer | Uint8Array): Promise<{ iv: string; dados: ArrayBuffer }> {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const dados = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, chave, bytes as BufferSource);
+export async function cifrarBytes(chave: ChaveDeNota, bytes: ArrayBuffer | Uint8Array): Promise<{ iv: string; dados: ArrayBuffer }> {
+  const iv = aleatorios(12);
+  const dados = await cifrarAes(chave, iv, bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
   return { iv: paraBase64(iv), dados };
 }
 
 /** Decifra; `null` se a palavra-passe está errada (o AES-GCM não deixa passar dados alterados). */
-export async function decifrarBytes(chave: CryptoKey, iv: string, dados: ArrayBuffer | Uint8Array): Promise<ArrayBuffer | null> {
+export async function decifrarBytes(chave: ChaveDeNota, iv: string, dados: ArrayBuffer | Uint8Array): Promise<ArrayBuffer | null> {
   try {
-    return await crypto.subtle.decrypt({ name: "AES-GCM", iv: deBase64(iv) as BufferSource }, chave, dados as BufferSource);
+    return await decifrarAes(chave, deBase64(iv), dados instanceof Uint8Array ? dados : new Uint8Array(dados));
   } catch {
     return null;
   }
 }
 
 /** Cifra o conteúdo de uma nota com a palavra-passe; devolve a chave para cifrar também os ficheiros. */
-export async function cifrarConteudo(c: ConteudoDaNota, senha: string, sal = novoSal()): Promise<{ cifra: Cifra; chave: CryptoKey }> {
+export async function cifrarConteudo(c: ConteudoDaNota, senha: string, sal = novoSal()): Promise<{ cifra: Cifra; chave: ChaveDeNota }> {
   const chave = await derivarChave(senha, sal);
   const { iv, dados } = await cifrarBytes(chave, codificador.encode(JSON.stringify(c)));
   return { cifra: { sal: paraBase64(sal), iv, dados: paraBase64(dados) }, chave };
 }
 
-export async function decifrarConteudo(cifra: Cifra, senha: string): Promise<{ conteudo: ConteudoDaNota; chave: CryptoKey } | null> {
+export async function decifrarConteudo(cifra: Cifra, senha: string): Promise<{ conteudo: ConteudoDaNota; chave: ChaveDeNota } | null> {
   const chave = await derivarChave(senha, deBase64(cifra.sal));
   const bytes = await decifrarBytes(chave, cifra.iv, deBase64(cifra.dados));
   if (!bytes) return null;

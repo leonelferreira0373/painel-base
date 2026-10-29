@@ -10,9 +10,10 @@ import { identificador } from "@/lib/conta";
 import { MOEDAS } from "@/lib/iban";
 import { ESTADOS_DE_PRODUTO, erroDoPreco, erroDoProduto, erroDoStock, formatarPreco, lerPreco, lerStock, precoParaTexto, produtoNovo, useProdutos, type EstadoDeProduto, type Produto } from "@/lib/produtos";
 import { Cartao, Confirmar, Linha } from "../conta/Pecas";
+import { BarraDeGuardar } from "../BarraDeGuardar";
 import { Ic, ICONES } from "../Icones";
 import { SeletorPersonalizavel } from "../SeletorPersonalizavel";
-import { Pagina, Titulo } from "../ui";
+import { BotaoIcone, Pagina, Titulo } from "../ui";
 import { BlocoDeImagem } from "./BlocoDeImagem";
 import { useUrlsDeImagens, Vazio } from "./ConteudoPecas";
 
@@ -21,6 +22,8 @@ const nomeDaCategoria = (c: string) => CATEGORIA_DE_PRODUTO.opcoes[c] ?? c;
 
 function Editor({ inicial, aoGuardar, aoSair }: { inicial: Produto; aoGuardar: (p: Produto) => void; aoSair: () => void }) {
   const [p, setP] = useState<Produto>(inicial);
+  /** O que está guardado: «Desfazer» volta a isto. */
+  const [guardado, setGuardado] = useState<Produto>(inicial);
   const [preco, setPreco] = useState(precoParaTexto(inicial.preco));
   const [stock, setStock] = useState(String(inicial.stock));
   const [sujo, setSujo] = useState(false);
@@ -33,25 +36,27 @@ function Editor({ inicial, aoGuardar, aoSair }: { inicial: Produto; aoGuardar: (
     const novo: Produto = { ...p, nome: p.nome.trim(), preco: lerPreco(preco) ?? 0, stock: lerStock(stock) ?? 0, atualizado: new Date().toISOString() };
     aoGuardar(novo);
     setP(novo);
+    setGuardado(novo);
+    setSujo(false);
+  };
+  const desfazer = () => {
+    setP(guardado);
+    setPreco(precoParaTexto(guardado.preco));
+    setStock(String(guardado.stock));
     setSujo(false);
   };
 
   return (
     <Pagina largo>
-      <Titulo titulo={p.nome.trim() || "Produto novo"}>
-        <Button variant="ghost" icon={ICONES.anterior} onClick={() => (sujo ? setSaida(true) : aoSair())}>
-          Produtos
-        </Button>
-        <Button variant="primary" disabled={!!erro || !sujo} onClick={gravar}>
-          Guardar
-        </Button>
-      </Titulo>
+      {/* começa logo nas imagens: o bloco grande fica fixo e só o que está por baixo rola */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-start">
-        {/* no PC as imagens ficam fixas à esquerda enquanto os campos rolam; no telemóvel vêm primeiro */}
-        <div className="min-w-0 lg:sticky lg:top-4">
-          <Cartao titulo="Imagens">
-            <BlocoDeImagem local="produtos" varias ids={p.imagens} aoMudar={(ids) => mudar({ imagens: ids })} vazio="Sem imagens" />
-          </Cartao>
+        <div className="pleno sticky top-0 z-10 min-w-0 rounded-xl bg-kumo-base ring ring-kumo-line lg:top-4">
+          <div className="relative">
+            <BlocoDeImagem local="produtos" varias ids={p.imagens} aoMudar={(ids) => mudar({ imagens: ids })} vazio="Sem imagens" proporcao="aspect-[16/10] max-h-[34dvh] lg:aspect-[4/3] lg:max-h-none" />
+            <span className="absolute left-6 top-6">
+              <BotaoIcone dica="Voltar aos produtos" icone="anterior" aoClicar={() => (sujo ? setSaida(true) : aoSair())} />
+            </span>
+          </div>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Cartao titulo="Produto">
@@ -75,6 +80,7 @@ function Editor({ inicial, aoGuardar, aoSair }: { inicial: Produto; aoGuardar: (
           </Cartao>
         </div>
       </div>
+      <BarraDeGuardar sujo={sujo} desativadoGuardar={!!erro} aoDesfazer={desfazer} aoGuardar={gravar} />
       <Confirmar aberto={saida} aoMudar={setSaida} titulo="Sair sem guardar?" texto="As alterações a este produto ainda não foram guardadas." rotuloAcao="Sair sem guardar" perigo aoConfirmar={aoSair} />
     </Pagina>
   );

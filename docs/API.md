@@ -1,6 +1,6 @@
-# As APIs do painel (pagamentos, marketing e developer tools)
+# As APIs do painel (pagamentos, marketing e ferramentas de programador)
 
-O painel traz três áreas prontas — **Pagamentos**, **Marketing** (com os e-mails) e **Developer tools** (com as implementações e o GitHub) — e a configuração dos módulos, que falam com um servidor através de um contrato fixo. Por omissão correm em **dados de demonstração** (nada sai do navegador); para os usar a sério, põe-se o endereço de um servidor que cumpra o contrato em Developer tools, «API e ligações». Nenhum ecrã muda: os mesmos ecrãs leem e escrevem no servidor.
+O painel traz três áreas prontas — **Pagamentos**, **Marketing** (com os e-mails) e **Ferramentas de programador** (com as implementações e o GitHub) — e a configuração dos módulos, que falam com um servidor através de um contrato fixo. Por omissão correm em **dados de demonstração** (nada sai do navegador); para os usar a sério, põe-se o endereço de um servidor que cumpra o contrato em Ferramentas de programador, «API e ligações». Nenhum ecrã muda: os mesmos ecrãs leem e escrevem no servidor.
 
 - O contrato está em `src/lib/api/contrato.ts` (cada endereço, o método, o que faz e um exemplo). A lista e o comando `curl` de cada um estão no próprio painel, em «API e ligações», e o botão «Descarregar OpenAPI» dá o contrato em OpenAPI 3.1.
 - `src/lib/api/cliente.ts` guarda a ligação (`simulado` ou `ligado`, o endereço e o token), faz os pedidos (`chamar`) e dá aos ecrãs o hook `useApi`. `src/lib/api/colecao.ts` faz o mesmo para listas com identificador (`useColecao`: contas bancárias, regras do firewall, e-mails, cópias de segurança).
@@ -12,7 +12,7 @@ O painel traz três áreas prontas — **Pagamentos**, **Marketing** (com os e-m
 node scripts/servidor-de-exemplo.mjs
 ```
 
-Sobe um servidor sem dependências em `http://localhost:4000` e imprime o token. Depois, no painel: Developer tools → API e ligações → origem «Ligado a um servidor», endereço `http://localhost:4000` e o token. Responde a todos os endereços do contrato com dados em memória, e algumas coisas são a sério:
+Sobe um servidor sem dependências em `http://localhost:4000` e imprime o token. Depois, no painel: Ferramentas de programador → API e ligações → origem «Ligado a um servidor», endereço `http://localhost:4000` e o token. Responde a todos os endereços do contrato com dados em memória, e algumas coisas são a sério:
 
 - **Saúde do servidor**: CPU, memória, disco e tempo ligado do próprio sistema.
 - **Pedidos em tempo real**: os pedidos que o servidor recebeu, com estado e tempo; um erro 5xx entra no registo de erros.
@@ -33,7 +33,7 @@ Uma IA com um token controla o painel por inteiro só pelas APIs: `GET /v1/paine
 
 ## Registos do servidor
 
-«Developer tools → Registos do servidor» mostra as linhas que o servidor escreve, em direto, como os registos do Render: pesquisa, níveis (depuração, informação, aviso, erro), fonte, pausa, hora local ou UTC, exportar em qualquer formato e investigar com a IA. O painel lê `GET /v1/dev/logs?desde=<id>&limite=500` de 1,5 em 1,5 segundos (`desde` é o `id` da última linha que já tem, e o `cursor` da resposta é o que se passa a pedir) e as fontes em `GET /v1/dev/logs/fontes`.
+«Ferramentas de programador → Registos do servidor» mostra as linhas que o servidor escreve, em direto, como os registos do Render: pesquisa, níveis (depuração, informação, aviso, erro), fonte, pausa, hora local ou UTC, exportar em qualquer formato e investigar com a IA. O painel lê `GET /v1/dev/logs?desde=<id>&limite=500` de 1,5 em 1,5 segundos (`desde` é o `id` da última linha que já tem, e o `cursor` da resposta é o que se passa a pedir) e as fontes em `GET /v1/dev/logs/fontes`.
 
 O servidor de exemplo escreve nos registos a sua consola e cada pedido, e liga-se a mais fontes por variáveis de ambiente (todas opcionais):
 
@@ -52,7 +52,7 @@ Cada linha tem `id` (cresce sempre, com zeros à esquerda), `quando` (ISO), `niv
 2. Proteja-os com um token (`Authorization: Bearer <token>`); `401` ou `403` fazem o painel dizer «O servidor recusou o token». Só `POST /v1/eventos` fica aberto, porque é o site que o chama.
 3. Ative o CORS para o endereço do painel (`Access-Control-Allow-Origin`, `Authorization` e `Content-Type` nos cabeçalhos, e os métodos `GET, POST, PUT, PATCH, DELETE, OPTIONS`).
 4. Em produção o endereço tem de ser `https://` (o painel só aceita `http://` em `localhost`) e a política de segurança do painel (`connect-src` em `seguranca.conf`) tem de o permitir; o ficheiro traz `https:`.
-5. Em Developer tools, «API e ligações», ponha o endereço e o token, use «Testar a ligação» e guarde.
+5. Em Ferramentas de programador, «API e ligações», ponha o endereço e o token, use «Testar a ligação» e guarde.
 
 O token fica guardado no navegador de quem o escreveu (`localStorage`, chave `painel.api`). Para um painel partilhado, o ideal é o servidor emitir tokens por pessoa e curtos, em vez de um token fixo.
 

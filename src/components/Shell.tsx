@@ -20,7 +20,7 @@ import { catalogoDoPainel } from "@/lib/catalogo";
 import { devePerguntarAIa, mensagensDaPesquisa, perguntarAIa, pontuarPaginas, type PaginaPesquisavel } from "@/lib/pesquisa-ia";
 import { marcarEmUso, registarUsoDaIa, useEmUso } from "@/lib/ia-uso";
 import { AnelDeContexto } from "./ia/AnelDeContexto";
-import { PensarEmLinha } from "./ia/PensarEmLinha";
+import { IconeDaAccao } from "@/assistente/cliente/icones";
 import { useApp } from "@/lib/estado";
 import { useTema, type Tema } from "@/lib/tema";
 import { toasts } from "@/lib/toasts";
@@ -489,12 +489,19 @@ function Pesquisa({ aberta, aoMudar }: { aberta: boolean; aoMudar: (v: boolean) 
     >
       <CommandPalette.Input
         placeholder={T.topo.pesquisaPlaceholder}
+        // enquanto a IA trabalha, o cérebro (a pensar) ou o lápis (a escolher) tomam o lugar da lupa, à esquerda do campo
+        leading={
+          aPensar ? (
+            <span className="aia-pensa-icone shrink-0" role="status" aria-label={ia.consulta === consulta && ia.escrevendo ? T.topo.aEscolherComIa : T.topo.aPesquisarComIa}>
+              <span className="aia-pensa-icone-forma" data-forma={ia.consulta === consulta && ia.escrevendo ? "lapis" : "cerebro"} key={ia.consulta === consulta && ia.escrevendo ? "lapis" : "cerebro"}>
+                <IconeDaAccao forma={ia.consulta === consulta && ia.escrevendo ? "lapis" : "cerebro"} className="aia-icone-pequeno" />
+              </span>
+            </span>
+          ) : undefined
+        }
         trailing={
-          // à direita: o que a IA está a fazer (o brilho do chat, o cérebro e o lápis) e o anel de contexto, que só tem cor enquanto a IA trabalha
-          <span className="flex min-w-0 items-center gap-2">
-            {aPensar && <PensarEmLinha forma={ia.consulta === consulta && ia.escrevendo ? "lapis" : "cerebro"} texto={ia.consulta === consulta && ia.escrevendo ? T.topo.aEscolherComIa : T.topo.aPesquisarComIa} />}
-            {!!PROJETO.urlIa && <AnelDeContexto origem="pesquisa" ativo={iaEmUso || aPensar} />}
-          </span>
+          // à direita só o anel de contexto, que só tem cor enquanto a IA trabalha
+          !!PROJETO.urlIa ? <AnelDeContexto origem="pesquisa" ativo={iaEmUso || aPensar} /> : undefined
         }
       />
       <CommandPalette.List>

@@ -171,7 +171,7 @@ function bloco(rotulo: string, v: unknown, nivel: number, chave?: string, recuoB
   return [`${cab}: ${texto.replace(/\r?\n/g, `\n${recuo}  `)}`];
 }
 
-/** O nome da página de onde se copiou, como se lê no menu («Developer tools: Registos do servidor»). */
+/** O nome da página de onde se copiou, como se lê no menu («Ferramentas de programador: Registos do servidor»). */
 export function nomeDaPagina(origem?: string): string | null {
   if (!origem) return null;
   const partes = origem.split("/").filter(Boolean);

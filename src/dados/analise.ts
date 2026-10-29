@@ -61,17 +61,7 @@ export const ANALISE = {
   },
 } as const;
 
-/** Os nomes dos países em português, para a dica do mapa e para a tabela. */
-export const NOMES_DE_PAISES: Record<string, string> = {
-  Portugal: "Portugal",
-  Spain: "Espanha",
-  France: "França",
-  Brazil: "Brasil",
-  Angola: "Angola",
-  Germany: "Alemanha",
-  "United Kingdom": "Reino Unido",
-  "United States of America": "Estados Unidos",
-};
+export { NOMES_DE_PAISES } from "./paises";
 
 /** O país de uma linha: fictício mas estável (a mesma linha dá sempre o mesmo país). */
 export function paisDe(linha: Linha): string {

@@ -96,7 +96,7 @@ export function GraficoMapa({ dados, nomes, unidade, altura = 340, destacado, ao
   const opcoes = useMemo(() => {
     const max = Math.max(1, ...dados.map((d) => d.valor));
     const base = {
-      tooltip: { trigger: "item", backgroundColor: "#fff", borderColor: "#e5e5e5", textStyle: { color: "#171717", fontSize: 12 }, formatter: (p: { name: string; value?: number }) => (Number.isFinite(p.value) ? `${nomes[p.name] ?? p.name}: <b>${p.value}</b> ${unidade}<br/><span style="opacity:.65">Clique para ver os detalhes</span>` : `${nomes[p.name] ?? p.name}: sem ${unidade}`) },
+      tooltip: { trigger: "item", confine: true, backgroundColor: "#fff", borderColor: "#e5e5e5", textStyle: { color: "#171717", fontSize: 12 }, formatter: (p: { name: string; value?: number }) => (Number.isFinite(p.value) ? `${nomes[p.name] ?? p.name}: <b>${p.value}</b> ${unidade}<br/><span style="opacity:.65">Clique para ver os detalhes</span>` : `${nomes[p.name] ?? p.name}: sem ${unidade}`) },
       visualMap: { min: 0, max, orient: "horizontal", left: 8, bottom: 4, itemWidth: 10, itemHeight: 90, text: ["mais", "menos"], calculable: false, inRange: { color: ["#c9d6f2", "#155DFC"] }, textStyle: { color: "#737373", fontSize: 11 } },
       series: [
         {

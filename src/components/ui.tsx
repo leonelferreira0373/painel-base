@@ -16,6 +16,7 @@ import { Ic, ICONES, type Icone } from "./Icones";
 import { AreaMini } from "./graficos/Pequenos";
 import { mesmoPeriodo, PERIODOS, type Periodo } from "./Periodo";
 import { GatilhoDoMenu, ItensDeKpi, MenuDoKpi, useJanelaDeCor } from "./MenuDeDados";
+import { useJanelasDoCartao } from "./DetalhesDoCartao";
 import { IndicadorDeVariacao } from "./IndicadorDeVariacao";
 import { useTemGrafico } from "@/lib/elementos-do-grafico";
 import { IndicadorDeNotas } from "./notas/MotorDeNotas";
@@ -129,6 +130,7 @@ export function CartaoMetrica({
   const paginaDoCartao = usePathname() ?? "";
   const idDaCor = idDoGrafico(paginaDoCartao, titulo);
   const cor = useJanelaDeCor(idDaCor);
+  const det = useJanelasDoCartao(idDaCor, titulo);
   const tipoAtual = TIPOS_CARTAO.find((t) => t.id === tipo);
   return (
     <Surface className={`pleno group/cartao flex min-w-0 flex-col gap-1 rounded-xl p-4 ${className}`}>
@@ -144,7 +146,7 @@ export function CartaoMetrica({
             <MenuCartao>
               {href && (
                 <DropdownMenu.LinkItem href={href} icon={<Ic nome="olho" />} render={<Link href={href} />}>
-                  Ver detalhes
+                  {det.aoVerDetalhes ? "Abrir a página" : "Ver detalhes"}
                 </DropdownMenu.LinkItem>
               )}
               {aoAtualizar && (
@@ -176,7 +178,7 @@ export function CartaoMetrica({
                   </SubMenuCartao>
                 </DropdownMenu.Sub>
               )}
-              <ItensDeKpi dados={exportar} titulo={titulo} idDaCor={idDaCor} aoOutraCor={cor.abrir} aoResultado={(ok) => definirCopia(ok ? "ok" : "erro")} estruturado={valor !== undefined ? { dados: { indicador: titulo, valor, variacao: variacao ?? null } } : undefined} />
+              <ItensDeKpi dados={exportar} titulo={titulo} idDaCor={idDaCor} aoOutraCor={cor.abrir} aoVerDetalhes={det.aoVerDetalhes} aoVerMapa={det.aoVerMapa} aoResultado={(ok) => definirCopia(ok ? "ok" : "erro")} estruturado={valor !== undefined ? { dados: { indicador: titulo, valor, variacao: variacao ?? null } } : undefined} />
               {aoRemover && (
                 <>
                   <SeparadorDeMenu />
@@ -189,6 +191,7 @@ export function CartaoMetrica({
           </DropdownMenu>
         )}
         {cor.janela}
+        {det.janelas}
       </div>
       {carregando ? (
         <EsqueletoCartao altura={alturaEsqueleto} anel={anel} />
@@ -211,7 +214,7 @@ export function CartaoMetrica({
   );
 }
 
-export function Painel({ titulo, children, acoes, className = "", dados }: { titulo: string; children: ReactNode; acoes?: ReactNode; className?: string; /** Os dados do painel, em tabela: dão-lhe «Exportar» e «Copiar» no menu. */ dados?: DadosExportaveis }) {
+export function Painel({ titulo, children, acoes, className = "", dados, semCor = false }: { titulo: string; /** O gráfico do painel não se pinta elemento a elemento (um mapa). */ semCor?: boolean; children: ReactNode; acoes?: ReactNode; className?: string; /** Os dados do painel, em tabela: dão-lhe «Exportar» e «Copiar» no menu. */ dados?: DadosExportaveis }) {
   const pagina = usePathname() ?? "";
   const idDaCor = idDoGrafico(pagina, titulo);
   // um painel com um gráfico tem o menu de três pontinhos dos cartões (cor de cada elemento, nota, IA); um painel só com texto ou listas fica como estava
@@ -222,7 +225,7 @@ export function Painel({ titulo, children, acoes, className = "", dados }: { tit
         <h3 className="text-sm font-medium">{titulo}</h3>
         <span className="flex shrink-0 items-center gap-1">
           {acoes}
-          {(temGrafico || dados) && <MenuDoKpi titulo={titulo} dados={dados} tipo="cartao" idDaCor={temGrafico ? idDaCor : undefined} />}
+          {(temGrafico || dados) && <MenuDoKpi titulo={titulo} dados={dados} tipo="cartao" idDaCor={temGrafico ? idDaCor : undefined} semCor={semCor} />}
         </span>
       </LayerCard.Secondary>
       <LayerCard.Primary className="p-4">

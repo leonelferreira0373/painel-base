@@ -57,7 +57,7 @@ const eixoTexto = { color: TEXTO, fontSize: 11, fontFamily: "Inter Variable, Int
 const areaDe = (cor?: string) => ({ type: "linear" as const, x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: cor ? comOpacidade(cor, 0.26) : "rgba(21,93,252,0.26)" }, { offset: 1, color: cor ? comOpacidade(cor, 0.02) : "rgba(21,93,252,0.02)" }] });
 const AREA = { type: "linear" as const, x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(21,93,252,0.26)" }, { offset: 1, color: "rgba(21,93,252,0.02)" }] };
 const grelhaBase = { left: 8, right: 12, top: 16, bottom: 4, containLabel: true };
-const dica = { trigger: "item" as const, backgroundColor: "#fff", borderColor: GRELHA, textStyle: { color: "#171717", fontSize: 12 } };
+const dica = { trigger: "item" as const, backgroundColor: "#fff", borderColor: GRELHA, textStyle: { color: "#171717", fontSize: 12 }, confine: true };
 
 /** Quantos elementos no máximo se listam para escolher a cor de cada um (uma coluna por dia, num mês, já era demais). */
 const MAXIMO_DE_ELEMENTOS = 12;
@@ -166,7 +166,7 @@ export function opcoesDe(spec: GraficoSpec, cor?: string, itens?: Record<string,
       tooltip: { ...dica, formatter: (p: { value: number[] }) => `${spec.nomes[p.value[1]]} × ${spec.nomes[p.value[0]]}: ${pt.format(p.value[2])}` },
       xAxis: { type: "category", data: spec.nomes, axisLabel: { ...eixoTexto, rotate: 35, width: 90, overflow: "truncate" }, splitArea: { show: false }, axisLine: { show: false }, axisTick: { show: false } },
       yAxis: { type: "category", data: spec.nomes, inverse: true, axisLabel: { ...eixoTexto, color: "#171717", width: 100, overflow: "truncate" }, axisLine: { show: false }, axisTick: { show: false } },
-      visualMap: { min: -1, max: 1, calculable: false, orient: "horizontal", left: "center", bottom: 0, itemWidth: 12, itemHeight: 90, text: ["1", "-1"], textStyle: eixoTexto, inRange: { color: ["#1d1d1f", "#e5e5e5", "#155dfc"] } },
+      visualMap: { min: -1, max: 1, calculable: false, orient: "horizontal", left: "center", bottom: 0, itemWidth: 12, itemHeight: 90, text: ["1", "-1"], textStyle: eixoTexto, inRange: { color: ["#1d1d1f", "#e5e5e5", base] } },
       series: [{ type: "heatmap", data: dados, label: { show: spec.nomes.length <= 8, fontSize: 10, color: "#171717", formatter: (p: { value: number[] }) => pt.format(p.value[2]) }, itemStyle: { borderColor: "#fff", borderWidth: 2, borderRadius: 3 } }],
     } as KumoChartOption;
   }
@@ -227,8 +227,22 @@ export function semDados(spec: GraficoSpec): boolean {
   return spec.pontos.length === 0 || spec.pontos.every((p) => p.valor === 0);
 }
 
+/** Regista, sem desenhar nada, os elementos de um gráfico que o cartão mostra de outra forma (o mapa, uma lista): o cartão ganha «Ver detalhes» e, se os elementos são países, «Ver o mapa». */
+export function RegistoDoGrafico({ spec }: { spec: GraficoSpec }) {
+  const id = useIdDoGrafico();
+  const elementos = useMemo(() => elementosDe(spec, undefined), [spec]);
+  const assinatura = elementos.map((e) => `${e.chave}|${e.rotulo}|${e.padrao}`).join(";");
+  const chaveDaSpec = useMemo(() => JSON.stringify(spec), [spec]);
+  useEffect(() => {
+    if (!id) return;
+    registarElementos(id, elementos, spec, chaveDaSpec);
+    return () => retirarElementos(id);
+  }, [id, assinatura, chaveDaSpec]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
 /** Gráfico com a aparência do painel da Cloudflare; sem dados, mostra a onda esmaecida com a etiqueta «Sem dados». */
-export function Grafico({ spec, altura = 240 }: { spec: GraficoSpec; altura?: number; nome?: string }) {
+export function Grafico({ spec, altura = 240, semRegisto = false }: { spec: GraficoSpec; altura?: number; nome?: string; /** O gráfico da janela «Ver detalhes» é uma cópia do do cartão e não se regista (senão, ao fechar, tirava o do cartão). */ semRegisto?: boolean }) {
   const vazio = semDados(spec);
   const { efetivo } = useTema();
   const id = useIdDoGrafico();
@@ -238,11 +252,12 @@ export function Grafico({ spec, altura = 240 }: { spec: GraficoSpec; altura?: nu
   const todos = useMemo(() => elementosCompletos(spec, cor), [spec, cor]);
   // a janela da cor (no menu do cartão) lista os elementos que o gráfico tem agora
   const assinatura = elementos.map((e) => `${e.chave}|${e.rotulo}|${e.padrao}`).join(";");
+  const chaveDaSpec = useMemo(() => JSON.stringify(spec), [spec]);
   useEffect(() => {
-    if (!id) return;
-    registarElementos(id, elementos);
+    if (!id || semRegisto) return;
+    registarElementos(id, elementos, spec, chaveDaSpec);
     return () => retirarElementos(id);
-  }, [id, assinatura]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, assinatura, chaveDaSpec, semRegisto]); // eslint-disable-line react-hooks/exhaustive-deps
   const opcoes = useMemo(() => (vazio ? null : efetivo === "escuro" ? paraEscuro(opcoesExportacao(spec, cor, itens)) : opcoesExportacao(spec, cor, itens)), [spec, vazio, efetivo, cor, itens]);
   const botaoDaCor: ReactNode = null;
   if (!opcoes) return <SemDadosGrafico altura={altura} />;

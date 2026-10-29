@@ -66,7 +66,7 @@ Se uma receita lhe obrigar a mexer em mais ficheiros do que os listados, falta u
 
 ### Ligar um módulo de registos a um servidor
 
-Ponha `api` na definição (`DefRegistos.api`) e o módulo passa a ler do servidor quando o painel está ligado (Developer tools, «API e ligações»), como os de `src/dados/modulos-super.ts`:
+Ponha `api` na definição (`DefRegistos.api`) e o módulo passa a ler do servidor quando o painel está ligado (Ferramentas de programador, «API e ligações»), como os de `src/dados/modulos-super.ts`:
 
 ```ts
 api: { lista: "/v1/faturas", estado: "/v1/faturas/{id}", criar: "/v1/faturas", mapear: (f) => ({ ...f, data: String(f.data).slice(0, 10) }) },

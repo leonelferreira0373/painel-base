@@ -10,6 +10,8 @@ import { auth } from "@/lib/auth";
 import { EVENTO_RESTAURAR_CONTA } from "@/lib/reciclagem-tipos";
 import { useApp } from "@/lib/estado";
 import { toasts } from "@/lib/toasts";
+import type { ChaveDoNavegador } from "@/lib/chave-do-navegador";
+import type { ContactoDeRecuperacao, ModoDeEntrada } from "@/lib/seguranca-conta";
 
 /** «cada-N» é uma repetição personalizada, de N em N dias. */
 export type Repeticao = "nao" | "diario" | "semanal" | "mensal" | `cada-${number}`;
@@ -81,6 +83,16 @@ export interface Conta {
   telefone: string;
   telefoneVerificado: boolean;
 
+  /** Mais e-mails e números de recuperação, além do e-mail alternativo e do telefone: os verificados também recebem os códigos de uso único. */
+  recuperacao: ContactoDeRecuperacao[];
+  /** Os códigos de uso único vão também para os contactos de recuperação verificados. */
+  codigosTambemParaRecuperacao: boolean;
+  /** Como a pessoa entra: com a palavra-passe (e, se estiver ligada, a verificação em dois passos) ou só com um código de uso único. */
+  modoDeEntrada: ModoDeEntrada;
+  /** O segredo da aplicação autenticadora (base32). Em modo simulado fica neste navegador; em modo ligado é o servidor que o guarda. */
+  segredoTotp?: string;
+  /** As chaves seguras de navegador com que a pessoa pode entrar (a parte privada nunca sai do navegador onde foi criada). */
+  chavesNavegador: ChaveDoNavegador[];
   senhaAlteradaEm: string;
   doisFatores: boolean;
   codigosRecuperacao: number;
@@ -127,6 +139,10 @@ export function contaInicial(f: Funcao): Conta {
     emailRecuperacao: "",
     telefone: "+244 923 000 000",
     telefoneVerificado: true,
+    recuperacao: [],
+    codigosTambemParaRecuperacao: true,
+    modoDeEntrada: "senha",
+    chavesNavegador: [],
     senhaAlteradaEm: mais(-86_400_000 * 47),
     doisFatores: false,
     codigosRecuperacao: 0,

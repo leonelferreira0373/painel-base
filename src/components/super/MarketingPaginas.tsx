@@ -3,33 +3,78 @@
 
 import { Button, Input } from "@cloudflare/kumo";
 import { useEffect, useMemo, useState } from "react";
-import { gerarCliques, gerarOrigens, gerarPaginas, gerarResumoMarketing, type Clique, type Origem, type PaginaQuente, type ResumoMarketing } from "@/dados/super-dados";
+import { gerarCliques, gerarOrigens, gerarPaginas, gerarPublico, gerarResumoMarketing, type Clique, type Origem, type PaginaQuente, type PublicoDeMarketing, type ResumoMarketing } from "@/dados/super-dados";
+import { NOMES_DE_PAISES } from "@/dados/paises";
+import { paisNoMapa } from "@/lib/detalhes-do-grafico";
+import { GraficoMapa } from "../graficos/GraficoMapa";
 import { estruturaDeRegisto } from "@/lib/copiar-dados";
 import { chamar, useApi, useLigacao } from "@/lib/api/cliente";
 import { endpointPorId } from "@/lib/api/contrato";
 import { identificador } from "@/lib/conta";
+import { analisarContactos, ESTADOS_DE_CONTACTO, metricasDeContactos, ORDEM_DOS_ESTADOS } from "@/lib/email-contactos";
 import { frasaDaRota, textoDaRota } from "@/lib/rotas";
 import { erroDoUtm, montarUrlUtm, origemDoVisitante, taxaDeConversao, type ParametrosUtm } from "@/lib/marketing";
 import { useEditar } from "@/lib/permissao";
 import { Cartao, Confirmar, Linha } from "../conta/Pecas";
 import { Frase, Rota } from "../Frase";
 import { BotaoCopiar } from "../Copiar";
-import { Grafico } from "../graficos/Graficos";
+import { Grafico, RegistoDoGrafico } from "../graficos/Graficos";
 import { GrelhaOrdenavel } from "../GrelhaOrdenavel";
 import { ICONES } from "../Icones";
 import { LinhaOrdenada } from "../LinhaOrdenada";
 import { CartaoEstatistica, Painel, Pagina, Titulo } from "../ui";
 import { Vazio } from "../conteudo/ConteudoPecas";
+import { useAgora, useEmails } from "./EmailPecas";
 import { AvisoDeApi, dataCurta, Estatistica, inteiro, percentagem, TabelaSimples, useGuardado, useTick } from "./SuperPecas";
 
 // ---------- visão geral ----------
+
+/** O estado das pessoas que escrevem ou a quem se escreve (urgente, quente, lead, atendido…), tirado das mensagens: a rosca por estado e os números que dizem como se atende. */
+function EstadoDosContactos() {
+  const emails = useEmails();
+  const agora = useAgora();
+  const m = useMemo(() => (agora ? metricasDeContactos(analisarContactos(emails.itens, agora), emails.itens) : null), [emails.itens, agora]);
+  if (!m) return <div className="min-h-40 text-sm text-kumo-subtle">A ler as mensagens…</div>;
+  if (m.contactos === 0) return <span className="text-sm text-kumo-subtle">Ainda não há mensagens.</span>;
+  const pontos = ORDEM_DOS_ESTADOS.filter((s) => m.porEstado[s] > 0).map((s) => ({ chave: s, rotulo: ESTADOS_DE_CONTACTO[s].rotulo, valor: m.porEstado[s], n: m.porEstado[s] }));
+  const horas = m.horasAteResponder;
+  return (
+    <div className="flex flex-col gap-3">
+      <Grafico spec={{ tipo: "rosca", pontos }} altura={180} />
+      <dl className="grid grid-cols-3 gap-3 text-sm">
+        <div>
+          <dt className="text-xs text-kumo-subtle">Taxa de resposta</dt>
+          <dd className="font-semibold tabular-nums">{Math.round(m.taxaDeResposta * 100)} %</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-kumo-subtle">Até responder</dt>
+          <dd className="font-semibold tabular-nums">{horas === null ? "—" : horas < 1 ? "< 1 h" : horas < 48 ? `${Math.round(horas)} h` : `${Math.round(horas / 24)} dias`}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-kumo-subtle">Mensagens por pessoa</dt>
+          <dd className="font-semibold tabular-nums">{m.mensagensPorContacto.toLocaleString("pt-PT", { maximumFractionDigits: 1 })}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
 
 export function MarketingVisao() {
   const resumo = useApi<ResumoMarketing>("/v1/marketing/resumo", () => gerarResumoMarketing());
   const origens = useApi<{ itens: Origem[] }>("/v1/marketing/origens", () => ({ itens: gerarOrigens() }));
   const paginas = useApi<{ itens: PaginaQuente[] }>("/v1/marketing/paginas", () => ({ itens: gerarPaginas() }));
   const cliques = useApi<{ itens: Clique[] }>("/v1/marketing/cliques", () => ({ itens: gerarCliques() }));
+  const publico = useApi<PublicoDeMarketing>("/v1/marketing/publico", () => gerarPublico());
   const r = resumo.dados;
+  const p = publico.dados;
+  // o mapa pinta os países (o nome que o mapa usa); a lista ao lado diz quantas visitas e que parte do total
+  const paises = useMemo(() => [...(p?.paises ?? [])].sort((a, b) => b.visitas - a.visitas), [p]);
+  const totalDePaises = paises.reduce((s, x) => s + x.visitas, 0);
+  const dadosDoMapa = paises.flatMap((x) => {
+    const nome = paisNoMapa(x.pais);
+    return nome ? [{ nome, valor: x.visitas }] : [];
+  });
+  const totalDeDispositivos = (p?.dispositivos ?? []).reduce((s, x) => s + x.visitas, 0);
   const serie = r?.porDia.map((d) => d.visitas) ?? [];
   // os outros cartões usam o mesmo número de cada dia, se o servidor o disser
   const doDia = (campo: "visitantes" | "paginasPorVisita" | "rejeicao" | "conversoes", escala = 1) => (r && r.porDia.length > 1 && r.porDia.every((d) => d[campo] !== undefined) ? r.porDia.map((d) => (d[campo] as number) * escala) : undefined);
@@ -46,7 +91,7 @@ export function MarketingVisao() {
   return (
     <Pagina>
       <Titulo titulo="Marketing" />
-      <AvisoDeApi erro={resumo.erro ?? origens.erro ?? paginas.erro ?? cliques.erro} aoTentar={() => (resumo.recarregar(), origens.recarregar(), paginas.recarregar(), cliques.recarregar())} />
+      <AvisoDeApi erro={resumo.erro ?? origens.erro ?? paginas.erro ?? cliques.erro ?? publico.erro} aoTentar={() => (resumo.recarregar(), origens.recarregar(), paginas.recarregar(), cliques.recarregar(), publico.recarregar())} />
       {r && (
         <>
           <GrelhaOrdenavel
@@ -75,6 +120,29 @@ export function MarketingVisao() {
                 </span>
               </div>
             </Painel>
+            <Painel titulo="Visitantes por país" className="lg:col-span-3" semCor dados={{ nome: "visitantes-por-pais", titulo: "Visitantes por país", colunas: ["País", "Visitas"], linhas: paises.map((x) => [x.pais, x.visitas]) }}>
+              <RegistoDoGrafico spec={{ tipo: "barras", pontos: paises.map((x) => ({ chave: x.pais, rotulo: x.pais, valor: x.visitas, n: x.visitas })) }} />
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+                <div className="min-w-0 overflow-hidden rounded-lg">
+                  <GraficoMapa dados={dadosDoMapa} nomes={NOMES_DE_PAISES} unidade="visitas" altura={320} />
+                </div>
+                <div className="flex min-w-0 flex-col">
+                  {paises.slice(0, 8).map((x) => (
+                    <LinhaOrdenada key={x.pais} larguraDoValor="min-w-28" nome={x.pais} valor={`${inteiro(x.visitas)} · ${percentagem(totalDePaises ? x.visitas / totalDePaises : 0)}`} proporcao={(x.visitas / Math.max(1, paises[0].visitas)) * 100} />
+                  ))}
+                </div>
+              </div>
+            </Painel>
+            <Painel titulo="Aparelhos">
+              <Grafico spec={{ tipo: "rosca", pontos: (p?.dispositivos ?? []).map((d) => ({ chave: d.tipo, rotulo: d.tipo, valor: d.visitas, n: d.visitas })) }} altura={200} />
+              <p className="mt-2 text-sm text-kumo-subtle">{totalDeDispositivos ? `${percentagem((p?.dispositivos[0]?.visitas ?? 0) / totalDeDispositivos)} das visitas vêm de ${(p?.dispositivos[0]?.tipo ?? "").toLowerCase()}.` : ""}</p>
+            </Painel>
+            <Painel titulo="Horas de maior movimento" className="lg:col-span-2">
+              <Grafico spec={{ tipo: "colunas", pontos: (p?.horas ?? []).map((h) => ({ chave: `${h.hora}`, rotulo: `${String(h.hora).padStart(2, "0")}h`, valor: h.visitas, n: h.visitas })) }} altura={220} />
+            </Painel>
+            <Painel titulo="Do primeiro clique ao pedido">
+              <Grafico spec={{ tipo: "barras", pontos: (p?.funil ?? []).map((f) => ({ chave: f.etapa, rotulo: f.etapa, valor: f.visitantes, n: f.visitantes })) }} altura={200} />
+            </Painel>
             <Painel titulo="De onde vieram">
               {porFonte.map((f) => (
                 <LinhaOrdenada key={f.fonte} nome={f.fonte} valor={inteiro(f.visitas)} proporcao={(f.visitas / Math.max(1, porFonte[0].visitas)) * 100} />
@@ -84,6 +152,9 @@ export function MarketingVisao() {
               {quentes.map((p) => (
                 <LinhaOrdenada key={p.pagina} nome={textoDaRota(p.pagina)} conteudo={<Rota caminho={p.pagina} />} copiar={p.pagina} valor={inteiro(p.visitas)} proporcao={(p.visitas / Math.max(1, quentes[0].visitas)) * 100} />
               ))}
+            </Painel>
+            <Painel titulo="Contactos de e-mail">
+              <EstadoDosContactos />
             </Painel>
             <Painel titulo="Botões mais clicados">
               {topCliques.map((c) => (
@@ -235,7 +306,7 @@ export function Rastreio() {
         </div>
       </Cartao>
       )}
-      <Cartao titulo="O contrato do evento" dica="O mesmo que está em Developer tools, «API e ligações».">
+      <Cartao titulo="O contrato do evento" dica="O mesmo que está em Ferramentas de programador, «API e ligações».">
         <div className="flex flex-col gap-2 p-4 text-sm">
           <span>
             <b>{e.metodo}</b> <code>{e.caminho}</code>: {e.descricao}

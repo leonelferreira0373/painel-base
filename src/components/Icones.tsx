@@ -97,8 +97,11 @@ import {
   LinkIcon,
   LockIcon,
   MagnifyingGlassIcon,
+  MicrophoneIcon,
   MapPinIcon,
   MoneyIcon,
+  NoteIcon,
+  PaperclipIcon,
   PlugsConnectedIcon,
   PlusIcon,
   QuestionIcon,
@@ -231,6 +234,9 @@ const BASE = {
   amanhecer: SunHorizonIcon,
   bandeja: TrayIcon,
   proibido: ProhibitIcon,
+  microfone: MicrophoneIcon,
+  anexo: PaperclipIcon,
+  nota: NoteIcon,
 } satisfies Record<string, IconeFosforo>;
 
 /** Todos os ícones saem com traço grosso («bold»), para terem peso visual no painel. Nunca «duotone»: pinta um retângulo cinzento por trás do desenho. */

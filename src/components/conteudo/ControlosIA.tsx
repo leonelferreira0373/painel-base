@@ -4,6 +4,8 @@
 import { Badge, Button, Dialog, Input, InputArea, Meter, Select } from "@cloudflare/kumo";
 import { useMemo, useState } from "react";
 import { caracteresAtivos, CONTROLOS_DE_ORIGEM, guardarControlos, instrucoesFinais, LIMITE_DE_MEMORIA, procurar, TAMANHOS, TONS, useControlosIA, type ControlosIA, type DocumentoDeMemoria, type Passagem } from "@/lib/ia-controlos";
+import { extrairFicheiro } from "@/lib/extract";
+import { textoDosExtraidos } from "@/lib/ia-ficheiros";
 import { textoDoPdf } from "@/lib/ia-pdf";
 import { useArmazem } from "@/lib/armazem";
 import { faqAtivas, faqComoDocumentos, useFaq } from "@/lib/faq";
@@ -11,8 +13,10 @@ import { identificador } from "@/lib/conta";
 import { Cartao, Confirmar, Interruptor, Linha } from "../conta/Pecas";
 import { BotaoCopiar } from "../Copiar";
 import { Frase } from "../Frase";
-import { ICONES } from "../Icones";
-import { Pagina, Titulo } from "../ui";
+import { BarraDeGuardar } from "../BarraDeGuardar";
+import { Ic, ICONES } from "../Icones";
+import { responderNoTeste } from "@/lib/ia-teste";
+import { BotaoIcone, Pagina, Titulo } from "../ui";
 import { Vazio, ZonaDeUpload } from "./ConteudoPecas";
 import { formatarTamanho } from "@/lib/biblioteca";
 
@@ -46,23 +50,18 @@ function Comportamento() {
           <Interruptor marcado={atual.soMemoria} aoMudar={(v) => mudar({ soMemoria: v })} rotulo="Responder só com a memória" />
         </Linha>
       </Cartao>
-      <div className="flex items-center justify-between gap-3 rounded-xl bg-kumo-base px-4 py-3 ring ring-kumo-line">
-        <span className="inline-flex shrink-0 items-center gap-2 text-sm text-kumo-subtle">
-          <span aria-hidden className={`size-2 rounded-full ${sujo ? "bg-kumo-warning" : "bg-kumo-success"}`} />
-          {sujo ? "Alterações por guardar" : "Tudo guardado"}
-        </span>
-        <div className="sem-barra -m-1 flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto p-1 [&>*]:shrink-0 [&>*:first-child]:ml-auto">
+      <BarraDeGuardar
+        sujo={sujo}
+        rotuloDesfazer="Descartar"
+        rotuloGuardar="Guardar alterações"
+        aoDesfazer={() => (setC(guardado), setMexeu(false))}
+        aoGuardar={() => (guardarControlos(c), setMexeu(false))}
+        extra={
           <Button variant="ghost" disabled={JSON.stringify(atual) === JSON.stringify(CONTROLOS_DE_ORIGEM)} onClick={() => (guardarControlos(CONTROLOS_DE_ORIGEM), setC(CONTROLOS_DE_ORIGEM), setMexeu(false))}>
             Repor o original
           </Button>
-          <Button variant="secondary" disabled={!sujo} onClick={() => (setC(guardado), setMexeu(false))}>
-            Descartar
-          </Button>
-          <Button variant="primary" icon={ICONES.guardar} disabled={!sujo} onClick={() => (guardarControlos(c), setMexeu(false))}>
-            Guardar alterações
-          </Button>
-        </div>
-      </div>
+        }
+      />
     </div>
   );
 }
@@ -79,24 +78,18 @@ function Memoria() {
   const [texto, setTexto] = useState("");
   const usados = caracteresAtivos(docs);
 
+  /** Qualquer ficheiro entra: o PDF lê-se à parte (com as páginas e o OCR das digitalizadas) e o resto (Excel, Word, CSV, texto, JSON, XML, BIND, imagens, ZIP…) com o motor da análise de dados. */
   const carregar = async (ficheiros: File[]) => {
     setErro(null);
     for (const f of ficheiros) {
-      const eTexto = /\.(txt|md)$/i.test(f.name) || f.type.startsWith("text/");
-      if (!eTexto && f.type !== "application/pdf" && !/\.pdf$/i.test(f.name)) {
-        setErro(`«${f.name}» não é um PDF nem um ficheiro de texto.`);
-        continue;
-      }
       try {
         setLendo(f.name);
-        const lido = eTexto ? { texto: await f.text(), paginas: undefined as number | undefined } : await textoDoPdf(new Uint8Array(await f.arrayBuffer()), (m) => setLendo(`${f.name}: ${m}`));
-        if (!lido.texto.trim()) {
-          setErro(`Não foi possível ler texto em «${f.name}».`);
-          continue;
-        }
-        await guardar({ id: identificador(), nome: f.name, origem: "pdf", tamanho: f.size, paginas: lido.paginas, criado: new Date().toISOString(), ativo: true, texto: lido.texto });
+        const ePdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+        const lido = ePdf ? await textoDoPdf(new Uint8Array(await f.arrayBuffer()), (m) => setLendo(`${f.name}: ${m}`)) : { texto: textoDosExtraidos(await extrairFicheiro(f, { progresso: (m) => setLendo(`${f.name}: ${m}`) })), paginas: undefined as number | undefined };
+        // sem texto legível o ficheiro entra à mesma, desligado, para se ver que lá está
+        await guardar({ id: identificador(), nome: f.name, origem: "pdf", tamanho: f.size, paginas: lido.paginas, criado: new Date().toISOString(), ativo: !!lido.texto.trim(), texto: lido.texto.trim() || "Este ficheiro não tem texto legível." });
       } catch {
-        setErro(`Não foi possível ler «${f.name}». O ficheiro pode estar protegido ou danificado.`);
+        setErro(`Não foi possível ler «${f.name}».`);
       }
     }
     setLendo(null);
@@ -107,16 +100,16 @@ function Memoria() {
     <div className="flex flex-col gap-4">
       <Cartao
         titulo="Memória do assistente"
-        dica="Os documentos e as notas ativos são o que o assistente sabe além das perguntas prontas. Os PDF são lidos neste navegador (com OCR nas páginas digitalizadas) e nada sai daqui."
+        dica="Os documentos e as notas ativos são o que o assistente sabe além das perguntas prontas. Aceita qualquer ficheiro (PDF, Excel, Word, CSV, texto, JSON, BIND…): lê-se neste navegador, com OCR nas páginas e imagens digitalizadas, e nada sai daqui."
         acoes={
           <div className="flex gap-2">
             <Button variant="secondary" size="sm" icon={ICONES.mais} onClick={() => (setTitulo(""), setTexto(""), setNota(true))}>
               Adicionar nota
             </Button>
-            <ZonaDeUpload aceitar=".pdf,application/pdf,.txt,.md,text/plain,text/markdown" aoEscolher={carregar} className="contents">
+            <ZonaDeUpload aceitar="" multiplo aoEscolher={carregar} className="contents">
               {(abrir) => (
                 <Button variant="primary" size="sm" icon={ICONES.enviar} onClick={abrir} disabled={!!lendo}>
-                  Carregar PDF
+                  Carregar ficheiros
                 </Button>
               )}
             </ZonaDeUpload>
@@ -138,7 +131,7 @@ function Memoria() {
         {!pronto ? (
           <div className="p-6 text-sm text-kumo-subtle">A abrir a memória…</div>
         ) : docs.length === 0 ? (
-          <Vazio icone="pdf" titulo="A memória está vazia" texto="Carregue um PDF (um manual, uma política, perguntas frequentes) ou escreva uma nota." />
+          <Vazio icone="pdf" titulo="A memória está vazia" texto="Carregue ficheiros (um manual, uma tabela de preços, perguntas frequentes) ou escreva uma nota." />
         ) : (
           docs.map((d) => (
             <Linha
@@ -187,44 +180,63 @@ function Memoria() {
   );
 }
 
+/** O teste do assistente: uma conversa a sério, como a de um cliente. Escreve-se uma pergunta (ou carrega-se numa das prontas) e vê-se a resposta, com a fonte por baixo. */
 function Testar() {
   const { itens } = useArmazem<DocumentoDeMemoria>("memoria");
   const controlos = useControlosIA();
   const { faq } = useFaq();
-  const [pergunta, setPergunta] = useState("");
-  const [achados, setAchados] = useState<Passagem[] | null>(null);
-  // as perguntas frequentes publicadas são parte do que o assistente sabe
   const conhecido = useMemo(() => [...faqComoDocumentos(faq), ...itens], [faq, itens]);
-  const instrucoes = useMemo(() => instrucoesFinais(controlos, itens, faqAtivas(faq).length), [controlos, itens, faq]);
+  const prontas = useMemo(() => faqAtivas(faq).filter((f) => f.sugerida).slice(0, 4), [faq]);
+  const [conversa, setConversa] = useState<{ de: "eu" | "assistente"; texto: string; fonte?: string }[]>([]);
+  const [pergunta, setPergunta] = useState("");
+  const perguntar = (texto: string) => {
+    const t = texto.trim();
+    if (!t) return;
+    const r = responderNoTeste(controlos, conhecido, t);
+    setConversa((c) => [...c, { de: "eu", texto: t }, { de: "assistente", texto: r.texto, fonte: r.fonte }]);
+    setPergunta("");
+  };
   return (
-    <div className="flex flex-col gap-4">
-      <Cartao titulo="Testar a memória" dica="Escreva uma pergunta e veja que passagens dos documentos ativos e das perguntas frequentes publicadas o assistente encontraria.">
-        <div className="flex flex-col gap-4 p-4">
-          <div className="flex items-end gap-2">
-            <Input label="Pergunta" value={pergunta} onChange={(e) => setPergunta(e.target.value)} onKeyDown={(e) => e.key === "Enter" && pergunta.trim() && setAchados(procurar(conhecido, pergunta))} placeholder="Como peço férias?" className="w-full" />
-            <Button variant="primary" disabled={!pergunta.trim()} onClick={() => setAchados(procurar(conhecido, pergunta))}>
-              Procurar
-            </Button>
-          </div>
-          {achados !== null &&
-            (achados.length === 0 ? (
-              <span className="text-sm text-kumo-subtle">{controlos.soMemoria ? "Nada na memória responde a isto: o assistente diria que não sabe." : "Nada na memória responde a isto: o assistente usaria só as perguntas prontas."}</span>
+    <Cartao titulo="Experimentar o assistente" acoes={conversa.length > 0 ? <BotaoIcone dica="Recomeçar a conversa" icone="atualizar" aoClicar={() => setConversa([])} /> : undefined}>
+      <div className="flex flex-col gap-3 p-4">
+        <div className="flex min-h-56 flex-col gap-2">
+          <p className="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-kumo-tint px-3 py-2 text-sm text-kumo-default">{controlos.boasVindas}</p>
+          {conversa.length === 0 && prontas.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {prontas.map((f) => (
+                <Button key={f.id} variant="secondary" size="sm" onClick={() => perguntar(f.pergunta)}>
+                  {f.pergunta}
+                </Button>
+              ))}
+            </div>
+          )}
+          {conversa.map((m, i) =>
+            m.de === "eu" ? (
+              <p key={i} className="max-w-[85%] self-end whitespace-pre-wrap rounded-2xl rounded-br-md bg-kumo-brand px-3 py-2 text-sm text-white">
+                {m.texto}
+              </p>
             ) : (
-              <ul className="flex flex-col gap-3">
-                {achados.map((p, i) => (
-                  <li key={i} className="rounded-lg p-3 ring ring-kumo-line">
-                    <div className="mb-1 text-xs font-medium text-kumo-subtle">{p.documento}</div>
-                    <div className="whitespace-pre-wrap text-sm text-kumo-default">{p.texto}</div>
-                  </li>
-                ))}
-              </ul>
-            ))}
+              <div key={i} className="flex max-w-[85%] flex-col gap-1 self-start">
+                <p className="whitespace-pre-wrap rounded-2xl rounded-bl-md bg-kumo-tint px-3 py-2 text-sm text-kumo-default">{m.texto}</p>
+                {m.fonte && <span className="px-1 text-xs text-kumo-subtle">{m.fonte}</span>}
+              </div>
+            ),
+          )}
         </div>
-      </Cartao>
-      <Cartao titulo="Instruções que o modelo recebe" acoes={<BotaoCopiar texto={instrucoes} rotulo="Copiar" dica="Copiar as instruções" tamanho="sm" />}>
-        <pre className="m-4 whitespace-pre-wrap rounded-lg bg-kumo-tint p-3 text-xs">{instrucoes}</pre>
-      </Cartao>
-    </div>
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            perguntar(pergunta);
+          }}
+        >
+          <div className="min-w-0 flex-1">
+            <Input aria-label="Pergunta" value={pergunta} onChange={(e) => setPergunta(e.target.value)} placeholder="Escreva como se fosse um cliente" autoComplete="off" className="w-full" />
+          </div>
+          <Button type="submit" variant="primary" shape="square" icon={<Ic nome="enviar" />} aria-label="Enviar a pergunta" disabled={!pergunta.trim()} />
+        </form>
+      </div>
+    </Cartao>
   );
 }
 

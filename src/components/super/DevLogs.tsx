@@ -1,4 +1,4 @@
-// Developer tools > Registos do servidor: as linhas que o servidor escreve, em direto, como os registos do Render. Vêm do processo do site, de contentores Docker, de ficheiros de registo, do journald de um VPS ou do Cloudflare Workers (o servidor liga-se às fontes e o painel lê /v1/dev/logs). Com pesquisa, níveis, fonte, pausa, quebra de linhas, hora local ou UTC, exportar em qualquer formato e investigar com IA. Em modo simulado geram-se linhas de demonstração, marcadas como tal.
+// Ferramentas de programador > Registos do servidor: as linhas que o servidor escreve, em direto, como os registos do Render. Vêm do processo do site, de contentores Docker, de ficheiros de registo, do journald de um VPS ou do Cloudflare Workers (o servidor liga-se às fontes e o painel lê /v1/dev/logs). Com pesquisa, níveis, fonte, pausa, quebra de linhas, hora local ou UTC, exportar em qualquer formato e investigar com IA. Em modo simulado geram-se linhas de demonstração, marcadas como tal.
 "use client";
 
 import { Button, DropdownMenu, Input, Select } from "@cloudflare/kumo";

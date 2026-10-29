@@ -7,6 +7,7 @@ import { CORES, LETRAS, TIPOS_DE_LETRA, type Aparencia, type CorId, type LetraId
 import { contraste, hexValido, paleta, pilhaDe, variaveisDe } from "@/lib/aparencia";
 import { useConta } from "@/lib/conta";
 import { Dica } from "../Dica";
+import { BarraDeGuardar } from "../BarraDeGuardar";
 import { ICONES } from "../Icones";
 import { PopupCartao } from "../Flutuantes";
 import { Separadores } from "../ui";
@@ -221,23 +222,18 @@ export function PersonalizarAparencia() {
       </Cartao>
       <AdicionarLetra aberto={adicionarLetra} aoMudar={setAdicionarLetra} aoAdicionar={adicionarLetraNova} />
 
-      <div className="sticky bottom-4 z-10 flex items-center justify-between gap-3 rounded-xl bg-kumo-base px-4 py-3 shadow-(--elevacao-popup) ring ring-kumo-line">
-        <span className="inline-flex shrink-0 items-center gap-2 text-sm text-kumo-subtle">
-          <span aria-hidden className={`size-2 rounded-full ${sujo ? "bg-kumo-warning" : "bg-kumo-success"}`} />
-          {sujo ? "Alterações por guardar" : "Tudo guardado"}
-        </span>
-        <div className="sem-barra -m-1 flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto p-1 [&>*]:shrink-0 [&>*:first-child]:ml-auto">
+      <BarraDeGuardar
+        sujo={sujo}
+        rotuloDesfazer="Descartar"
+        rotuloGuardar="Guardar alterações"
+        aoDesfazer={() => setRascunho(guardado ?? {})}
+        aoGuardar={() => mudar({ aparencia: Object.keys(rascunho.claro ?? {}).length + Object.keys(rascunho.escuro ?? {}).length + Object.keys(rascunho.letras ?? {}).length === 0 ? undefined : rascunho }, "Aparência alterada")}
+        extra={
           <Button variant="ghost" disabled={!guardado} onClick={() => { mudar({ aparencia: undefined }, "Aparência reposta"); setRascunho({}); }}>
             Repor o original
           </Button>
-          <Button variant="secondary" disabled={!sujo} onClick={() => setRascunho(guardado ?? {})}>
-            Descartar
-          </Button>
-          <Button variant="primary" icon={ICONES.guardar} disabled={!sujo} onClick={() => mudar({ aparencia: Object.keys(rascunho.claro ?? {}).length + Object.keys(rascunho.escuro ?? {}).length + Object.keys(rascunho.letras ?? {}).length === 0 ? undefined : rascunho }, "Aparência alterada")}>
-            Guardar alterações
-          </Button>
-        </div>
-      </div>
+        }
+      />
     </>
   );
 }

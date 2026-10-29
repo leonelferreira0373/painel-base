@@ -1,4 +1,4 @@
-// Developer tools: as funções puras dos ecrãs (alvo de uma regra do firewall, destino das cópias de segurança, consulta SQL só de leitura com dados de demonstração e e-mail de teste). Os ecrãs só as chamam.
+// Ferramentas de programador: as funções puras dos ecrãs (alvo de uma regra do firewall, destino das cópias de segurança, consulta SQL só de leitura com dados de demonstração e e-mail de teste). Os ecrãs só as chamam.
 import { Sorteio } from "@/dados/semente";
 
 /** Mensagem de erro para o alvo de uma regra de firewall (um IPv4, uma gama CIDR ou um país de duas letras), ou null se serve. */
@@ -13,18 +13,61 @@ export function erroDoAlvo(alvo: string): string | null {
   return null;
 }
 
-export type TipoDeDestino = "local" | "s3" | "sftp" | "drive";
+export type TipoDeDestino = "local" | "s3" | "sftp" | "drive" | "endpoint" | "offline";
 
-export const DESTINOS: Record<TipoDeDestino, string> = { local: "Neste servidor", s3: "Armazenamento S3", sftp: "Servidor SFTP", drive: "Google Drive" };
+export const DESTINOS: Record<TipoDeDestino, string> = {
+  local: "Neste servidor",
+  s3: "Armazenamento S3",
+  sftp: "Servidor SFTP",
+  drive: "Google Drive",
+  endpoint: "Endpoint à medida (HTTP)",
+  offline: "Offline (disco, NAS ou rede local)",
+};
 
-/** Mensagem de erro para o endereço de destino das cópias de segurança, ou null se serve. */
-export function erroDoDestino(tipo: TipoDeDestino, endereco: string): string | null {
+/** Mensagem de erro para o endereço de destino das cópias de segurança, ou null se serve. Nada aqui precisa de internet: um destino offline guarda-se mesmo sem ligação. */
+export function erroDoDestino(tipo: TipoDeDestino, endereco: string, pastaDoNavegador = false): string | null {
   const e = endereco.trim();
-  if (!e) return "Escreva o endereço do destino.";
+  if (!e) return pastaDoNavegador ? "Escolha a pasta." : "Escreva o endereço do destino.";
+  // uma pasta escolhida na janela do sistema só tem o nome (o navegador não dá o caminho): serve como está
+  if (tipo === "offline" && pastaDoNavegador) return null;
   if (tipo === "local") return e.startsWith("/") ? null : "Um caminho do servidor começa por / (por exemplo /var/copias).";
   if (tipo === "s3") return /^s3:\/\/[a-z0-9][a-z0-9.-]{2,62}(\/.*)?$/.test(e) ? null : "Use s3://nome-do-balde/pasta.";
   if (tipo === "sftp") return /^sftp:\/\/[^/\s]+(:\d+)?\/.+/.test(e) ? null : "Use sftp://servidor/pasta (a porta é opcional).";
+  if (tipo === "endpoint") return /^https?:\/\/[^\s/:]+(:\d{1,5})?(\/\S*)?$/.test(e) ? null : "Use http://servidor:porta/caminho ou https://servidor/caminho (serve um endereço da rede local, como http://192.168.0.50:9000/copias).";
+  if (tipo === "offline") return /^([A-Za-z]:[\\/].*|\\\\[^\\\s]+\\.+|\/\S.*|file:\/\/\/.+|smb:\/\/[^/\s]+\/.+)$/.test(e) ? null : "Escreva o caminho no aparelho ou na rede local: D:\\copias, \\\\NAS\\copias, /mnt/disco/copias, file:///mnt/disco ou smb://nas/copias.";
   return /^[A-Za-z0-9_-]{10,}$/.test(e) ? null : "Escreva o identificador da pasta do Google Drive.";
+}
+
+/** Um destino das cópias de segurança. Pode haver vários ao mesmo tempo: cada cópia vai para todos os que estão ligados. */
+export interface DestinoDeCopia {
+  id: string;
+  /** O nome que a pessoa lhe dá («Disco do escritório»); sem nome, vale o endereço. */
+  nome: string;
+  tipo: TipoDeDestino;
+  endereco: string;
+  ativo: boolean;
+  /** O destino é uma pasta escolhida no navegador (o `endereco` é só o nome dela); o acesso fica neste navegador. */
+  pasta?: boolean;
+}
+
+export const rotuloDoDestino = (d: Pick<DestinoDeCopia, "nome" | "endereco">): string => d.nome.trim() || d.endereco;
+
+/** Os destinos para onde a próxima cópia vai. */
+export const destinosAtivos = (ds: DestinoDeCopia[]): DestinoDeCopia[] => ds.filter((d) => d.ativo);
+
+/** O que está mal num destino novo ou mudado (o endereço, ou um igual que já existe), ou null. `idAtual` é o destino que se está a mudar. */
+export function erroDoNovoDestino(d: Pick<DestinoDeCopia, "tipo" | "endereco" | "pasta">, existentes: DestinoDeCopia[], idAtual?: string): string | null {
+  const erro = erroDoDestino(d.tipo, d.endereco, !!d.pasta);
+  if (erro) return erro;
+  const igual = existentes.find((x) => x.id !== idAtual && x.tipo === d.tipo && x.endereco.trim().toLowerCase() === d.endereco.trim().toLowerCase());
+  return igual ? `Este destino já existe (${rotuloDoDestino(igual)}).` : null;
+}
+
+/** A lista de destinos de uma configuração guardada: as antigas, de um só destino (`tipo` e `endereco`), passam a ter um. */
+export function destinosDaConfig(c: { destinos?: DestinoDeCopia[]; tipo?: TipoDeDestino; endereco?: string }): DestinoDeCopia[] {
+  if (Array.isArray(c.destinos)) return c.destinos;
+  if (c.tipo && c.endereco) return [{ id: "dest-1", nome: "", tipo: c.tipo, endereco: c.endereco, ativo: true }];
+  return [];
 }
 
 export interface ResultadoSql {

@@ -1,8 +1,8 @@
-// Testes das funções de developer tools: alvo do firewall, destino das cópias, consulta SQL só de leitura e apagar por dias.
+// Testes das funções de ferramentas de programador: alvo do firewall, destino das cópias, consulta SQL só de leitura e apagar por dias.
 import { describe, expect, it } from "vitest";
-import { alvoApanhaIp, correrConsulta, emailValido, erroDoAlvo, erroDoDestino, erroDoRepositorio, ipBloqueado, linhasApagadas, planoDeAcesso, regraQueApanha } from "./dev";
+import { alvoApanhaIp, correrConsulta, destinosAtivos, destinosDaConfig, emailValido, erroDoAlvo, erroDoDestino, erroDoNovoDestino, erroDoRepositorio, ipBloqueado, linhasApagadas, planoDeAcesso, regraQueApanha } from "./dev";
 
-describe("developer tools", () => {
+describe("ferramentas de programador", () => {
   it("valida o alvo de uma regra do firewall", () => {
     expect(erroDoAlvo("203.0.113.7")).toBeNull();
     expect(erroDoAlvo("203.0.113.0/24")).toBeNull();
@@ -21,6 +21,33 @@ describe("developer tools", () => {
     expect(erroDoDestino("sftp", "servidor/pasta")).toContain("sftp://");
     expect(erroDoDestino("drive", "1AbCdEfGhIjKlMn")).toBeNull();
     expect(erroDoDestino("drive", "")).toContain("Escreva");
+  });
+  it("valida um endpoint à medida e um destino offline (nada precisa de internet)", () => {
+    expect(erroDoDestino("endpoint", "http://192.168.0.50:9000/copias")).toBeNull();
+    expect(erroDoDestino("endpoint", "https://copias.exemplo.pt/painel")).toBeNull();
+    expect(erroDoDestino("endpoint", "192.168.0.50/copias")).toContain("http://");
+    expect(erroDoDestino("offline", "D:\\copias")).toBeNull();
+    expect(erroDoDestino("offline", "\\\\NAS\\copias\\painel")).toBeNull();
+    expect(erroDoDestino("offline", "/mnt/disco/copias")).toBeNull();
+    expect(erroDoDestino("offline", "file:///mnt/disco")).toBeNull();
+    expect(erroDoDestino("offline", "smb://nas/copias")).toBeNull();
+    expect(erroDoDestino("offline", "copias")).toContain("caminho");
+  });
+  it("junta vários destinos, só os ligados recebem a cópia, e não deixa repetir", () => {
+    const ds = [
+      { id: "a", nome: "Nuvem", tipo: "s3" as const, endereco: "s3://copias/painel", ativo: true },
+      { id: "b", nome: "", tipo: "offline" as const, endereco: "/mnt/disco/copias", ativo: false },
+      { id: "c", nome: "NAS", tipo: "endpoint" as const, endereco: "http://192.168.0.50:9000/copias", ativo: true },
+    ];
+    expect(destinosAtivos(ds).map((d) => d.id)).toEqual(["a", "c"]);
+    expect(erroDoNovoDestino({ tipo: "s3", endereco: "s3://copias/painel" }, ds)).toContain("já existe");
+    expect(erroDoNovoDestino({ tipo: "s3", endereco: "s3://copias/painel" }, ds, "a")).toBeNull();
+    expect(erroDoNovoDestino({ tipo: "offline", endereco: "disco" }, ds)).toContain("caminho");
+  });
+  it("uma configuração antiga, de um só destino, passa a ter um na lista", () => {
+    expect(destinosDaConfig({ tipo: "s3", endereco: "s3://copias/painel" })).toEqual([{ id: "dest-1", nome: "", tipo: "s3", endereco: "s3://copias/painel", ativo: true }]);
+    expect(destinosDaConfig({ destinos: [] })).toEqual([]);
+    expect(destinosDaConfig({})).toEqual([]);
   });
   it("corre consultas de leitura e recusa o resto", () => {
     const r = correrConsulta("SELECT * FROM pagamentos LIMIT 3;");

@@ -1,4 +1,4 @@
-// Developer tools, primeira parte: a saúde do servidor (medidores e serviços em tempo real), os pedidos web em tempo real, a base de dados (tabelas, segurança por linha e consola de leitura) e a limpeza de dados. Em modo simulado os números vêm de geradores locais; em modo ligado, do servidor (ver contrato das APIs).
+// Ferramentas de programador, primeira parte: a saúde do servidor (medidores e serviços em tempo real), os pedidos web em tempo real, a base de dados (tabelas, segurança por linha e consola de leitura) e a limpeza de dados. Em modo simulado os números vêm de geradores locais; em modo ligado, do servidor (ver contrato das APIs).
 "use client";
 
 import { Badge, Button, Dialog, Input, InputArea, Select } from "@cloudflare/kumo";

@@ -146,7 +146,7 @@ function BotaoDeNotaNaJanela({ alvo, quem }: { alvo: AlvoDeNota; quem: Quem }) {
     <Tooltip
       content={n ? `${n} ${n === 1 ? "nota" : "notas"} nesta janela` : "Deixar uma nota nesta janela"}
       render={
-        <Button variant="ghost" shape="square" aria-label="Notas desta janela" onClick={() => abrirNota(alvo)} icon={<Ic nome="lembrete" tamanho={16} />}>
+        <Button variant="ghost" shape="square" aria-label="Notas desta janela" onClick={() => abrirNota(alvo)} icon={<Ic nome="nota" tamanho={16} />}>
           {n > 0 && <span className="ml-1 text-xs font-semibold tabular-nums">{n}</span>}
         </Button>
       }
@@ -165,7 +165,7 @@ export function IndicadorDeNotas({ alvo }: { alvo: AlvoDeNota }) {
       content={`${n} ${n === 1 ? "nota" : "notas"} neste cartão`}
       render={
         <button type="button" onClick={() => abrirNota(alvo)} aria-label={`${n} ${n === 1 ? "nota" : "notas"} neste cartão`} className="nota-papel inline-flex h-5 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-[11px] font-semibold tabular-nums ring-1 ring-black/15">
-          <Ic nome="lembrete" tamanho={11} />
+          <Ic nome="nota" tamanho={11} />
           {n}
         </button>
       }

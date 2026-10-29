@@ -161,7 +161,7 @@ export const AREAS: Area[] = [
   {
     id: "dev",
     secao: "Plataforma",
-    rotulo: "Developer tools",
+    rotulo: "Ferramentas de programador",
     icone: "terminal",
     modulos: [
       { id: "saude", descricao: "CPU, memória, disco, rede e serviços do servidor, em tempo real.", palavras: "servidor, cpu, memória, disco, desempenho, estado", grupo: "Servidor", rotulo: "Saúde do servidor", icone: "servidor", tipo: "pagina" },

@@ -1,7 +1,7 @@
 // O GitHub a sério no painel: o cartão para ligar (ou desligar) um repositório e as tabelas das implementações e das execuções reais. Os dados vêm de lib/github-real.ts (api.github.com, a partir do navegador); o token fica só neste navegador.
 "use client";
 
-import { Button, Input, Select } from "@cloudflare/kumo";
+import { Button, Input } from "@cloudflare/kumo";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { caminho } from "@/dados/estrutura";
@@ -22,6 +22,8 @@ import {
   type RepositorioReal,
 } from "@/lib/github-real";
 import { Cartao, Linha } from "../conta/Pecas";
+import { DicaInfo } from "../Dica";
+import { IconeDoGitHub, LinhaDoNo, NoDoFluxo } from "../Fluxo";
 import { Estado } from "../Estado";
 import { AvisoDeApi, dataHora, duracao, TabelaSimples, type ColunaSimples } from "./SuperPecas";
 
@@ -82,8 +84,8 @@ export function EstadoReal({ valor }: { valor: string }) {
 
 const horaDe = (iso: string) => new Date(iso).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
 
-/** O cartão de ligar ao GitHub (repositório e, se for preciso, um token de leitura) e, ligado, o resumo do que está ligado. */
-export function CartaoLigacaoReal({ ligacao, token, repositorio, ramos, limite, aCarregar, editar }: { ligacao: LigacaoReal | null; token: string; repositorio?: RepositorioReal; ramos: string[]; limite?: LimiteDoGitHub; aCarregar: boolean; editar: boolean }) {
+/** O nó do diagrama do GitHub: sem ligação, o formulário para ligar (repositório e, se for preciso, um token de leitura); ligado, o resumo do que está ligado, com «Abrir» e «Desligar». */
+export function NoDaLigacaoReal({ ligacao, token, repositorio, limite, aCarregar, editar }: { ligacao: LigacaoReal | null; token: string; repositorio?: RepositorioReal; limite?: LimiteDoGitHub; aCarregar: boolean; editar: boolean }) {
   const [repo, setRepo] = useState("");
   const [chave, setChave] = useState("");
   const [aLigar, setALigar] = useState(false);
@@ -106,50 +108,46 @@ export function CartaoLigacaoReal({ ligacao, token, repositorio, ramos, limite, 
 
   if (!ligacao) {
     return (
-      <Cartao titulo="Ligação ao GitHub" dica="Lê, a partir deste navegador, o repositório que escolher: ramos, commits, execuções do GitHub Actions e implementações. Repositórios públicos não precisam de token (60 pedidos por hora); para os privados, e para subir o limite para 5000, use um token de acesso pessoal só de leitura. O token fica guardado apenas neste navegador e só é enviado ao GitHub.">
-        <div className="flex flex-col gap-4 p-4">
-          <Input label="Repositório" value={repo} disabled={!editar} onChange={(e) => setRepo(e.target.value)} placeholder="dono/nome" autoComplete="off" error={erro ?? undefined} />
-          <Input label="Token de acesso (opcional)" type="password" value={chave} disabled={!editar} onChange={(e) => setChave(e.target.value)} placeholder="github_pat_…" autoComplete="off" />
-          {editar && (
-            <div>
-              <Button variant="primary" loading={aLigar} disabled={!repo.trim()} onClick={() => void ligar()}>
-                Ligar ao GitHub
-              </Button>
-            </div>
-          )}
-        </div>
-      </Cartao>
+      <NoDoFluxo
+        id="ligar"
+        titulo={
+          <span className="inline-flex items-center gap-1.5">
+            Ligar ao GitHub
+            <DicaInfo titulo="Ligar ao GitHub" texto="Lê, a partir deste navegador, o repositório que escolher: ramos, commits, execuções do GitHub Actions e implementações. Repositórios públicos não precisam de token (60 pedidos por hora); para os privados, e para subir o limite para 5000, use um token de acesso pessoal só de leitura. O token fica guardado apenas neste navegador e só é enviado ao GitHub." />
+          </span>
+        }
+        icone={<IconeDoGitHub />}
+        indicador="cinza"
+      >
+        <Input label="Repositório" value={repo} disabled={!editar} onChange={(e) => setRepo(e.target.value)} placeholder="dono/nome" autoComplete="off" error={erro ?? undefined} />
+        <Input label="Token de acesso (opcional)" type="password" value={chave} disabled={!editar} onChange={(e) => setChave(e.target.value)} placeholder="github_pat_…" autoComplete="off" />
+        {editar && (
+          <Button variant="primary" loading={aLigar} disabled={!repo.trim()} onClick={() => void ligar()}>
+            Ligar ao GitHub
+          </Button>
+        )}
+      </NoDoFluxo>
     );
   }
   return (
-    <Cartao
-      titulo="Ligação ao GitHub"
-      acoes={
-        editar ? (
-          <Button variant="ghost" size="sm" onClick={() => guardarLigacaoReal(null)}>
+    <NoDoFluxo id="repo" titulo={ligacao.repositorio} icone={<IconeDoGitHub />} indicador={repositorio ? "verde" : "ambar"}>
+      <LinhaDoNo rotulo="Visibilidade">{repositorio ? <EstadoReal valor={repositorio.privado ? "Privado" : "Público"} /> : aCarregar ? "A ler…" : "—"}</LinhaDoNo>
+      <LinhaDoNo rotulo="Token">{token ? "Guardado" : "Nenhum"}</LinhaDoNo>
+      {limite && <LinhaDoNo rotulo="Pedidos">{`${limite.restante} de ${limite.total}`}</LinhaDoNo>}
+      {limite && <LinhaDoNo rotulo="Reposição">{horaDe(limite.reposicao)}</LinhaDoNo>}
+      <div className="flex flex-wrap items-center gap-2">
+        {repositorio && (
+          <a href={repositorio.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-kumo-default underline underline-offset-2">
+            Abrir no GitHub
+          </a>
+        )}
+        {editar && (
+          <Button variant="secondary" size="sm" onClick={() => guardarLigacaoReal(null)}>
             Desligar
           </Button>
-        ) : undefined
-      }
-    >
-      <Linha titulo={ligacao.repositorio} estado={repositorio?.descricao || (aCarregar ? "A ler o repositório…" : undefined)}>
-        {repositorio && (
-          <>
-            <EstadoReal valor={repositorio.privado ? "Privado" : "Público"} />
-            <a href={repositorio.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-kumo-default underline underline-offset-2">
-              Abrir no GitHub
-            </a>
-          </>
         )}
-      </Linha>
-      <Linha titulo="Ramo">
-        <div className="w-44">
-          <Select aria-label="Ramo" value={ligacao.ramo || repositorio?.ramoPadrao || ""} disabled={!editar || ramos.length === 0} onValueChange={(v) => guardarLigacaoReal({ ...ligacao, ramo: String(v) })} items={Object.fromEntries((ramos.length ? ramos : [ligacao.ramo || "main"]).map((r) => [r, r]))} className="w-full" />
-        </div>
-      </Linha>
-      <Linha titulo="Token" estado={token ? "Guardado neste navegador" : "Sem token: só repositórios públicos"} />
-      {limite && <Linha titulo="Pedidos ao GitHub" estado={`Repõe-se às ${horaDe(limite.reposicao)}`}>{`${limite.restante} de ${limite.total}`}</Linha>}
-    </Cartao>
+      </div>
+    </NoDoFluxo>
   );
 }
 

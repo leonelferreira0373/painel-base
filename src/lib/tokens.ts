@@ -4,6 +4,7 @@
 import { AREAS } from "@/dados/estrutura";
 import { ENDPOINTS, type Endpoint } from "./api/contrato";
 import { useColecao } from "./api/colecao";
+import { sha256Hex } from "./cripto";
 
 export type Acesso = "ler" | "editar";
 
@@ -60,7 +61,7 @@ export const rotuloDaArea = (area: string): string => (area === "*" ? "Todas as 
 export const rotuloDoModulo = (area: string, modulo: string): string => (modulo === "*" ? "Todos os módulos" : (RECURSOS.find((r) => r.area === area)?.modulos.find((m) => m.id === modulo)?.rotulo ?? modulo));
 export const rotuloDoAcesso = (a: Acesso): string => (a === "editar" ? "Editar" : "Ler");
 
-/** Uma permissão em palavras: «Developer tools · Firewall: Editar». */
+/** Uma permissão em palavras: «Ferramentas de programador · Firewall: Editar». */
 export const descreverPermissao = (p: PermissaoDeToken): string => `${rotuloDaArea(p.area)}${p.area === "*" ? "" : ` · ${rotuloDoModulo(p.area, p.modulo)}`}: ${rotuloDoAcesso(p.acesso)}`;
 
 /** A lista da tabela: as duas primeiras permissões e quantas mais há. */
@@ -220,6 +221,87 @@ export function permitePedido(permissoes: PermissaoDeToken[], e: Pick<Endpoint, 
 /** Os endpoints que um token com estas permissões pode usar. */
 export const endpointsPermitidos = (permissoes: PermissaoDeToken[]): Endpoint[] => ENDPOINTS.filter((e) => permitePedido(permissoes, e));
 
+// ---------- as permissões como interruptores ----------
+
+/** O que o token pode fazer num módulo: nada, só ler, ou editar (que já inclui ler). */
+export type NivelDeAcesso = "nada" | Acesso;
+/** O nível de cada módulo, pela chave «área/módulo». É o que os interruptores mostram e mudam; as permissões guardadas saem daqui. */
+export type NiveisDoToken = Record<string, NivelDeAcesso>;
+
+export const chaveDoNivel = (area: string, modulo: string): string => `${area}/${modulo}`;
+
+/** Os módulos de uma área do contrato; uma área sem módulos próprios conta como um só («*»). */
+export const modulosDoRecurso = (r: OpcaoDeRecurso): { id: string; rotulo: string }[] => (r.modulos.length ? r.modulos : [{ id: "*", rotulo: r.rotuloDaArea }]);
+
+/** O nível de cada módulo que as permissões dão (a mais alta que o cobre). */
+export function niveisDasPermissoes(ps: PermissaoDeToken[]): NiveisDoToken {
+  const n: NiveisDoToken = {};
+  for (const r of RECURSOS) {
+    for (const m of modulosDoRecurso(r)) {
+      const cobrem = ps.filter((p) => (p.area === "*" || p.area === r.area) && (p.modulo === "*" || p.modulo === m.id));
+      n[chaveDoNivel(r.area, m.id)] = cobrem.some((p) => p.acesso === "editar") ? "editar" : cobrem.length ? "ler" : "nada";
+    }
+  }
+  return n;
+}
+
+/** As permissões que os interruptores não conseguem mostrar (uma área ou um módulo que já não está no contrato): guardam-se como estão. */
+export function permissoesForaDosInterruptores(ps: PermissaoDeToken[]): PermissaoDeToken[] {
+  return ps.filter((p) => {
+    if (p.area === "*") return false;
+    const r = RECURSOS.find((x) => x.area === p.area);
+    return !r || (p.modulo !== "*" && !modulosDoRecurso(r).some((m) => m.id === p.modulo));
+  });
+}
+
+/** As permissões de uns níveis, o mais curtas possível: uma área toda a editar (ou a ler) é uma só; tudo igual é «*». */
+export function permissoesDosNiveis(n: NiveisDoToken, extras: PermissaoDeToken[] = []): PermissaoDeToken[] {
+  const saida: PermissaoDeToken[] = [];
+  for (const r of RECURSOS) {
+    const ms = modulosDoRecurso(r).map((m) => ({ id: m.id, nivel: n[chaveDoNivel(r.area, m.id)] ?? "nada" }));
+    if (ms.every((m) => m.nivel === "editar")) saida.push({ area: r.area, modulo: "*", acesso: "editar" });
+    else if (ms.every((m) => m.nivel !== "nada")) {
+      saida.push({ area: r.area, modulo: "*", acesso: "ler" });
+      for (const m of ms) if (m.nivel === "editar") saida.push({ area: r.area, modulo: m.id, acesso: "editar" });
+    } else for (const m of ms) if (m.nivel !== "nada") saida.push({ area: r.area, modulo: m.id, acesso: m.nivel as Acesso });
+  }
+  const areaInteira = (a: string) => saida.some((p) => p.area === a && p.modulo === "*");
+  const areaEditada = (a: string) => saida.some((p) => p.area === a && p.modulo === "*" && p.acesso === "editar");
+  let lista = saida;
+  if (RECURSOS.length > 0 && RECURSOS.every((r) => areaEditada(r.area))) lista = [{ area: "*", modulo: "*", acesso: "editar" }];
+  else if (RECURSOS.length > 0 && RECURSOS.every((r) => areaInteira(r.area))) lista = [{ area: "*", modulo: "*", acesso: "ler" }, ...saida.filter((p) => p.acesso === "editar")];
+  return simplificarPermissoes([...lista, ...extras]);
+}
+
+const comNivel = (n: NiveisDoToken, area: string, modulo: string | null, nivel: (atual: NivelDeAcesso) => NivelDeAcesso): NiveisDoToken => {
+  const r = RECURSOS.find((x) => x.area === area);
+  if (!r) return n;
+  const novo = { ...n };
+  for (const m of modulosDoRecurso(r)) if (modulo === null || m.id === modulo) novo[chaveDoNivel(area, m.id)] = nivel(n[chaveDoNivel(area, m.id)] ?? "nada");
+  return novo;
+};
+
+/** Liga ou desliga «ler» num módulo (ou, sem módulo, na área toda). Desligar tira também o editar. */
+export const mudarLer = (n: NiveisDoToken, area: string, modulo: string | null, ligado: boolean): NiveisDoToken => comNivel(n, area, modulo, (atual) => (ligado ? (atual === "editar" ? "editar" : "ler") : "nada"));
+
+/** Liga ou desliga «editar» num módulo (ou na área toda). Ligar dá também o ler; desligar deixa o ler. */
+export const mudarEditar = (n: NiveisDoToken, area: string, modulo: string | null, ligado: boolean): NiveisDoToken => comNivel(n, area, modulo, (atual) => (ligado ? "editar" : atual === "editar" ? "ler" : atual));
+
+/** Tudo no mesmo nível (para os atalhos «Só ler», «Editar tudo» e «Nada»). */
+export const todosOsNiveis = (nivel: NivelDeAcesso): NiveisDoToken => Object.fromEntries(RECURSOS.flatMap((r) => modulosDoRecurso(r).map((m) => [chaveDoNivel(r.area, m.id), nivel])));
+
+export interface ResumoDaArea {
+  total: number;
+  podeLer: number;
+  podeEditar: number;
+}
+
+/** Quantos módulos da área o token lê e quantos edita. */
+export function resumoDaArea(n: NiveisDoToken, r: OpcaoDeRecurso): ResumoDaArea {
+  const ms = modulosDoRecurso(r).map((m) => n[chaveDoNivel(r.area, m.id)] ?? "nada");
+  return { total: ms.length, podeLer: ms.filter((x) => x !== "nada").length, podeEditar: ms.filter((x) => x === "editar").length };
+}
+
 export interface FerramentaParaIa {
   name: string;
   description: string;
@@ -277,8 +359,7 @@ export function gerarToken(): string {
 }
 
 export async function impressaoDoToken(token: string): Promise<string> {
-  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return sha256Hex(token);
 }
 
 export async function novoToken(r: RascunhoDeToken, agora = new Date(), modelo?: string): Promise<{ token: TokenDaApi; segredo: string }> {

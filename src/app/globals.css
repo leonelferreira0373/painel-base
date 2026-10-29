@@ -263,6 +263,12 @@ h3 {
   z-index: 100;
 }
 
+/* A janela da cor fica em baixo ou no canto e não escurece nem bloqueia o resto: o gráfico vê-se a mudar enquanto se escolhe. */
+html.janela-de-cor [class*="bg-kumo-overlay"] {
+  background: transparent !important;
+  pointer-events: none !important;
+}
+
 /* Um seletor com rótulo ocupa a largura do campo, como os campos de texto (o do Kumo só tem a largura do texto e os formulários ficavam desalinhados). */
 div.grid.gap-2 > button[data-kumo-component="Select"][data-kumo-part="trigger"] {
   width: 100%;

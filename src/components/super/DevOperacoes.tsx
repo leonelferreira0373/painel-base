@@ -1,4 +1,4 @@
-// Developer tools, segunda parte: cópias de segurança (destino, agenda, criar, restaurar), firewall (ligar e desligar, limite, regras, bloqueios), páginas do site (ativar, manutenção, desativar), envio de e-mails (registo, SMTP, teste, DNS), ligação às APIs e limpeza de dados. Em modo simulado tudo vive no navegador; em modo ligado cada ação chama o contrato.
+// Ferramentas de programador, segunda parte: cópias de segurança (destino, agenda, criar, restaurar), firewall (ligar e desligar, limite, regras, bloqueios), páginas do site (ativar, manutenção, desativar), envio de e-mails (registo, SMTP, teste, DNS), ligação às APIs e limpeza de dados. Em modo simulado tudo vive no navegador; em modo ligado cada ação chama o contrato.
 "use client";
 
 import { Badge, Button, Input, InputArea, Select, Tabs } from "@cloudflare/kumo";
@@ -9,8 +9,9 @@ import { chamar, erroDoEndereco, guardarLigacao, useApi, useLigacao, type Ligaca
 import { useColecao } from "@/lib/api/colecao";
 import { comoCurl, ENDPOINTS, paraOpenApi } from "@/lib/api/contrato";
 import { formatarTamanho } from "@/lib/biblioteca";
-import { DESTINOS, emailValido, erroDoAlvo, erroDoDestino, linhasApagadas, type TipoDeDestino } from "@/lib/dev";
+import { DESTINOS, destinosAtivos, destinosDaConfig, emailValido, erroDoAlvo, erroDoDestino, erroDoNovoDestino, linhasApagadas, rotuloDoDestino, type DestinoDeCopia, type TipoDeDestino } from "@/lib/dev";
 import { useApp } from "@/lib/estado";
+import { escolherPasta, escreverNaPasta, guardarPasta, lerPasta, licencaDaPasta, podeEscolherPasta, tirarPasta, type PastaDoNavegador } from "@/lib/pasta-do-navegador";
 import { frasaDaRota, textoDaRota } from "@/lib/rotas";
 import { useEditar } from "@/lib/permissao";
 import { acumular, agrupar, contarPorIntervalo, instante, intervalosPara, razao, somarPorIntervalo } from "@/lib/serie";
@@ -22,66 +23,146 @@ import { Frase, Rota } from "../Frase";
 import { ICONES } from "../Icones";
 import { SeletorPersonalizavel } from "../SeletorPersonalizavel";
 import { SeletorDeHora } from "../SeletoresDeTempo";
-import { Pagina, Titulo } from "../ui";
+import { BotaoIcone, Pagina, Titulo } from "../ui";
 import { AvisoDeApi, dataHora, Estatistica, horaCompleta, inteiro, percentagem, TabelaSimples, useGuardado, useTick, type ColunaSimples } from "./SuperPecas";
 
 // ---------- cópias de segurança ----------
 
 interface ConfigDeCopias {
-  tipo: TipoDeDestino;
-  endereco: string;
+  /** Os sítios para onde vai cada cópia: pode haver vários ao mesmo tempo. */
+  destinos: DestinoDeCopia[];
   automatico: boolean;
   frequencia: string;
   hora: string;
   retencao: string;
 }
 
-const COPIAS_DE_ORIGEM: ConfigDeCopias = { tipo: "s3", endereco: "s3://copias/painel", automatico: true, frequencia: "24", hora: "02:00", retencao: "14" };
+const COPIAS_DE_ORIGEM: ConfigDeCopias = { destinos: [{ id: "dest-1", nome: "Nuvem", tipo: "s3", endereco: "s3://copias/painel", ativo: true }], automatico: true, frequencia: "24", hora: "02:00", retencao: "14" };
+
+type ResultadoDoTeste = { ok: boolean; texto: string } | "a-testar";
+const DESTINO_VAZIO = { nome: "", tipo: "endpoint" as TipoDeDestino, endereco: "", pasta: false };
+const PLACEHOLDER_DO_ENDERECO: Record<TipoDeDestino, string> = { s3: "s3://nome-do-balde/pasta", sftp: "sftp://servidor/pasta", local: "/var/copias", drive: "Identificador da pasta", endpoint: "http://192.168.0.50:9000/copias", offline: "D:\\copias  ou  \\\\NAS\\copias" };
 
 export function Backups() {
   const ligacao = useLigacao();
   const { avisar } = useApp();
   const editar = useEditar();
   const colecao = useColecao<Backup>("/v1/dev/backups", "backups", gerarBackups());
-  const [config, setConfig] = useGuardado<ConfigDeCopias>("backups-config", COPIAS_DE_ORIGEM);
+  const [bruta, setBruta] = useGuardado<ConfigDeCopias & { tipo?: TipoDeDestino; endereco?: string }>("backups-config", COPIAS_DE_ORIGEM);
+  // as configurações antigas tinham um só destino: passam a ter um na lista
+  const config = useMemo<ConfigDeCopias>(() => ({ ...COPIAS_DE_ORIGEM, ...bruta, destinos: destinosDaConfig(bruta) }), [bruta]);
   const [rascunho, setRascunho] = useState(config);
-  const [teste, setTeste] = useState<{ ok: boolean; texto: string } | "a-testar" | null>(null);
+  const [testes, setTestes] = useState<Record<string, ResultadoDoTeste>>({});
+  const [janela, setJanela] = useState<{ id: string | null } | null>(null);
+  const [form, setForm] = useState(DESTINO_VAZIO);
+  /** O acesso à pasta que acabou de se escolher (guarda-se com o destino). */
+  const [pastaNova, setPastaNova] = useState<PastaDoNavegador | null>(null);
+  const [seletor, setSeletor] = useState(false);
+  const [aguentaPastas, setAguentaPastas] = useState(false);
+  useEffect(() => setAguentaPastas(podeEscolherPasta()), []);
+  const [tirar, setTirar] = useState<DestinoDeCopia | null>(null);
   const [restaurar, setRestaurar] = useState<Backup | null>(null);
   const [apagar, setApagar] = useState<Backup | null>(null);
   useEffect(() => setRascunho(config), [config]);
-  const erro = erroDoDestino(rascunho.tipo, rascunho.endereco);
-  const mudou = JSON.stringify(rascunho) !== JSON.stringify(config);
+  const mudouAgenda = JSON.stringify({ ...rascunho, destinos: 0 }) !== JSON.stringify({ ...config, destinos: 0 });
+  const erroDaJanela = janela ? erroDoNovoDestino(form, config.destinos, janela.id ?? undefined) : null;
   const copias = useMemo(() => [...colecao.itens].sort((a, b) => (b.quando ?? "").localeCompare(a.quando ?? "")), [colecao.itens]);
   const concluidas = copias.filter((c) => c.estado === "Concluído");
   const baldes = useMemo(() => agrupar(copias, (c) => instante(c.quando), intervalosPara(copias.length)), [copias]);
+  const ativos = destinosAtivos(config.destinos);
 
-  const guardar = async () => {
-    if (ligacao.modo === "ligado") await chamar(ligacao, "PUT", "/v1/dev/backups/destino", { ...rascunho, retencao: Number(rascunho.retencao) });
-    setConfig(rascunho);
-    avisar("Destino das cópias guardado");
+  /** O que o servidor recebe: todos os destinos e, por compatibilidade, o primeiro ligado em `tipo` e `endereco`. */
+  const paraOServidor = (c: ConfigDeCopias) => ({ ...c, tipo: destinosAtivos(c.destinos)[0]?.tipo, endereco: destinosAtivos(c.destinos)[0]?.endereco, retencao: Number(c.retencao) });
+  const guardarConfig = async (nova: ConfigDeCopias, mensagem: string) => {
+    try {
+      if (ligacao.modo === "ligado") await chamar(ligacao, "PUT", "/v1/dev/backups/destino", paraOServidor(nova));
+      setBruta(nova);
+      avisar(mensagem);
+    } catch (e) {
+      avisar(e instanceof Error ? e.message : "Não foi possível guardar");
+    }
   };
-  const testar = async () => {
-    setTeste("a-testar");
+  const mudarDestino = (id: string, parcial: Partial<DestinoDeCopia>, mensagem: string) => guardarConfig({ ...config, destinos: config.destinos.map((d) => (d.id === id ? { ...d, ...parcial } : d)) }, mensagem);
+
+  const abrirJanela = (d: DestinoDeCopia | null) => {
+    setForm(d ? { nome: d.nome, tipo: d.tipo, endereco: d.endereco, pasta: !!d.pasta } : DESTINO_VAZIO);
+    setPastaNova(null);
+    setJanela({ id: d?.id ?? null });
+  };
+  const guardarDestino = () => {
+    if (!janela) return;
+    const id = janela.id ?? `dest-${Date.now().toString(36)}`;
+    const dados = { nome: form.nome.trim(), tipo: form.tipo, endereco: form.endereco.trim(), pasta: form.tipo === "offline" && form.pasta };
+    // o acesso à pasta escolhida fica neste navegador, com o identificador do destino
+    if (pastaNova && dados.pasta) void guardarPasta(id, pastaNova);
+    if (!dados.pasta) void tirarPasta(id).catch(() => undefined);
+    if (janela.id) void mudarDestino(id, dados, "Destino guardado");
+    else void guardarConfig({ ...config, destinos: [...config.destinos, { id, ...dados, ativo: true }] }, "Destino adicionado");
+  };
+  /** Abre a janela de pastas do sistema; o navegador só devolve o nome da pasta, que passa a ser o endereço. */
+  const escolher = async () => {
+    if (!aguentaPastas) return avisar("Este navegador só escolhe pastas numa ligação segura (https) e no Chrome ou no Edge");
+    setSeletor(true);
+    try {
+      const p = await escolherPasta();
+      if (p) {
+        setPastaNova(p);
+        setForm((f) => ({ ...f, tipo: "offline", endereco: p.name, pasta: true, nome: f.nome.trim() ? f.nome : p.name }));
+      }
+    } catch (e) {
+      avisar(e instanceof Error ? e.message : "Não foi possível abrir a janela de pastas.");
+    }
+    setSeletor(false);
+  };
+
+  /** Testa um destino (o do formulário usa o id «novo»); nada disto precisa de internet para um destino offline. */
+  const testar = async (id: string, d: Pick<DestinoDeCopia, "tipo" | "endereco" | "pasta">, aPasta?: PastaDoNavegador | null) => {
+    setTestes((t) => ({ ...t, [id]: "a-testar" }));
+    if (d.pasta) {
+      // uma pasta escolhida no navegador: vê-se se o navegador deixa escrever nela
+      try {
+        const p = aPasta ?? (await lerPasta(id));
+        const ok = !!p && (await licencaDaPasta(p));
+        return setTestes((t) => ({ ...t, [id]: ok ? { ok: true, texto: `A pasta «${d.endereco}» está ligada e pode receber cópias.` } : { ok: false, texto: p ? "O navegador não deixou escrever na pasta." : "Escolha a pasta outra vez: este navegador já não tem acesso a ela." } }));
+      } catch {
+        return setTestes((t) => ({ ...t, [id]: { ok: false, texto: "Não foi possível abrir a pasta." } }));
+      }
+    }
     await new Promise((r) => window.setTimeout(r, 900));
-    if (erro) return setTeste({ ok: false, texto: erro });
+    const erro = erroDoDestino(d.tipo, d.endereco);
+    if (erro) return setTestes((t) => ({ ...t, [id]: { ok: false, texto: erro } }));
     if (ligacao.modo === "ligado") {
       try {
         await chamar(ligacao, "GET", "/v1/dev/backups");
       } catch (e) {
-        return setTeste({ ok: false, texto: e instanceof Error ? e.message : "Falhou." });
+        return setTestes((t) => ({ ...t, [id]: { ok: false, texto: e instanceof Error ? e.message : "Falhou." } }));
       }
     }
-    setTeste({ ok: true, texto: `Ligação a ${DESTINOS[rascunho.tipo].toLowerCase()} confirmada.` });
+    setTestes((t) => ({ ...t, [id]: { ok: true, texto: `Ligação a ${DESTINOS[d.tipo].toLowerCase()} confirmada.` } }));
   };
   const criar = async () => {
+    if (ativos.length === 0) return avisar("Ligue pelo menos um destino para criar a cópia");
     if (ligacao.modo === "ligado") {
       await chamar(ligacao, "POST", "/v1/dev/backups", {});
       colecao.recarregar();
       return;
     }
     const id = `bk-${Date.now().toString(36)}`;
-    await colecao.guardar({ id, quando: new Date().toISOString(), tipo: "Manual", bytes: 0, estado: "A decorrer", destino: config.endereco });
-    window.setTimeout(() => void colecao.guardar({ id, quando: new Date().toISOString(), tipo: "Manual", bytes: 52_400_000, estado: "Concluído", destino: config.endereco }), 3500);
+    const destino = ativos.map((d) => d.endereco).join(" · ");
+    await colecao.guardar({ id, quando: new Date().toISOString(), tipo: "Manual", bytes: 0, estado: "A decorrer", destino });
+    window.setTimeout(() => {
+      const feita: Backup = { id, quando: new Date().toISOString(), tipo: "Manual", bytes: 52_400_000 * ativos.length, estado: "Concluído", destino };
+      void colecao.guardar(feita);
+      // as pastas escolhidas no navegador recebem mesmo o ficheiro da cópia
+      for (const d of ativos.filter((x) => x.pasta)) {
+        void lerPasta(d.id)
+          .then(async (p) => {
+            if (!p || !(await licencaDaPasta(p, false))) throw new Error("sem acesso");
+            await escreverNaPasta(p, `copia-${id}.json`, JSON.stringify(feita, null, 2));
+          })
+          .catch(() => avisar(`Não foi possível escrever na pasta «${d.endereco}»: volte a escolhê-la ou use «Testar»`));
+      }
+    }, 3500);
   };
 
   const colunas: ColunaSimples<Backup>[] = [
@@ -89,7 +170,7 @@ export function Backups() {
     { rotulo: "Tipo", render: (c) => c.tipo },
     { rotulo: "Tamanho", direita: true, render: (c) => (c.bytes ? formatarTamanho(c.bytes) : "—") },
     { rotulo: "Estado", filtro: (c) => String(c.estado), render: (c) => <Estado valor={c.estado} /> },
-    { rotulo: "Destino", render: (c) => <span className="text-kumo-subtle">{c.destino}</span> },
+    { rotulo: "Destinos", render: (c) => <span className="flex flex-col gap-0.5 text-kumo-subtle">{String(c.destino).split(" · ").map((x) => <span key={x} className="whitespace-nowrap">{x}</span>)}</span> },
     ...(editar
       ? [
           {
@@ -111,6 +192,7 @@ export function Backups() {
       : []),
   ];
 
+  const resultadoDoForm = testes.novo;
   return (
     <Pagina>
       <Titulo titulo="Cópias de segurança">
@@ -128,22 +210,41 @@ export function Backups() {
         <Estatistica titulo="Falhadas" valor={inteiro(copias.filter((c) => c.estado === "Falhou").length)} pior numero={copias.filter((c) => c.estado === "Falhou").length} serie={contarPorIntervalo(baldes, (c) => c.estado === "Falhou")} />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Cartao titulo="Para onde vão as cópias" dica="O destino das cópias de segurança. Em modo ligado o servidor é que faz a cópia e envia para aqui.">
-          <div className="flex flex-col gap-4 p-4">
-            <Select label="Destino" value={rascunho.tipo} onValueChange={(v) => setRascunho({ ...rascunho, tipo: String(v) as TipoDeDestino })} items={DESTINOS} disabled={!editar} />
-            <Input label="Endereço" value={rascunho.endereco} disabled={!editar} onChange={(e) => setRascunho({ ...rascunho, endereco: e.target.value })} error={rascunho.endereco ? (erro ?? undefined) : undefined} placeholder={rascunho.tipo === "s3" ? "s3://nome-do-balde/pasta" : rascunho.tipo === "sftp" ? "sftp://servidor/pasta" : rascunho.tipo === "local" ? "/var/copias" : "Identificador da pasta"} />
-            {teste && teste !== "a-testar" && <span className={`text-sm ${teste.ok ? "text-kumo-default" : "text-kumo-danger"}`}>{teste.texto}</span>}
-            {editar && (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" disabled={teste === "a-testar"} onClick={() => void testar()}>
-                  {teste === "a-testar" ? "A testar…" : "Testar a ligação"}
+        <Cartao
+          titulo={`Para onde vão as cópias (${ativos.length} de ${config.destinos.length})`}
+          dica="Cada cópia vai para todos os destinos que estiverem ligados. Pode juntar quantos quiser: na nuvem (S3, SFTP, Google Drive), num endpoint seu (um servidor ou um NAS em http://… na rede local) ou num disco ou pasta offline. Um destino guarda-se mesmo sem ligação à internet."
+          acoes={
+            editar ? (
+              <Button size="sm" variant="secondary" icon={ICONES.mais} onClick={() => abrirJanela(null)}>
+                Adicionar
+              </Button>
+            ) : undefined
+          }
+        >
+          {config.destinos.length === 0 && <Linha titulo="Ainda não há destinos" estado="Adicione pelo menos um para as cópias terem para onde ir." />}
+          {config.destinos.map((d) => {
+            const r = testes[d.id];
+            return (
+              <Linha key={d.id} titulo={d.nome.trim() || DESTINOS[d.tipo]} estado={<span className="block break-all">{d.nome.trim() ? `${DESTINOS[d.tipo]} · ${d.endereco}` : d.endereco}</span>}>
+                {r && r !== "a-testar" && <Estado valor={r.ok ? "Ligado" : "Sem ligação"} variante={r.ok ? "success" : "error"} />}
+                <Button variant="ghost" size="sm" disabled={r === "a-testar"} onClick={() => void testar(d.id, d)}>
+                  {r === "a-testar" ? "A testar…" : "Testar"}
                 </Button>
-                <Button variant="primary" disabled={!mudou || !!erro} onClick={() => void guardar()}>
-                  Guardar
-                </Button>
-              </div>
-            )}
-          </div>
+                {editar && (
+                  <>
+                    <BotaoIcone dica="Mudar este destino" icone="engrenagem" tamanho="sm" aoClicar={() => abrirJanela(d)} />
+                    <BotaoIcone dica="Tirar este destino" icone="lixo" tamanho="sm" aoClicar={() => setTirar(d)} />
+                  </>
+                )}
+                <Interruptor marcado={d.ativo} aoMudar={(v) => void mudarDestino(d.id, { ativo: v }, v ? "Destino ligado" : "Destino desligado")} rotulo={`Destino ${rotuloDoDestino(d)} ligado`} desativado={!editar} />
+              </Linha>
+            );
+          })}
+          {Object.entries(testes).some(([id, r]) => r !== "a-testar" && !r.ok && id !== "novo") && (
+            <div className="border-t border-kumo-hairline px-4 py-3 text-sm text-kumo-danger">
+              {config.destinos.filter((d) => { const r = testes[d.id]; return r && r !== "a-testar" && !r.ok; }).map((d) => <div key={d.id}>{rotuloDoDestino(d)}: {(testes[d.id] as { texto: string }).texto}</div>)}
+            </div>
+          )}
         </Cartao>
         <Cartao titulo="Agenda">
           <Linha titulo="Cópia automática" estado="Faz uma cópia sozinha, sem ninguém ter de se lembrar.">
@@ -153,12 +254,46 @@ export function Backups() {
             <SeletorPersonalizavel label="Frequência" valor={rascunho.frequencia} opcoes={FREQUENCIA_DE_COPIA.opcoes} personalizado={FREQUENCIA_DE_COPIA.personalizado} aoMudar={(v) => setRascunho({ ...rascunho, frequencia: v })} disabled={!editar || !rascunho.automatico} />
             <SeletorDeHora label="Hora" valor={rascunho.hora} aoMudar={(v) => setRascunho({ ...rascunho, hora: v })} disabled={!editar || !rascunho.automatico} />
             <SeletorPersonalizavel label="Guardar durante" valor={rascunho.retencao} opcoes={RETENCAO_DE_COPIAS.opcoes} personalizado={RETENCAO_DE_COPIAS.personalizado} aoMudar={(v) => setRascunho({ ...rascunho, retencao: v })} disabled={!editar} />
+            {editar && (
+              <div>
+                <Button variant="primary" disabled={!mudouAgenda} onClick={() => void guardarConfig({ ...config, automatico: rascunho.automatico, frequencia: rascunho.frequencia, hora: rascunho.hora, retencao: rascunho.retencao }, "Agenda guardada")}>
+                  Guardar
+                </Button>
+              </div>
+            )}
           </LinhaCampo>
         </Cartao>
       </div>
       <Cartao titulo={`Cópias (${copias.length})`}>
         <TabelaSimples colunas={colunas} linhas={copias} chave={(c) => c.id} vazio="Ainda não há cópias." />
       </Cartao>
+      <Confirmar
+        aberto={!!janela}
+        aoMudar={(v) => !v && (setJanela(null), setTestes((t) => Object.fromEntries(Object.entries(t).filter(([k]) => k !== "novo"))))}
+        titulo={janela?.id ? "Mudar o destino" : "Adicionar um destino"}
+        texto=""
+        rotuloAcao="Guardar"
+        desativado={!!erroDaJanela}
+        aoConfirmar={guardarDestino}
+      >
+        <div className="flex flex-col gap-4">
+          <Select label="Tipo" className="w-full min-w-0" value={form.tipo} onValueChange={(v) => { const tipo = String(v) as TipoDeDestino; setForm({ ...form, tipo, pasta: tipo === "offline" && form.pasta, endereco: erroDoDestino(tipo, form.endereco, tipo === "offline" && form.pasta) ? "" : form.endereco }); }} items={DESTINOS} />
+          <Input label="Nome (opcional)" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="Ex.: Disco do escritório" autoComplete="off" />
+          <Input label={form.pasta ? "Pasta" : "Endereço"} value={form.endereco} onChange={(e) => (setPastaNova(null), setForm({ ...form, endereco: e.target.value, pasta: false }))} error={form.endereco ? (erroDaJanela ?? undefined) : undefined} placeholder={PLACEHOLDER_DO_ENDERECO[form.tipo]} autoComplete="off" />
+          {resultadoDoForm && resultadoDoForm !== "a-testar" && <span className={`text-sm ${resultadoDoForm.ok ? "text-kumo-default" : "text-kumo-danger"}`}>{resultadoDoForm.texto}</span>}
+          <div className="flex flex-wrap gap-2">
+            {form.tipo === "offline" && (
+              <Button variant="secondary" icon={ICONES.pasta} loading={seletor} onClick={() => void escolher()}>
+                Escolher a pasta
+              </Button>
+            )}
+            <Button variant="secondary" disabled={resultadoDoForm === "a-testar" || !form.endereco.trim()} onClick={() => void testar(janela?.id ?? "novo", form, pastaNova)}>
+              {resultadoDoForm === "a-testar" ? "A testar…" : "Testar a ligação"}
+            </Button>
+          </div>
+        </div>
+      </Confirmar>
+      <Confirmar aberto={!!tirar} aoMudar={(v) => !v && setTirar(null)} titulo="Tirar o destino" perigo texto={tirar ? `As cópias novas deixam de ir para «${rotuloDoDestino(tirar)}». As que lá estão não se apagam.` : ""} rotuloAcao="Tirar" aoConfirmar={() => tirar && void guardarConfig({ ...config, destinos: config.destinos.filter((d) => d.id !== tirar.id) }, "Destino tirado")} />
       <Confirmar aberto={!!restaurar} aoMudar={(v) => !v && setRestaurar(null)} titulo="Restaurar a cópia" texto={restaurar ? `Os dados voltam ao estado de ${dataHora(restaurar.quando)}. O que foi feito depois disso perde-se.` : ""} rotuloAcao="Restaurar" perigo escrever={restaurar ? `RESTAURAR ${dataHora(restaurar.quando)}` : "RESTAURAR"} aoConfirmar={async () => {
         if (!restaurar) return;
         if (ligacao.modo === "ligado") await chamar(ligacao, "POST", "/v1/dev/backups/{id}/restaurar", {}, { id: restaurar.id }).catch(() => undefined);
@@ -547,7 +682,7 @@ export function ApiLigacoes() {
             tabs={[
               { value: "pagamentos", label: "Pagamentos" },
               { value: "marketing", label: "Marketing" },
-              { value: "dev", label: "Developer tools" },
+              { value: "dev", label: "Ferramentas de programador" },
               { value: "painel", label: "Painel" },
             ]}
           />

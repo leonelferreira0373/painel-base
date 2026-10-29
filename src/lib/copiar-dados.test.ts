@@ -103,7 +103,7 @@ describe("os pormenores", () => {
   });
   it("a página de onde se copiou diz-se pelo nome que tem no menu", () => {
     expect(nomeDaPagina("/ia/uso/")).toBe("Assistente de IA: Utilização");
-    expect(nomeDaPagina("/a5c836a030b7e18896e3bdfc86b13d78/dev/logs/")).toBe("Developer tools: Registos do servidor");
+    expect(nomeDaPagina("/a5c836a030b7e18896e3bdfc86b13d78/dev/logs/")).toBe("Ferramentas de programador: Registos do servidor");
     expect(nomeDaPagina("/conta/tokens/")).toBe("Definições da conta: Tokens da API");
     expect(nomeDaPagina("/")).toBe("Página inicial");
     expect(nomeDaPagina("/qualquer/coisa/")).toBe("/qualquer/coisa/");
