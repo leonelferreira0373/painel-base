@@ -4,7 +4,8 @@ import type { Icone } from "@/components/Icones";
 import { PROJETO } from "./projeto";
 
 /** Como se desenha o módulo: `analise` e `visao` são ecrãs próprios; `registos` usa a tabela genérica; `painel` é um componente à medida (ver `PAINEIS` em components/Paineis.tsx). */
-export type TipoModulo = "analise" | "visao" | "registos" | "painel";
+/** «pagina» é um ecrã próprio, escolhido em components/Modulo.tsx (o conteúdo, a IA e o resto do super painel). */
+export type TipoModulo = "analise" | "visao" | "registos" | "painel" | "pagina";
 
 export interface Modulo {
   id: string;
@@ -65,6 +66,28 @@ export const AREAS: Area[] = [
     modulos: [
       { id: "carteira", descricao: "Clientes, contactos e encomendas por cliente.", rotulo: "Carteira de clientes", icone: "predio", tipo: "registos" },
       { id: "notificacoes", descricao: "E-mails enviados aos clientes e o estado de cada envio.", rotulo: "Notificações por e-mail", icone: "correio", tipo: "registos" },
+    ],
+  },
+  {
+    id: "conteudo",
+    secao: "Plataforma",
+    rotulo: "Conteúdo",
+    icone: "pasta",
+    modulos: [
+      { id: "biblioteca", descricao: "Pastas e ficheiros guardados neste navegador: carregar, pré-visualizar, renomear, mover e remover.", rotulo: "Gestor de ficheiros", icone: "pasta", tipo: "pagina" },
+      { id: "galeria", descricao: "Carregar imagens e vê-las em grelha, com texto alternativo.", rotulo: "Galeria de imagens", icone: "galeria", tipo: "pagina" },
+      { id: "blog", descricao: "Escrever, publicar e exportar artigos.", rotulo: "Editor de blog", icone: "artigo", tipo: "pagina" },
+    ],
+  },
+  {
+    id: "ia",
+    secao: "Inteligência artificial",
+    rotulo: "Assistente de IA",
+    icone: "ia",
+    modulos: [
+      { id: "comportamento", descricao: "Nome, tom, tamanho das respostas, instruções e limites do assistente.", rotulo: "Comportamento", icone: "engrenagem", tipo: "pagina" },
+      { id: "memoria", descricao: "Os PDF e as notas que o assistente tem na memória.", rotulo: "Memória", icone: "pdf", tipo: "pagina" },
+      { id: "testar", descricao: "Ver o que o assistente encontraria na memória e as instruções que recebe.", rotulo: "Testar", icone: "lupa", tipo: "pagina" },
     ],
   },
   {

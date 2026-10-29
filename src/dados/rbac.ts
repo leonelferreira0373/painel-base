@@ -21,7 +21,7 @@ export const FUNCOES: Funcao[] = [
     id: "administrador",
     rotulo: "Administrador",
     pessoa: "Ana Costa",
-    areas: { inicio: TUDO, analise: TUDO, vendas: TUDO, clientes: TUDO, admin: TUDO },
+    areas: { inicio: TUDO, analise: TUDO, vendas: TUDO, clientes: TUDO, conteudo: TUDO, ia: TUDO, admin: TUDO },
   },
   {
     id: "gestor",
@@ -33,7 +33,7 @@ export const FUNCOES: Funcao[] = [
     id: "analista",
     rotulo: "Analista de dados",
     pessoa: "Carla Pereira",
-    areas: { inicio: VER, analise: TUDO, vendas: VER, clientes: VER },
+    areas: { inicio: VER, analise: TUDO, vendas: VER, clientes: VER, conteudo: TUDO, ia: TUDO },
   },
   {
     id: "apoio",

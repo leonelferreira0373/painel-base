@@ -7,6 +7,10 @@ import { REGISTOS } from "@/dados/modulos";
 import { FUNCOES, podeVer } from "@/dados/rbac";
 import { T } from "@/dados/textos";
 import { useApp } from "@/lib/estado";
+import { ControlosDaIA } from "./conteudo/ControlosIA";
+import { Blog } from "./conteudo/Blog";
+import { Galeria } from "./conteudo/Galeria";
+import { GestorDeFicheiros } from "./conteudo/GestorDeFicheiros";
 import { Exportar } from "./analise/Exportar";
 import { Ficheiros } from "./analise/Ficheiros";
 import { GraficosPagina } from "./analise/Graficos";
@@ -48,6 +52,12 @@ export function Modulo({ areaId, moduloId }: { areaId: string; moduloId: string 
     if (moduloId === "graficos") return <GraficosPagina />;
     return <Exportar />;
   }
+  if (areaId === "conteudo") {
+    if (moduloId === "biblioteca") return <GestorDeFicheiros />;
+    if (moduloId === "galeria") return <Galeria />;
+    return <Blog />;
+  }
+  if (areaId === "ia") return <ControlosDaIA aba={moduloId as "comportamento" | "memoria" | "testar"} />;
   const Painel = PAINEIS[moduloId];
   if (Painel) return <Painel />;
   if (REGISTOS[moduloId]) return <Registos moduloId={moduloId} />;

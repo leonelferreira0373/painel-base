@@ -73,7 +73,7 @@ export function SeletorCliente({ slug, pagina }: { slug: string; pagina: string 
             </button>
           }
         />
-        <PopupCartao className="w-[min(440px,calc(100vw-24px))]">
+        <PopupCartao modalNoTelemovel className="w-[min(440px,calc(100vw-24px))]">
               <div className="flex items-center border-b border-kumo-line pr-3">
                 <Dica conteudo={soFavoritos ? "Mostrar todos" : "Mostrar só os favoritos"}>
                   <button type="button" aria-label="Só favoritos" aria-pressed={soFavoritos} onClick={() => setSoFavoritos((v) => !v)} className="ml-1.5 flex size-8 shrink-0 items-center justify-center rounded-md text-kumo-subtle hover:bg-kumo-tint">

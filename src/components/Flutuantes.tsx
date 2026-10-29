@@ -15,10 +15,10 @@ export const DISTANCIA_AO_GATILHO = 8;
 export const SUPERFICIE_FLUTUANTE = "rounded-lg bg-kumo-base text-kumo-default";
 
 /** Um cartão flutuante com conteúdo livre (o seletor de contas, o do período, o dos filtros): abre junto do gatilho e vira para o lado onde houver espaço. */
-export function PopupCartao({ children, className = "", lado = "bottom", alinhar = "start" }: { children: ReactNode; className?: string; lado?: "bottom" | "top" | "left" | "right"; alinhar?: "start" | "center" | "end" }) {
+export function PopupCartao({ children, className = "", lado = "bottom", alinhar = "start", modalNoTelemovel = false }: { children: ReactNode; className?: string; lado?: "bottom" | "top" | "left" | "right"; alinhar?: "start" | "center" | "end"; /** No telemóvel abre como janela no meio do ecrã, com o fundo escurecido, em vez de colado ao botão. */ modalNoTelemovel?: boolean }) {
   return (
     <Popover.Portal>
-      <Popover.Positioner collisionPadding={MARGEM_AO_BORDO} side={lado} align={alinhar} sideOffset={DISTANCIA_AO_GATILHO}>
+      <Popover.Positioner collisionPadding={MARGEM_AO_BORDO} side={lado} align={alinhar} sideOffset={DISTANCIA_AO_GATILHO} data-modal-telemovel={modalNoTelemovel ? "" : undefined}>
         <Popover.Popup className={`${SUPERFICIE_FLUTUANTE} overflow-hidden p-0 ${className}`}>{children}</Popover.Popup>
       </Popover.Positioner>
     </Popover.Portal>

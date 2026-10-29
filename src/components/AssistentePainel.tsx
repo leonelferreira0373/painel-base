@@ -7,12 +7,32 @@ import "@/styles/assistente.css";
 import NextLink from "next/link";
 import { useEffect, useMemo } from "react";
 import { AREAS, caminho } from "@/dados/estrutura";
+import { useArmazem } from "@/lib/armazem";
+import { useControlosIA, type DocumentoDeMemoria } from "@/lib/ia-controlos";
 import { ASSISTENTE } from "@/dados/assistente";
 
 /** O evento que o botão do cabeçalho envia para abrir o assistente. */
 export const EVENTO_ASSISTENTE = "painel:assistente";
 
+/** A resposta de um documento da memória: o começo do texto, sem passar de 420 caracteres. */
+const resumoDe = (texto: string) => {
+  const limpo = texto.replace(/\s+/g, " ").trim();
+  return limpo.length > 420 ? `${limpo.slice(0, 420).replace(/\s\S*$/, "")}…` : limpo;
+};
+
 export function AssistentePainel() {
+  const controlos = useControlosIA();
+  const { itens: memoria } = useArmazem<DocumentoDeMemoria>("memoria");
+  // o nome, a primeira mensagem e a memória ativa (um resumo de cada documento) vêm dos controlos da IA
+  const dados = useMemo(
+    () => ({
+      ...ASSISTENTE.conteudo,
+      nome: controlos.nome || ASSISTENTE.conteudo.nome,
+      abertura: [controlos.boasVindas || ASSISTENTE.conteudo.abertura[0]],
+      perguntas: [...ASSISTENTE.conteudo.perguntas, ...memoria.filter((d) => d.ativo).slice(0, 8).map((d) => ({ pergunta: `O que diz «${d.nome}»?`, resposta: resumoDe(d.texto) }))],
+    }),
+    [controlos, memoria],
+  );
   const paginas = useMemo(() => ["/", ...AREAS.filter((a) => a.id !== "inicio").flatMap((a) => a.modulos.map((m) => caminho(a.id, m.id)))], []);
   useEffect(() => {
     const abrir = () => {
@@ -22,5 +42,5 @@ export function AssistentePainel() {
     window.addEventListener(EVENTO_ASSISTENTE, abrir);
     return () => window.removeEventListener(EVENTO_ASSISTENTE, abrir);
   }, []);
-  return <AssistenteIA dados={ASSISTENTE.conteudo} endpoint={ASSISTENTE.endpoint} paginas={paginas} Ligacao={NextLink} seletorDaHero={false} atrasoMs={0} chaveDeSessao={ASSISTENTE.chaveDeSessao} />;
+  return <AssistenteIA dados={dados} endpoint={ASSISTENTE.endpoint} paginas={paginas} Ligacao={NextLink} seletorDaHero={false} atrasoMs={0} chaveDeSessao={ASSISTENTE.chaveDeSessao} />;
 }

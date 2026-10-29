@@ -47,30 +47,80 @@ svg:has(> path.fill-kumo-arrow-edge) {
   display: none !important;
 }
 
+/* As tabelas nunca quebram as palavras nem as empilham: cada coluna tem a largura do que lá está e a tabela desliza na horizontal quando não cabe (no telemóvel, por exemplo). */
+.tabela-larga table {
+  width: max-content;
+  min-width: 100%;
+}
+.tabela-larga th,
+.tabela-larga td {
+  white-space: nowrap;
+}
+
 /* Telemóvel: tudo sangra até aos bordos do ecrã, sem cantos redondos nem margens laterais; os títulos mantêm a margem de 16 px. */
 @media (max-width: 639px) {
   .pleno {
     margin-inline: -16px;
+    /* Com margem negativa só, um cartão com width:100% (o LayerCard) fica puxado para a esquerda: a largura também cresce os 32 px. */
+    width: calc(100% + 32px);
+    max-width: none;
     border-radius: 0 !important;
     border-inline-width: 0 !important;
     box-shadow:
       inset 0 1px 0 0 var(--color-kumo-hairline),
       inset 0 -1px 0 0 var(--color-kumo-hairline) !important;
   }
-  /* A pesquisa rápida ocupa o ecrã inteiro e acompanha o teclado. */
-  [role="dialog"][class*="max-w-2xl"] {
-    top: 0 !important;
-    left: 0 !important;
+  /* No cabeçalho só aparece a página atual (o caminho completo não cabe e ficava «Operações > E…»); o Kumo desenha o caminho do telemóvel num bloco à parte. */
+  header nav[aria-label="breadcrumb"] > .contents > :not(:last-child) {
+    display: none;
+  }
+  /* As janelas modais ficam no meio do ecrã e não coladas ao topo (o Kumo põe-nas a 32 px do topo); se forem mais altas do que o ecrã, rolam por dentro. Só as do Dialog: os popups e a pesquisa têm o seu próprio sítio. */
+  [role="dialog"][class*="sm:top-16"] {
+    top: 50% !important;
+    translate: -50% -50% !important;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto !important;
+  }
+  /* O seletor de contas (e o de clientes) abre no meio do ecrã, com o fundo escurecido, como as janelas do painel da Business Corporation: a moldura do Base UI cobre o ecrã e o cartão fica ao centro, com 16 px de margem. */
+  [data-modal-telemovel] {
+    position: fixed !important;
+    inset: 0 !important;
     width: 100vw !important;
-    max-width: none !important;
-    height: 100dvh;
+    height: 100dvh !important;
     transform: none !important;
-    border-radius: 0 !important;
+    translate: none !important;
+    display: grid !important;
+    place-items: center;
+    padding: 16px;
+    background: rgb(11 11 11 / 0.28);
+  }
+  [data-modal-telemovel] > [role="dialog"] {
+    width: min(100%, 28rem) !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 32px);
+    border-radius: 20px;
+  }
+
+  /* A gaveta do menu tem 288 px de largura e o cabeçalho 56 px, com 12 px de margem, como no painel da Business Corporation no telemóvel. */
+  [class*="group/sidebar-wrapper"] {
+    --sidebar-width: 288px !important;
+  }
+  /* A pesquisa rápida é um cartão que flutua por baixo do cabeçalho, com 16 px de margem de cada lado e cantos redondos, como a do painel da Business Corporation no telemóvel: nunca meio fora do ecrã (o Tailwind 4 centra com a propriedade translate, não com transform) nem o ecrã inteiro. */
+  [role="dialog"][class*="max-w-2xl"] {
+    top: max(72px, 14dvh) !important;
+    left: 16px !important;
+    width: calc(100vw - 32px) !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: calc(100dvh - max(72px, 14dvh) - 16px);
+    transform: none !important;
+    translate: none !important;
+    border-radius: 20px !important;
   }
   [role="dialog"][class*="max-w-2xl"] > div {
-    height: 100%;
-    max-height: none !important;
-    border-radius: 0 !important;
+    height: auto;
+    max-height: inherit;
+    border-radius: 20px !important;
   }
 }
 

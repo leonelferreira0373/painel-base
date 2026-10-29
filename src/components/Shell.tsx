@@ -89,7 +89,7 @@ function PerfilLateral() {
     if (isMobile) setOpenMobile(false);
   };
   return (
-    <div className="flex h-[58px] min-w-0 flex-1 items-center">
+    <div className="flex h-14 sm:h-[58px] min-w-0 flex-1 items-center">
       <Popover.Root open={aberto} onOpenChange={setAberto}>
         <Dica bloco lado="right" conteudo={<CorpoDica titulo={conta.nome} texto={`${funcao.rotulo}. Abra o menu para trocar de conta ou criar uma nova.`} />}>
           <Popover.Trigger
@@ -106,7 +106,7 @@ function PerfilLateral() {
             }
           />
         </Dica>
-        <PopupCartao className="w-[288px] max-w-[calc(100vw-16px)]">
+        <PopupCartao modalNoTelemovel className="w-[288px] max-w-[calc(100vw-16px)]">
               <div className="flex items-center border-b border-kumo-line pr-3">
                 <Ic nome="lupa" tamanho={14} className="ml-3 shrink-0 text-kumo-subtle" />
                 <CampoDePesquisa valor={q} aoMudar={setQ} rotulo="Pesquisar contas" placeholder="Pesquisar contas…" idLista="lista-contas" />
@@ -583,7 +583,7 @@ function Cabecalho({ aoPesquisar }: { aoPesquisar: () => void }) {
     router.push(href);
   };
   return (
-    <header className="flex h-[58px] shrink-0 items-center justify-between gap-3 border-b border-kumo-hairline bg-kumo-canvas px-4">
+    <header className="flex h-14 sm:h-[58px] shrink-0 items-center justify-between gap-3 border-b border-kumo-hairline bg-kumo-canvas px-3 sm:px-4">
       <div className="flex min-w-0 items-center gap-2">
         <span className="md:hidden">
           <AlternarBarra />

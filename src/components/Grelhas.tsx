@@ -127,7 +127,7 @@ export function GrelhaRegistos({ colunas, linhas, porPagina = 10, filtros }: { c
         {filtros}
       </div>
       <LayerCard className="pleno overflow-hidden p-0">
-        <Esbatido className="sem-barra overflow-x-auto">
+        <Esbatido className="sem-barra tabela-larga overflow-x-auto">
           <Table>
             <Table.Header>
               <Table.Row>
@@ -292,7 +292,7 @@ export function GrelhaDados({ colunas, linhas, tipos, porPagina = 25 }: { coluna
         <Campos colunas={colunas} ocultas={ocultas} aoAlternar={alternar} aoMostrarTodas={() => setOcultas(new Set())} />
       </div>
       <LayerCard className="pleno overflow-hidden p-0">
-        <Esbatido className="sem-barra max-h-[520px] overflow-auto">
+        <Esbatido className="sem-barra tabela-larga max-h-[520px] overflow-auto">
           <Table>
             <Table.Header>
               <Table.Row>
