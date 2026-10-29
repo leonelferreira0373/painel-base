@@ -7,9 +7,11 @@ import { gerarCliques, gerarOrigens, gerarPaginas, gerarResumoMarketing, type Cl
 import { chamar, useApi, useLigacao } from "@/lib/api/cliente";
 import { endpointPorId } from "@/lib/api/contrato";
 import { identificador } from "@/lib/conta";
+import { frasaDaRota, textoDaRota } from "@/lib/rotas";
 import { erroDoUtm, montarUrlUtm, origemDoVisitante, taxaDeConversao, type ParametrosUtm } from "@/lib/marketing";
 import { useEditar } from "@/lib/permissao";
 import { Cartao, Confirmar, Linha } from "../conta/Pecas";
+import { Frase, Rota } from "../Frase";
 import { BotaoCopiar } from "../Copiar";
 import { Grafico } from "../graficos/Graficos";
 import { GrelhaOrdenavel } from "../GrelhaOrdenavel";
@@ -79,12 +81,12 @@ export function MarketingVisao() {
             </Painel>
             <Painel titulo="Páginas quentes">
               {quentes.map((p) => (
-                <LinhaOrdenada key={p.pagina} nome={p.pagina} valor={inteiro(p.visitas)} proporcao={(p.visitas / Math.max(1, quentes[0].visitas)) * 100} />
+                <LinhaOrdenada key={p.pagina} nome={textoDaRota(p.pagina)} conteudo={<Rota caminho={p.pagina} />} copiar={p.pagina} valor={inteiro(p.visitas)} proporcao={(p.visitas / Math.max(1, quentes[0].visitas)) * 100} />
               ))}
             </Painel>
             <Painel titulo="Botões mais clicados">
               {topCliques.map((c) => (
-                <LinhaOrdenada key={`${c.elemento}${c.pagina}`} nome={`${c.elemento} · ${c.pagina}`} copiar={c.elemento} valor={inteiro(c.cliques)} proporcao={(c.cliques / Math.max(1, topCliques[0].cliques)) * 100} />
+                <LinhaOrdenada key={`${c.elemento}${c.pagina}`} nome={`${textoDaRota(c.pagina)} › ${c.elemento}`} conteudo={<Frase>{`${frasaDaRota(c.pagina)} > «${c.elemento}»`}</Frase>} copiar={c.elemento} valor={inteiro(c.cliques)} proporcao={(c.cliques / Math.max(1, topCliques[0].cliques)) * 100} />
               ))}
             </Painel>
           </div>

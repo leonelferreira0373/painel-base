@@ -5,11 +5,11 @@ import type { ReactNode } from "react";
 import { BotaoCopiar } from "./Copiar";
 import { Ic } from "./Icones";
 
-export function LinhaOrdenada({ nome, valor, proporcao, copiar = nome, ativa = false, aoPassar, aoAbrir, rotulo }: { nome: string; valor: ReactNode; proporcao: number; copiar?: string; ativa?: boolean; aoPassar?: () => void; aoAbrir?: () => void; rotulo?: string }) {
+export function LinhaOrdenada({ conteudo: nomeEmElementos, nome, valor, proporcao, copiar = nome, ativa = false, aoPassar, aoAbrir, rotulo }: { /** O nome desenhado à medida (pills, por exemplo); `nome` fica para a dica e para copiar. */ conteudo?: ReactNode; nome: string; valor: ReactNode; proporcao: number; copiar?: string; ativa?: boolean; aoPassar?: () => void; aoAbrir?: () => void; rotulo?: string }) {
   const conteudo = (
     <>
       <span className="min-w-0 flex-1 truncate font-medium text-kumo-default" title={nome}>
-        {nome}
+        {nomeEmElementos ?? nome}
       </span>
       <span className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-kumo-tint">
         <span className="block h-full rounded-full bg-kumo-brand" style={{ width: `${Math.min(100, Math.max(0, proporcao))}%` }} />

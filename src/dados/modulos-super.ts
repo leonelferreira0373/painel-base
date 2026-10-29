@@ -92,7 +92,7 @@ const quentes: DefRegistos = {
   titulo: "Páginas quentes",
   api: { lista: "/v1/marketing/paginas", mapear: (p) => ({ ...p, rejeicao: Math.round(Number(p.rejeicao) * 100) }) },
   colunas: [
-    { chave: "pagina", rotulo: "Página" },
+    { chave: "pagina", rotulo: "Página", tipo: "rota" },
     { chave: "visitas", rotulo: "Visitas", tipo: "numero" },
     { chave: "tempoMedio", rotulo: "Tempo médio (s)", tipo: "numero" },
     { chave: "rejeicao", rotulo: "Rejeição (%)", tipo: "numero" },
@@ -112,7 +112,7 @@ const cliques: DefRegistos = {
   api: { lista: "/v1/marketing/cliques" },
   colunas: [
     { chave: "elemento", rotulo: "Botão ou ligação" },
-    { chave: "pagina", rotulo: "Página" },
+    { chave: "pagina", rotulo: "Página", tipo: "rota" },
     { chave: "cliques", rotulo: "Cliques", tipo: "numero" },
     { chave: "visitantes", rotulo: "Visitantes", tipo: "numero" },
   ],

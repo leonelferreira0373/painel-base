@@ -14,9 +14,11 @@ import type { DefGrafico, DefRegistos, Linha } from "@/dados/tipos";
 import { porCategoria, serieTemporal } from "@/lib/analysis/series";
 import { granularidadeAuto } from "@/lib/analysis/sugestoes";
 import { useApp } from "@/lib/estado";
+import { textoDaRota } from "@/lib/rotas";
 import { PermissaoProvider } from "@/lib/permissao";
 import type { Tabela } from "@/lib/tipos";
 import { Estado } from "./Estado";
+import { Frase, Rota } from "./Frase";
 import { Grafico, type GraficoSpec } from "./graficos/Graficos";
 import { GrelhaRegistos, type LinhaGrelha } from "./Grelhas";
 import { Ic, ICONES } from "./Icones";
@@ -27,7 +29,7 @@ function tabelaDe(def: DefRegistos, linhas: Linha[]): Tabela {
   return { id: def.id, ficheiroId: def.id, nome: def.titulo, origem: def.titulo, colunas: chaves, linhas: linhas.map((l) => chaves.map((k) => l[k] ?? null)) };
 }
 
-function especificacao(g: DefGrafico, t: Tabela): GraficoSpec | null {
+function especificacao(g: DefGrafico, t: Tabela, def: DefRegistos): GraficoSpec | null {
   const idx = (k?: string) => (k ? t.colunas.indexOf(k) : -1);
   if (g.tipo === "linha" && g.data) {
     const c = idx(g.data);
@@ -41,8 +43,11 @@ function especificacao(g: DefGrafico, t: Tabela): GraficoSpec | null {
     const c = idx(g.por);
     if (c < 0) return null;
     const m = g.medida ? idx(g.medida) : -1;
-    const pontos = porCategoria(t, c, m >= 0 ? m : null, "soma", 8);
-    return pontos.length > 0 ? { tipo: g.tipo === "rosca" ? "rosca" : "barras", pontos } : null;
+    const rotas = def.colunas.find((x) => x.chave === g.por)?.tipo === "rota";
+    // uma rota nunca se mostra como endereço: o gráfico usa o nome da página
+    const pontos = porCategoria(t, c, m >= 0 ? m : null, "soma", 8).map((p) => (rotas ? { ...p, rotulo: textoDaRota(p.rotulo) } : p));
+    if (pontos.length === 0) return null;
+    return g.tipo === "rosca" ? { tipo: "rosca", pontos, rotas } : { tipo: "barras", pontos };
   }
   return null;
 }
@@ -102,7 +107,7 @@ export function Registos({ moduloId, filtro, titulo }: { moduloId: string; filtr
   const todas = registos[moduloId] ?? [];
   const linhas = useMemo(() => (filtro ? todas.filter((l) => String(l[filtro.chave]) === filtro.valor) : todas), [todas, filtro]);
   const tabela = useMemo(() => tabelaDe(def, linhas), [def, linhas]);
-  const graficos = useMemo(() => def.graficos.map((g) => ({ g, spec: especificacao(g, tabela) })).filter((x) => x.spec), [def, tabela]);
+  const graficos = useMemo(() => def.graficos.map((g) => ({ g, spec: especificacao(g, tabela, def) })).filter((x) => x.spec), [def, tabela]);
   const chaveEstado = def.estadoChave ?? "estado";
 
   const grelha: LinhaGrelha[] = useMemo(
@@ -112,9 +117,9 @@ export function Registos({ moduloId, filtro, titulo }: { moduloId: string; filtr
         return {
           chave: l.id,
           pendente: pendentes.has(`${moduloId}:${l.id}`),
-          texto: def.colunas.map((c) => String(l[c.chave] ?? "")).join(" ").toLowerCase(),
+          texto: def.colunas.map((c) => (c.tipo === "rota" ? `${textoDaRota(String(l[c.chave] ?? ""))} ${String(l[c.chave] ?? "")}` : String(l[c.chave] ?? ""))).join(" ").toLowerCase(),
           ordem: def.colunas.map((c) => (c.tipo === "numero" ? Number(l[c.chave] ?? 0) : String(l[c.chave] ?? ""))),
-          celulas: def.colunas.map((c) => (c.tipo === "estado" ? <Estado key={c.chave} valor={String(l[c.chave] ?? "")} modulo={moduloId} /> : c.tipo === "numero" ? Number(l[c.chave] ?? 0).toLocaleString("pt-PT") : String(l[c.chave] ?? ""))),
+          celulas: def.colunas.map((c) => (c.tipo === "estado" ? <Estado key={c.chave} valor={String(l[c.chave] ?? "")} modulo={moduloId} /> : c.tipo === "rota" ? <Rota key={c.chave} caminho={String(l[c.chave] ?? "")} /> : c.tipo === "numero" ? Number(l[c.chave] ?? 0).toLocaleString("pt-PT") : String(l[c.chave] ?? ""))),
           acoes:
             disponiveis.length === 0 ? null : (
               <DropdownMenu>

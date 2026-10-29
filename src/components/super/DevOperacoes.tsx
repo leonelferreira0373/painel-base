@@ -11,12 +11,14 @@ import { comoCurl, ENDPOINTS, paraOpenApi } from "@/lib/api/contrato";
 import { formatarTamanho } from "@/lib/biblioteca";
 import { DESTINOS, emailValido, erroDoAlvo, erroDoDestino, linhasApagadas, type TipoDeDestino } from "@/lib/dev";
 import { useApp } from "@/lib/estado";
+import { frasaDaRota, textoDaRota } from "@/lib/rotas";
 import { useEditar } from "@/lib/permissao";
 import { acumular, agrupar, contarPorIntervalo, instante, intervalosPara, razao, somarPorIntervalo } from "@/lib/serie";
 import { CampoSenha } from "../auth/CampoSenha";
 import { useAcessoDeIp } from "./AcessoDeIp";
 import { BotaoCopiar, Cartao, Confirmar, descarregar, Interruptor, Linha, LinhaCampo } from "../conta/Pecas";
 import { Estado } from "../Estado";
+import { Frase, Rota } from "../Frase";
 import { ICONES } from "../Icones";
 import { SeletorPersonalizavel } from "../SeletorPersonalizavel";
 import { SeletorDeHora } from "../SeletoresDeTempo";
@@ -300,10 +302,10 @@ export function PaginasDoSite() {
     setAlvo({ pagina, estado });
   };
   const colunas: ColunaSimples<PaginaSite>[] = [
-    { rotulo: "Página", render: (p) => <span className="font-medium">{p.caminho}</span> },
+    { rotulo: "Página", render: (p) => <span title={p.caminho}><Rota caminho={p.caminho} /></span> },
     { rotulo: "Estado", render: (p) => <Estado valor={NOME_DE_ESTADO(p.estado)} variante={p.estado === "ativa" ? "success" : p.estado === "manutencao" ? "warning" : "error"} /> },
     { rotulo: "Mensagem aos visitantes", render: (p) => <span className="text-kumo-subtle">{p.mensagem || "—"}</span> },
-    { rotulo: "Mudar para", render: (p) => <Select aria-label={`Estado de ${p.caminho}`} value={p.estado} onValueChange={(v) => escolher(p, String(v) as PaginaSite["estado"])} items={ESTADOS_DE_PAGINA} className="w-44" disabled={!editar} /> },
+    { rotulo: "Mudar para", render: (p) => <Select aria-label={`Estado de ${textoDaRota(p.caminho)}`} value={p.estado} onValueChange={(v) => escolher(p, String(v) as PaginaSite["estado"])} items={ESTADOS_DE_PAGINA} className="w-44" disabled={!editar} /> },
   ];
   return (
     <Pagina>
@@ -327,7 +329,7 @@ export function PaginasDoSite() {
         aberto={!!alvo}
         aoMudar={(v) => !v && setAlvo(null)}
         titulo={alvo?.estado === "manutencao" ? "Pôr em manutenção" : "Desativar a página"}
-        texto={alvo ? `Os visitantes de ${alvo.pagina.caminho} passam a ver só a mensagem.` : ""}
+        texto={alvo ? `Os visitantes de ${frasaDaRota(alvo.pagina.caminho)} passam a ver só a mensagem.` : ""}
         rotuloAcao={alvo?.estado === "manutencao" ? "Pôr em manutenção" : "Desativar"}
         perigo={alvo?.estado === "desativada"}
         desativado={!mensagem.trim()}

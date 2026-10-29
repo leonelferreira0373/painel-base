@@ -7,7 +7,8 @@ export type Linha = { id: string } & Record<string, string | number>;
 export interface DefColuna {
   chave: string;
   rotulo: string;
-  tipo?: "texto" | "data" | "numero" | "estado";
+  /** «rota» é o endereço de uma página do site: mostra-se o nome da página, nunca o endereço. */
+  tipo?: "texto" | "data" | "numero" | "estado" | "rota";
 }
 
 export interface DefTransicao {

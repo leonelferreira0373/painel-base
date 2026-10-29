@@ -7,7 +7,9 @@ import { useMemo } from "react";
 import type { Ponto } from "@/lib/analysis/series";
 import { echarts } from "@/lib/echarts";
 import { useTema } from "@/lib/tema";
+import { SEPARADOR_DE_ROTA } from "@/lib/rotas";
 import { SemDadosGrafico } from "../Estados";
+import { Pilula, SetaDeCaminho } from "../Frase";
 
 export type GraficoSpec =
   | { tipo: "linha"; pontos: Ponto[]; nome?: string }
@@ -15,7 +17,8 @@ export type GraficoSpec =
   | { tipo: "colunas"; pontos: Ponto[] }
   | { tipo: "histograma"; classes: { de: number; ate: number; n: number }[] }
   | { tipo: "dispersao"; pontos: { x: number; y: number }[]; rx: string; ry: string }
-  | { tipo: "rosca"; pontos: Ponto[] }
+  /** `rotas`: os nomes são páginas do site, e a legenda mostra um pill por pedaço com chevron entre eles. */
+  | { tipo: "rosca"; pontos: Ponto[]; rotas?: boolean }
   | { tipo: "matriz"; nomes: string[]; valores: number[][] }
   /** Colunas empilhadas: uma camada por série (por exemplo, os pedidos por estado, dia a dia). */
   | { tipo: "empilhadas"; rotulos: string[]; series: { nome: string; valores: number[] }[]; unidade?: string }
@@ -195,5 +198,31 @@ export function Grafico({ spec, altura = 240 }: { spec: GraficoSpec; altura?: nu
   const { efetivo } = useTema();
   const opcoes = useMemo(() => (vazio ? null : efetivo === "escuro" ? paraEscuro(opcoesExportacao(spec)) : opcoesExportacao(spec)), [spec, vazio, efetivo]);
   if (!opcoes) return <SemDadosGrafico altura={altura} />;
+  if (spec.tipo === "rosca" && spec.rotas) {
+    // as páginas leem-se em pills: a legenda é do painel (não do canvas) e o anel fica ao centro do seu espaço
+    const sem = { ...opcoes, legend: { show: false }, series: (opcoes.series as { center?: string[] }[]).map((s) => ({ ...s, center: ["50%", "50%"] })) } as KumoChartOption;
+    return (
+      <div className="flex items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <Chart echarts={echarts} options={sem} height={alturaDe(spec, altura)} />
+        </div>
+        <ul className="flex w-[46%] shrink-0 flex-col gap-1.5">
+          {spec.pontos.map((p, i) => (
+            <li key={p.rotulo} className="flex min-w-0 items-center gap-2 text-xs text-kumo-default">
+              <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: ChartPalette.categorical(i % 6) }} />
+              <span className="min-w-0 flex-1 truncate">
+                {p.rotulo.split(SEPARADOR_DE_ROTA).map((parte, j) => (
+                  <span key={j}>
+                    {j > 0 && <SetaDeCaminho />}
+                    <Pilula>{parte}</Pilula>
+                  </span>
+                ))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
   return <Chart echarts={echarts} options={opcoes} height={alturaDe(spec, altura)} />;
 }
