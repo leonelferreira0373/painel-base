@@ -116,3 +116,8 @@ export const PORTA_SMTP = {
   opcoes: { "25": "25 (sem cifra)", "465": "465 (SSL)", "587": "587 (STARTTLS)", "2525": "2525 (alternativa)" } as Record<string, string>,
   personalizado: { chave: "portaSmtp", omissao: "587", rotulo: "Porta", tipo: "numero", min: 1, max: 65535, exemplo: "2587", mostrar: (v: string) => v } satisfies EspecificacaoPersonalizada,
 };
+
+export const CATEGORIA_DE_PRODUTO = {
+  opcoes: { servicos: "Serviços", equipamento: "Equipamento", consumiveis: "Consumíveis", pecas: "Peças" } as Record<string, string>,
+  personalizado: { chave: "categoriaDeProduto", omissao: "servicos", rotulo: "Nome da categoria", tipo: "texto", exemplo: "Embalagens", mostrar: (v: string) => v } satisfies EspecificacaoPersonalizada,
+};

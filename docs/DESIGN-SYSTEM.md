@@ -197,6 +197,16 @@ Usa-se sempre o componente do Kumo; **nunca** um `<button>`, `<input>` ou `<sele
 - **Número, data e hora** nunca são campos nativos: `SeletorDeData`, `SeletorDeHora` e texto com `inputMode="decimal"`.
 - **Só ver**: `Modulo.tsx` envolve cada ecrã próprio num `PermissaoProvider` com `podeEditar(funcao, área, módulo)` e o ecrã lê `useEditar()` (`lib/permissao.tsx`). Quem só vê encontra a marca «Só leitura» no título (`Titulo` mostra-a sozinho) e nenhum botão que crie, grave, apague ou reinicie: esses desaparecem (os interruptores ficam desativados e os campos de configuração ficam só para ler). Os campos de segredo (palavra-passe SMTP, token) e o descarregar de cópias de segurança também desaparecem. Um ecrã novo com ações faz o mesmo; os módulos de registos já o fazem por si.
 
+- **IBAN**: quem preenche nunca escreve o prefixo. A moeda da conta decide o país e o prefixo (`AOA` e `USD` dão `AO06`, `EUR` dá `PT50`, em `lib/iban.ts`) e o campo (`CampoIban`) só pede os 21 dígitos; colar um IBAN inteiro tira o prefixo. O banco preenche-se sozinho pelos quatro primeiros dígitos (`lib/bancos.ts`: só códigos confirmados num diretório SWIFT); se o código não estiver na tabela, o campo «Banco» fica livre. Um banco novo acrescenta-se à tabela com o código confirmado e um teste.
+- **Bloquear um IP**: onde um IP aparece (pedidos em tempo real, pedidos bloqueados do firewall) há «Bloquear IP» ou «Desbloquear», com a mesma janela (`useAcessoDeIp`, `super/AcessoDeIp.tsx`). A lógica é `planoDeAcesso` em `lib/dev.ts`: a regra mais específica ganha, por isso desbloquear um IP dentro de uma gama grava uma regra que o permite e a gama continua para os outros.
+
+## 5m. Imagens e locais
+
+- **Um local por campo com imagens**: cada campo do painel que aceita imagens (a capa do blog, as imagens de um produto…) é um local, registado em `dados/locais.ts` (`id`, `grupo`, `rotulo`). A galeria mostra um botão por local na imagem aberta («Onde aparece»), um filtro «Local» com contagens e um selo nas miniaturas; a imagem guarda os seus locais em `locais` (`lib/locais.ts`).
+- **Um só bloco de imagem**: o campo desenha-se sempre com `BlocoDeImagem local="…"` (`components/conteudo/BlocoDeImagem.tsx`): a imagem grande ou a zona onde se largam ficheiros, as miniaturas, «Enviar» (guarda na galeria já ligado ao local), «Da galeria» (`EscolherImagem`, com as imagens do local primeiro), «Tornar principal» e «Tirar». Nenhum ecrã desenha o seu próprio campo de imagem.
+- **Campo novo com imagens**: acrescente o local a `dados/locais.ts` e use `BlocoDeImagem`; a galeria ganha o botão sozinha.
+- **Editor de produtos** (`conteudo/Produtos.tsx`): no telemóvel a zona das imagens vem em cima e os campos por baixo; no PC as imagens ficam fixas à esquerda (`lg:sticky`) e só os campos da direita rolam. Os produtos ficam no navegador (`useProdutos`, chave `painel.produtos`) e cada produto guarda só os identificadores das imagens.
+
 ## 6. Gráficos
 
 - Os gráficos são do ECharts, desenhados por `Grafico` (`components/graficos/Graficos.tsx`) a partir de um `GraficoSpec` (`linha`, `colunas`, `barras`, `rosca`, `histograma`, `dispersao`, `matriz`).

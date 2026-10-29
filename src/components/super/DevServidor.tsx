@@ -3,8 +3,9 @@
 
 import { Badge, Button, Dialog, Input, InputArea, Select } from "@cloudflare/kumo";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { gerarPedido, gerarSaude, gerarTabelas, percentil, type PedidoWeb, type Saude, type TabelaBd } from "@/dados/super-dados";
+import { gerarPedido, gerarSaude, gerarTabelas, percentil, REGRAS_DE_ORIGEM, type PedidoWeb, type RegraFirewall, type Saude, type TabelaBd } from "@/dados/super-dados";
 import { chamar, useApi, useLigacao } from "@/lib/api/cliente";
+import { useColecao } from "@/lib/api/colecao";
 import { formatarTamanho } from "@/lib/biblioteca";
 import { correrConsulta, linhasApagadas } from "@/lib/dev";
 import { useEditar } from "@/lib/permissao";
@@ -16,6 +17,7 @@ import { Grafico } from "../graficos/Graficos";
 import { ICONES } from "../Icones";
 import { SeletorPersonalizavel } from "../SeletorPersonalizavel";
 import { CartaoEstatistica, Pagina, Titulo } from "../ui";
+import { useAcessoDeIp } from "./AcessoDeIp";
 import { AvisoDeApi, duracao, Estatistica, horaCompleta, inteiro, percentagem, TabelaSimples, useGuardado, useTick, type ColunaSimples } from "./SuperPecas";
 
 // ---------- saúde do servidor ----------
@@ -109,12 +111,18 @@ export function PedidosEmTempoReal() {
   const [procura, setProcura] = useState("");
   const [detalhe, setDetalhe] = useState<PedidoWeb | null>(null);
   const contador = useRef(1);
+  const editar = useEditar();
   const api = useApi<{ itens: PedidoWeb[] }>("/v1/dev/pedidos", () => ({ itens: [] }), ligacao.modo === "ligado" && !pausado ? 1000 : undefined);
+  const regras = useColecao<RegraFirewall>("/v1/dev/firewall/regras", "firewall-regras", REGRAS_DE_ORIGEM);
+  const acesso = useAcessoDeIp(regras);
+  // o gerador de pedidos simulados vê sempre as regras de agora: um IP bloqueado passa a ser recusado (403)
+  const recusa = useRef<(ip: string, pais: string) => boolean>(() => false);
+  recusa.current = (ip, pais) => acesso.ligado && !!acesso.bloqueadoPor(ip, pais);
 
   // modo simulado: gera pedidos ao ritmo escolhido
   useEffect(() => {
     if (ligacao.modo === "ligado" || pausado) return;
-    const t = window.setInterval(() => setPedidos((l) => [gerarPedido(contador.current++), ...l].slice(0, 300)), 1000 / Number(ritmo));
+    const t = window.setInterval(() => setPedidos((l) => [gerarPedido(contador.current++, Date.now(), (ip, pais) => recusa.current(ip, pais)), ...l].slice(0, 300)), 1000 / Number(ritmo));
     return () => window.clearInterval(t);
   }, [ligacao.modo, pausado, ritmo]);
   const todos = ligacao.modo === "ligado" ? (api.dados?.itens ?? []) : pedidos;
@@ -131,8 +139,28 @@ export function PedidosEmTempoReal() {
     { rotulo: "Caminho", render: (p) => <span className="font-medium">{p.caminho}</span> },
     { rotulo: "Estado", render: (p) => <Estado valor={String(p.estado)} variante={cor(p.estado)} /> },
     { rotulo: "Tempo", direita: true, render: (p) => `${p.ms} ms` },
-    { rotulo: "IP", render: (p) => <span className="tabular-nums">{p.ip}</span> },
+    { rotulo: "IP", render: (p) => <span className="inline-flex items-center gap-2 tabular-nums">{p.ip}{acesso.bloqueadoPor(p.ip, p.pais) && <Estado valor="Bloqueado" variante="error" />}</span> },
     { rotulo: "País", render: (p) => p.pais },
+    ...(editar
+      ? [
+          {
+            rotulo: "",
+            direita: true,
+            render: (p: PedidoWeb) => (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  acesso.pedir(p.ip, p.pais);
+                }}
+              >
+                {acesso.bloqueadoPor(p.ip, p.pais) ? "Desbloquear" : "Bloquear IP"}
+              </Button>
+            ),
+          },
+        ]
+      : []),
   ];
   return (
     <Pagina largo>
@@ -144,7 +172,7 @@ export function PedidosEmTempoReal() {
           Limpar
         </Button>
       </Titulo>
-      <AvisoDeApi erro={api.erro} aoTentar={api.recarregar} />
+      <AvisoDeApi erro={api.erro ?? regras.erro} aoTentar={() => (api.recarregar(), regras.recarregar())} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Estatistica titulo="Pedidos no último minuto" valor={inteiro(ultimoMinuto.length)} numero={ultimoMinuto.length} />
         <Estatistica titulo="Erros 5xx" valor={percentagem(ultimoMinuto.length ? erros / ultimoMinuto.length : 0, 1)} pior numero={ultimoMinuto.length ? (erros / ultimoMinuto.length) * 100 : 0} />
@@ -176,10 +204,18 @@ export function PedidosEmTempoReal() {
                 <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
               </div>
               <pre className="overflow-x-auto rounded-lg bg-kumo-tint p-3 text-xs">{JSON.stringify(detalhe, null, 2)}</pre>
+              {editar && (
+                <div className="flex justify-end">
+                  <Button variant="secondary" onClick={() => (setDetalhe(null), acesso.pedir(detalhe.ip, detalhe.pais))}>
+                    {acesso.bloqueadoPor(detalhe.ip, detalhe.pais) ? "Desbloquear este IP" : "Bloquear este IP"}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </Dialog>
       </Dialog.Root>
+      {acesso.dialogo}
     </Pagina>
   );
 }

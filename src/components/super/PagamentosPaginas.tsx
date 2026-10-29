@@ -12,7 +12,8 @@ import { ePasta, formatarTamanho, type ItemDaBiblioteca } from "@/lib/biblioteca
 import { desenharComprovativo } from "@/lib/comprovativos";
 import { identificador } from "@/lib/conta";
 import { useApp } from "@/lib/estado";
-import { erroDoIban, formatarIban, limparIban } from "@/lib/iban";
+import { bancoDoCorpo } from "@/lib/bancos";
+import { corpoDoIban, erroDoCorpo, formatarIban, ibanDoCorpo, limparIban, MOEDAS } from "@/lib/iban";
 import { calcularMetricas, type MetricasDePagamentos } from "@/lib/pagamentos";
 import { useEditar } from "@/lib/permissao";
 import { Cartao, Confirmar, Interruptor, Linha } from "../conta/Pecas";
@@ -25,6 +26,7 @@ import { LinhaOrdenada } from "../LinhaOrdenada";
 import { CartaoEstatistica, Painel, Pagina, Separadores, Titulo } from "../ui";
 import { descarregarBlob, PreVisualizar } from "../conteudo/GestorDeFicheiros";
 import { useUrlsDeImagens, Vazio, ZonaDeUpload } from "../conteudo/ConteudoPecas";
+import { CampoIban } from "./CampoIban";
 import { AvisoDeApi, dataHora, dinheiro, Estatistica, inteiro, percentagem, useGuardado } from "./SuperPecas";
 
 export const PASTA_DE_COMPROVATIVOS = "Comprovativos";
@@ -215,7 +217,6 @@ export function Comprovativos() {
 
 // ---------- contas e IBANs ----------
 
-const MOEDAS = { AOA: "Kwanza (AOA)", EUR: "Euro (EUR)", USD: "Dólar (USD)" };
 const VAZIA: ContaBancaria = { id: "", banco: "", titular: "", iban: "", moeda: "AOA", principal: false, ativa: true };
 
 export function ContasIban() {
@@ -225,13 +226,18 @@ export function ContasIban() {
   const [apagar, setApagar] = useState<ContaBancaria | null>(null);
   const editar = useEditar();
   const principal = contas.itens.find((c) => c.principal && c.ativa) ?? contas.itens.find((c) => c.ativa);
-  const erro = aEditar ? erroDoIban(aEditar.iban) : null;
-  const valida = !!aEditar && !erro && aEditar.banco.trim() !== "" && aEditar.titular.trim() !== "" && !contas.itens.some((c) => c.id !== aEditar.id && limparIban(c.iban) === limparIban(aEditar.iban));
-  const duplicada = !!aEditar && contas.itens.some((c) => c.id !== aEditar.id && limparIban(c.iban) === limparIban(aEditar.iban));
+  // a moeda decide o prefixo do IBAN («AO06», «PT50») e os quatro primeiros dígitos decidem o banco
+  const corpo = aEditar ? corpoDoIban(aEditar.iban, aEditar.moeda) : "";
+  const reconhecido = aEditar ? bancoDoCorpo(aEditar.moeda, corpo) : null;
+  const ibanCompleto = aEditar ? ibanDoCorpo(aEditar.moeda, corpo) : "";
+  const erro = aEditar ? erroDoCorpo(aEditar.moeda, corpo) : null;
+  const duplicada = !!aEditar && !!ibanCompleto && contas.itens.some((c) => c.id !== aEditar.id && limparIban(c.iban) === ibanCompleto);
+  const nomeDoBanco = (reconhecido ?? aEditar?.banco ?? "").trim();
+  const valida = !!aEditar && !erro && nomeDoBanco !== "" && aEditar.titular.trim() !== "" && !duplicada;
 
   const gravar = async () => {
     if (!aEditar || !valida) return;
-    const nova = { ...aEditar, iban: limparIban(aEditar.iban), banco: aEditar.banco.trim(), titular: aEditar.titular.trim(), id: aEditar.id || identificador() };
+    const nova = { ...aEditar, iban: ibanCompleto, banco: nomeDoBanco, titular: aEditar.titular.trim(), id: aEditar.id || identificador() };
     // só uma conta é a principal
     if (nova.principal) await contas.guardarVarios(contas.itens.filter((c) => c.principal && c.id !== nova.id).map((c) => ({ ...c, principal: false })));
     await contas.guardar(nova);
@@ -277,7 +283,7 @@ export function ContasIban() {
                 )}
                 {editar && (
                   <>
-                    <Button variant="ghost" size="sm" onClick={() => setAEditar({ ...c, iban: formatarIban(c.iban) })}>
+                    <Button variant="ghost" size="sm" onClick={() => setAEditar({ ...c })}>
                       Editar
                     </Button>
                     <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Remover ${c.banco}`} onClick={() => setApagar(c)} />
@@ -312,10 +318,10 @@ export function ContasIban() {
       <Confirmar aberto={!!aEditar} aoMudar={(v) => !v && setAEditar(null)} titulo={aEditar?.id ? "Editar a conta" : "Adicionar conta"} texto="O IBAN é validado enquanto escreve." rotuloAcao="Guardar" desativado={!valida} aoConfirmar={gravar}>
         {aEditar && (
           <div className="flex flex-col gap-3">
-            <Input label="Banco" value={aEditar.banco} onChange={(e) => setAEditar({ ...aEditar, banco: e.target.value })} placeholder="BAI" autoFocus />
-            <Input label="Titular" value={aEditar.titular} onChange={(e) => setAEditar({ ...aEditar, titular: e.target.value })} placeholder="Nome da empresa" />
-            <Input label="IBAN" value={aEditar.iban} onChange={(e) => setAEditar({ ...aEditar, iban: formatarIban(e.target.value) })} error={aEditar.iban.trim() ? (erro ?? (duplicada ? "Esta conta já está na lista." : undefined)) : undefined} placeholder="AO78 0000 0000 1234 5678 1017 2" />
             <Select label="Moeda" value={aEditar.moeda} onValueChange={(v) => setAEditar({ ...aEditar, moeda: String(v) })} items={MOEDAS} />
+            <CampoIban moeda={aEditar.moeda} corpo={corpo} aoMudar={(c) => setAEditar({ ...aEditar, iban: ibanDoCorpo(aEditar.moeda, c) })} erro={corpo ? (erro ?? (duplicada ? "Esta conta já está na lista." : undefined)) : undefined} autoFocus />
+            <Input label="Banco" value={reconhecido ?? aEditar.banco} disabled={!!reconhecido || corpo.length < 4} onChange={(e) => setAEditar({ ...aEditar, banco: e.target.value })} placeholder={corpo.length < 4 ? "Automático" : "Nome do banco"} />
+            <Input label="Titular" value={aEditar.titular} onChange={(e) => setAEditar({ ...aEditar, titular: e.target.value })} placeholder="Nome da empresa" />
           </div>
         )}
       </Confirmar>

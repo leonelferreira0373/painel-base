@@ -103,6 +103,7 @@ export const AREAS: Area[] = [
       { id: "biblioteca", descricao: "Pastas e ficheiros guardados neste navegador: carregar, pré-visualizar, renomear, mover e remover.", rotulo: "Gestor de ficheiros", icone: "pasta", tipo: "pagina" },
       { id: "galeria", descricao: "Carregar imagens e vê-las em grelha, com texto alternativo.", rotulo: "Galeria de imagens", icone: "galeria", tipo: "pagina" },
       { id: "blog", descricao: "Escrever, publicar e exportar artigos.", rotulo: "Editor de blog", icone: "artigo", tipo: "pagina" },
+      { id: "editor-produtos", descricao: "Criar e editar produtos, com as imagens da galeria.", rotulo: "Editor de produtos", icone: "produto", tipo: "pagina" },
     ],
   },
   {

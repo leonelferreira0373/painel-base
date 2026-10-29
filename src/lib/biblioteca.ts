@@ -11,6 +11,8 @@ export interface ItemDaBiblioteca {
   pasta: string;
   /** O texto alternativo de uma imagem. */
   alt?: string;
+  /** Os locais onde a imagem aparece (os ids de `dados/locais.ts`). */
+  locais?: string[];
   /** O conteúdo (só nos ficheiros). */
   blob?: Blob;
   /** Dados próprios de quem usa a biblioteca (por exemplo, o estado de um comprovativo). */

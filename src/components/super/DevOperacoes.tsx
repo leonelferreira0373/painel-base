@@ -13,6 +13,7 @@ import { DESTINOS, emailValido, erroDoAlvo, erroDoDestino, linhasApagadas, type 
 import { useApp } from "@/lib/estado";
 import { useEditar } from "@/lib/permissao";
 import { CampoSenha } from "../auth/CampoSenha";
+import { useAcessoDeIp } from "./AcessoDeIp";
 import { BotaoCopiar, Cartao, Confirmar, descarregar, Interruptor, Linha, LinhaCampo } from "../conta/Pecas";
 import { Estado } from "../Estado";
 import { ICONES } from "../Icones";
@@ -187,6 +188,7 @@ export function Firewall() {
   const [nova, setNova] = useState(false);
   const [rascunho, setRascunho] = useState({ acao: "bloquear", alvo: "", nota: "" });
   const [remover, setRemover] = useState<RegraFirewall | null>(null);
+  const acesso = useAcessoDeIp(regras);
   const erroAlvo = rascunho.alvo ? erroDoAlvo(rascunho.alvo) : null;
 
   const mudar = async (parcial: Partial<EstadoFirewall>) => {
@@ -208,6 +210,9 @@ export function Firewall() {
     { rotulo: "IP", render: (b) => <span className="tabular-nums">{b.ip}</span> },
     { rotulo: "Caminho", render: (b) => b.caminho },
     { rotulo: "Motivo", render: (b) => <span className="text-kumo-subtle">{b.motivo}</span> },
+    ...(editar
+      ? [{ rotulo: "", direita: true, render: (b: Bloqueio) => <Button variant="ghost" size="sm" onClick={() => acesso.pedir(b.ip)}>{acesso.bloqueadoPor(b.ip) ? "Desbloquear" : "Bloquear IP"}</Button> }]
+      : []),
   ];
   return (
     <Pagina>
@@ -237,6 +242,7 @@ export function Firewall() {
       <Cartao titulo="Pedidos bloqueados agora">
         <TabelaSimples colunas={colunasBloqueios} linhas={bloqueios.dados?.itens ?? []} chave={(b) => b.id} vazio={estado.ativo ? "Nada bloqueado neste momento." : "O firewall está desligado."} />
       </Cartao>
+      {acesso.dialogo}
       <Confirmar aberto={desligar} aoMudar={setDesligar} titulo="Desligar o firewall" texto="Sem firewall, nenhuma regra nem o limite de pedidos se aplica. O servidor fica exposto a abusos até o ligar de novo." rotuloAcao="Desligar" perigo escrever="DESLIGAR" aoConfirmar={() => void mudar({ ativo: false })} />
       <Confirmar aberto={!!remover} aoMudar={(v) => !v && setRemover(null)} titulo="Apagar a regra" texto={remover ? `A regra para ${remover.alvo} deixa de existir.` : ""} rotuloAcao="Apagar" perigo aoConfirmar={() => remover && void regras.remover(remover.id)} />
       <Confirmar

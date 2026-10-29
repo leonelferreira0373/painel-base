@@ -1,7 +1,7 @@
 // O editor de blog do painel: a lista de artigos (rascunho ou publicado) e o editor, com a barra de formatação, a pré-visualização, o endereço, o resumo, as etiquetas e a imagem de capa da biblioteca. Os artigos ficam no navegador; exportam-se em Markdown.
 "use client";
 
-import { Badge, Button, Dialog, Input, InputArea } from "@cloudflare/kumo";
+import { Badge, Button, Input, InputArea } from "@cloudflare/kumo";
 import { useMemo, useRef, useState } from "react";
 import { artigoNovo, lerEtiquetas, paraMarkdown, slugDe, tempoDeLeitura, type Artigo } from "@/lib/blog";
 import { eImagem, type ItemDaBiblioteca } from "@/lib/biblioteca";
@@ -11,40 +11,12 @@ import { Markdown } from "@/lib/markdown";
 import { Cartao, Confirmar, Linha } from "../conta/Pecas";
 import { Ic, ICONES, type Icone } from "../Icones";
 import { Pagina, Separadores, Titulo } from "../ui";
+import { BlocoDeImagem } from "./BlocoDeImagem";
 import { useUrlsDeImagens, Vazio } from "./ConteudoPecas";
+import { EscolherImagem } from "./EscolherImagem";
 import { descarregarBlob } from "./GestorDeFicheiros";
 
 const data = (iso: string) => new Date(iso).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" });
-
-/** Escolher uma imagem da biblioteca (a mesma da galeria e do gestor de ficheiros). */
-function EscolherImagem({ aberto, aoMudar, aoEscolher }: { aberto: boolean; aoMudar: (v: boolean) => void; aoEscolher: (i: ItemDaBiblioteca) => void }) {
-  const { itens } = useArmazem<ItemDaBiblioteca>("ficheiros");
-  const imagens = useMemo(() => itens.filter(eImagem), [itens]);
-  const urls = useUrlsDeImagens(imagens);
-  return (
-    <Dialog.Root open={aberto} onOpenChange={aoMudar}>
-      <Dialog size="lg" className="p-6">
-        <div className="mb-3 flex items-start justify-between gap-4">
-          <Dialog.Title className="text-lg font-semibold">Escolher uma imagem</Dialog.Title>
-          <Dialog.Close render={(props) => <Button {...props} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
-        </div>
-        {imagens.length === 0 ? (
-          <Vazio icone="galeria" titulo="A biblioteca não tem imagens" texto="Carregue-as primeiro na galeria de imagens." />
-        ) : (
-          <ul className="grid max-h-[55vh] grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
-            {imagens.map((i) => (
-              <li key={i.id}>
-                <button type="button" onClick={() => (aoEscolher(i), aoMudar(false))} aria-label={`Usar ${i.nome}`} className="relative block aspect-square w-full overflow-hidden rounded-lg ring ring-kumo-line hover:ring-kumo-interact">
-                  {urls.get(i.id) && <img src={urls.get(i.id)} alt={i.alt ?? i.nome} className="size-full object-cover" loading="lazy" />}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Dialog>
-    </Dialog.Root>
-  );
-}
 
 const FERRAMENTAS: { id: string; icone: Icone; rotulo: string; antes: string; depois: string; exemplo: string }[] = [
   { id: "negrito", icone: "negrito", rotulo: "Negrito", antes: "**", depois: "**", exemplo: "texto" },
@@ -64,13 +36,12 @@ function Editor({ inicial, aoSair }: { inicial: Artigo; aoSair: () => void }) {
   const [a, setA] = useState<Artigo>(inicial);
   const [etiquetas, setEtiquetas] = useState(inicial.etiquetas.join(", "));
   const [aba, setAba] = useState<"escrever" | "previsao">("escrever");
-  const [imagemPara, setImagemPara] = useState<"corpo" | "capa" | null>(null);
+  const [imagemNoTexto, setImagemNoTexto] = useState(false);
   const [sujo, setSujo] = useState(false);
   const [saida, setSaida] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
   const mudar = (p: Partial<Artigo>) => (setA((x) => ({ ...x, ...p })), setSujo(true));
   const slug = a.slug || slugDe(a.titulo);
-  const capaUrl = a.capa ? urls.get(a.capa) : undefined;
 
   const inserir = (antes: string, depois: string, exemplo: string) => {
     const t = area.current;
@@ -126,7 +97,7 @@ function Editor({ inicial, aoSair }: { inicial: Artigo; aoSair: () => void }) {
                   {FERRAMENTAS.map((f) => (
                     <Button key={f.id} variant="ghost" size="sm" shape="square" icon={<Ic nome={f.icone} />} aria-label={f.rotulo} title={f.rotulo} onClick={() => inserir(f.antes, f.depois, f.exemplo)} />
                   ))}
-                  <Button variant="ghost" size="sm" icon={<Ic nome="imagem" />} onClick={() => setImagemPara("corpo")}>
+                  <Button variant="ghost" size="sm" icon={<Ic nome="imagem" />} onClick={() => setImagemNoTexto(true)}>
                     Imagem
                   </Button>
                 </div>
@@ -152,26 +123,18 @@ function Editor({ inicial, aoSair }: { inicial: Artigo; aoSair: () => void }) {
             </div>
           </Cartao>
           <Cartao titulo="Imagem de capa">
-            <div className="flex flex-col gap-3 p-4">
-              {capaUrl ? <img src={capaUrl} alt="Capa do artigo" className="aspect-video w-full rounded-lg object-cover ring ring-kumo-line" /> : <div className="grid aspect-video w-full place-items-center rounded-lg bg-kumo-tint text-sm text-kumo-subtle">Sem capa</div>}
-              <div className="flex gap-2">
-                <Button variant="secondary" icon={<Ic nome="imagem" />} onClick={() => setImagemPara("capa")}>
-                  {a.capa ? "Mudar a capa" : "Escolher a capa"}
-                </Button>
-                {a.capa && (
-                  <Button variant="ghost" icon={ICONES.lixo} onClick={() => mudar({ capa: undefined })}>
-                    Tirar
-                  </Button>
-                )}
-              </div>
-            </div>
+            <BlocoDeImagem local="blog-capa" ids={a.capa ? [a.capa] : []} aoMudar={(ids) => mudar({ capa: ids[0] })} vazio="Sem capa" />
           </Cartao>
         </div>
       </div>
       <EscolherImagem
-        aberto={!!imagemPara}
-        aoMudar={(v) => !v && setImagemPara(null)}
-        aoEscolher={(i) => (imagemPara === "capa" ? mudar({ capa: i.id }) : inserir("![", `](biblioteca:${i.id})`, i.alt ?? i.nome))}
+        aberto={imagemNoTexto}
+        aoMudar={setImagemNoTexto}
+        local="blog-corpo"
+        aoEscolher={(ids) => {
+          const i = imagens.find((x) => x.id === ids[0]);
+          if (i) inserir("![", `](biblioteca:${i.id})`, i.alt ?? i.nome);
+        }}
       />
       <Confirmar aberto={saida} aoMudar={setSaida} titulo="Sair sem guardar?" texto="As alterações a este artigo ainda não foram guardadas." rotuloAcao="Sair sem guardar" perigo aoConfirmar={aoSair} />
     </Pagina>

@@ -1,12 +1,15 @@
-// A galeria de imagens do painel: carregar várias imagens de uma vez (também a arrastar), ver em grelha, abrir uma a grande com setas, escrever o texto alternativo, transferir e remover (uma ou várias). Usa a mesma biblioteca do gestor de ficheiros: as imagens que se carregam aqui aparecem lá, na pasta «Galeria».
+// A galeria de imagens do painel: carregar várias imagens de uma vez (também a arrastar), ver em grelha, abrir uma a grande com setas, escrever o texto alternativo, dizer em que locais ela aparece (um botão por campo do painel que aceita imagens: a capa do blog, os produtos…), transferir e remover (uma ou várias). Usa a mesma biblioteca do gestor de ficheiros: as imagens que se carregam aqui aparecem lá, na pasta «Galeria».
 "use client";
 
 import { Button, Checkbox, Dialog, Input, Select } from "@cloudflare/kumo";
 import { useEffect, useMemo, useState } from "react";
+import { LOCAIS_DE_IMAGEM } from "@/dados/locais";
 import { eImagem, formatarTamanho, nomeUnico, type ItemDaBiblioteca } from "@/lib/biblioteca";
+import { comLocal, contagemPorLocal, locaisDe } from "@/lib/locais";
 import { useArmazem } from "@/lib/armazem";
 import { identificador } from "@/lib/conta";
 import { Confirmar } from "../conta/Pecas";
+import { Dica } from "../Dica";
 import { Ic, ICONES } from "../Icones";
 import { Pagina, Titulo } from "../ui";
 import { useUrlsDeImagens, Vazio, ZonaDeUpload } from "./ConteudoPecas";
@@ -14,13 +17,19 @@ import { descarregarBlob } from "./GestorDeFicheiros";
 
 export const PASTA_DA_GALERIA = "Galeria";
 const TODAS = "__todas__";
+const SEM_LOCAL = "__sem_local__";
+/** Os locais por grupo, para os botões da imagem aberta («Blog», «Produtos»). */
+const GRUPOS_DE_LOCAIS = Array.from(new Set(LOCAIS_DE_IMAGEM.map((l) => l.grupo))).map((grupo) => ({ grupo, locais: LOCAIS_DE_IMAGEM.filter((l) => l.grupo === grupo) }));
 
 export function Galeria() {
   const { itens, pronto, guardar, remover } = useArmazem<ItemDaBiblioteca>("ficheiros");
   const imagens = useMemo(() => itens.filter(eImagem).sort((a, b) => b.criado.localeCompare(a.criado)), [itens]);
   const [album, setAlbum] = useState(TODAS);
+  const [local, setLocal] = useState(TODAS);
   const albuns = useMemo(() => Array.from(new Set(imagens.map((i) => i.pasta))).sort((a, b) => a.localeCompare(b, "pt")), [imagens]);
-  const visiveis = album === TODAS ? imagens : imagens.filter((i) => i.pasta === album);
+  const porAlbum = album === TODAS ? imagens : imagens.filter((i) => i.pasta === album);
+  const visiveis = local === TODAS ? porAlbum : local === SEM_LOCAL ? porAlbum.filter((i) => locaisDe(i).length === 0) : porAlbum.filter((i) => locaisDe(i).includes(local));
+  const contagem = useMemo(() => contagemPorLocal(imagens), [imagens]);
   const urls = useUrlsDeImagens(imagens);
   const [escolhidas, setEscolhidas] = useState<Set<string>>(new Set());
   const [aberta, setAberta] = useState<string | null>(null);
@@ -44,7 +53,9 @@ export function Galeria() {
     const atuais = [...itens];
     for (const f of ficheiros.filter((x) => x.type.startsWith("image/"))) {
       const pasta = album !== TODAS ? album : PASTA_DA_GALERIA;
-      const item: ItemDaBiblioteca = { id: identificador(), nome: nomeUnico(atuais, pasta, f.name), tipo: f.type, tamanho: f.size, criado: new Date().toISOString(), pasta, blob: f };
+      const base: ItemDaBiblioteca = { id: identificador(), nome: nomeUnico(atuais, pasta, f.name), tipo: f.type, tamanho: f.size, criado: new Date().toISOString(), pasta, blob: f };
+      // com um local escolhido no filtro, as imagens carregadas já ficam nesse local
+      const item = local !== TODAS && local !== SEM_LOCAL ? comLocal(base, local, true) : base;
       atuais.push(item);
       await guardar(item);
     }
@@ -72,11 +83,16 @@ export function Galeria() {
           )}
         </ZonaDeUpload>
       </Titulo>
-      {albuns.length > 1 && (
-        <div className="max-w-xs">
-          <Select label="Álbum" value={album} onValueChange={(v) => setAlbum(String(v))} items={{ [TODAS]: "Todas as imagens", ...Object.fromEntries(albuns.map((a) => [a, a || "Raiz"])) }} />
+      <div className="flex flex-wrap gap-3">
+        {albuns.length > 1 && (
+          <div className="w-full max-w-xs">
+            <Select label="Álbum" value={album} onValueChange={(v) => setAlbum(String(v))} items={{ [TODAS]: "Todas as imagens", ...Object.fromEntries(albuns.map((a) => [a, a || "Raiz"])) }} />
+          </div>
+        )}
+        <div className="w-full max-w-xs">
+          <Select label="Local" value={local} onValueChange={(v) => setLocal(String(v))} items={{ [TODAS]: "Todos os locais", [SEM_LOCAL]: "Sem local", ...Object.fromEntries(LOCAIS_DE_IMAGEM.map((l) => [l.id, `${l.grupo}: ${l.rotulo} (${contagem[l.id] ?? 0})`])) }} />
         </div>
-      )}
+      </div>
       <ZonaDeUpload aceitar="image/*" aoEscolher={carregar} className="min-w-0">
         {(abrir) =>
           !pronto ? (
@@ -100,6 +116,14 @@ export function Galeria() {
                     {urls.get(i.id) && <img src={urls.get(i.id)} alt={i.alt ?? i.nome} className="size-full object-cover transition-transform duration-200 group-hover/imagem:scale-105" loading="lazy" />}
                   </button>
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-kumo-base/90 px-2 py-1 text-xs text-kumo-default opacity-0 transition-opacity group-hover/imagem:opacity-100 max-sm:opacity-100">{i.nome}</span>
+                  {locaisDe(i).length > 0 && (
+                    <Dica conteudo={`Aparece em ${locaisDe(i).length} ${locaisDe(i).length === 1 ? "local" : "locais"}`}>
+                      <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md bg-kumo-base/90 px-1.5 py-1 text-xs tabular-nums text-kumo-default">
+                        <Ic nome="local" tamanho={12} />
+                        {locaisDe(i).length}
+                      </span>
+                    </Dica>
+                  )}
                   <span className={`absolute left-2 top-2 rounded-md bg-kumo-base/90 p-1 transition-opacity ${escolhidas.has(i.id) ? "opacity-100" : "opacity-0 group-hover/imagem:opacity-100 max-sm:opacity-100"}`}>
                     <Checkbox checked={escolhidas.has(i.id)} onCheckedChange={() => alternar(i.id)} aria-label={`Escolher ${i.nome}`} />
                   </span>
@@ -128,6 +152,24 @@ export function Galeria() {
                 )}
               </div>
               <Input label="Texto alternativo" description="Descreve a imagem para quem não a vê (leitores de ecrã) e para o blog." value={alt} onChange={(e) => setAlt(e.target.value)} onBlur={() => alt !== (atual.alt ?? "") && guardar({ ...atual, alt })} />
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-kumo-default">Onde aparece</span>
+                {GRUPOS_DE_LOCAIS.map(({ grupo, locais }) => (
+                  <div key={grupo} className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+                    <span className="shrink-0 text-xs text-kumo-subtle sm:w-20">{grupo}</span>
+                    <span className="flex flex-wrap gap-2">
+                    {locais.map((l) => {
+                      const ligado = locaisDe(atual).includes(l.id);
+                      return (
+                        <Button key={l.id} variant={ligado ? "primary" : "secondary"} size="sm" aria-pressed={ligado} icon={<Ic nome="local" />} onClick={() => guardar(comLocal(atual, l.id, !ligado))}>
+                          {l.rotulo}
+                        </Button>
+                      );
+                    })}
+                    </span>
+                  </div>
+                ))}
+              </div>
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-kumo-subtle">
                 <span>
                   {formatarTamanho(atual.tamanho)} · {posicao + 1} de {visiveis.length}

@@ -32,9 +32,9 @@ export interface ContaBancaria {
 }
 
 export const CONTAS_DE_ORIGEM: ContaBancaria[] = [
-  { id: "cb-1", banco: "BAI", titular: PROJETO.empresa, iban: gerarIban("AO", "1234567810172"), moeda: "AOA", principal: true, ativa: true },
-  { id: "cb-2", banco: "BFA", titular: PROJETO.empresa, iban: gerarIban("AO", "5550100012345"), moeda: "AOA", principal: false, ativa: true },
-  { id: "cb-3", banco: "Millennium bcp", titular: PROJETO.empresa, iban: "PT50000201231234567890154", moeda: "EUR", principal: false, ativa: false },
+  { id: "cb-1", banco: "BAI", titular: PROJETO.empresa, iban: gerarIban("AO", "0040000012345678101"), moeda: "AOA", principal: true, ativa: true },
+  { id: "cb-2", banco: "BFA", titular: PROJETO.empresa, iban: gerarIban("AO", "0006000055501000123"), moeda: "AOA", principal: false, ativa: true },
+  { id: "cb-3", banco: "Millennium bcp", titular: PROJETO.empresa, iban: gerarIban("PT", "0033000012345678901"), moeda: "EUR", principal: false, ativa: false },
 ];
 
 export function gerarPagamentos(n = 48): Pagamento[] {
@@ -262,14 +262,28 @@ const CAMINHOS = ["/", "/precos", "/servicos", "/contactos", "/api/pedidos", "/a
 const AGENTES = ["Chrome 141 · Android", "Safari 18 · iOS", "Chrome 141 · Windows", "Firefox 133", "Edge 141", "curl/8.5", "Googlebot/2.1"];
 const PAISES = ["AO", "AO", "AO", "PT", "BR", "US", "ZA", "MZ"];
 
-/** Gera um pedido novo; `n` é o número de ordem, para os identificadores e o sorteio serem estáveis. */
-export function gerarPedido(n: number, agora = Date.now()): PedidoWeb {
+/** Os visitantes que voltam: dois em cada três pedidos vêm dos mesmos IPs, como no tráfego verdadeiro, por isso bloquear um deles faz diferença nos pedidos seguintes. */
+const VISITANTES = Array.from({ length: 14 }, (_, i) => {
+  const s = new Sorteio(7000 + i);
+  return { ip: `${s.de([102, 41, 197, 154])}.${s.entre(0, 255)}.${s.entre(0, 255)}.${s.entre(1, 254)}`, pais: s.de(PAISES) };
+});
+
+/**
+ * Gera um pedido novo; `n` é o número de ordem, para os identificadores e o sorteio serem estáveis. Se `bloqueia` disser que o firewall bloqueia o IP do pedido, o pedido
+ * fica recusado (403) e quase instantâneo.
+ */
+export function gerarPedido(n: number, agora = Date.now(), bloqueia?: (ip: string, pais: string) => boolean): PedidoWeb {
   const s = new Sorteio(400 + n);
   const caminho = s.de(CAMINHOS);
   const eApi = caminho.startsWith("/api/");
   const metodo = eApi ? s.pesada(["POST", "GET", "PUT", "DELETE"] as const, [5, 6, 1, 1]) : "GET";
   const estado = eApi ? s.pesada([200, 201, 401, 429, 500, 502], [70, 8, 8, 5, 6, 3]) : s.pesada([200, 304, 404, 500], [82, 12, 5, 1]);
-  return { id: `rq-${n}`, quando: new Date(agora).toISOString(), metodo, caminho, estado, ms: Math.round((eApi ? 40 : 12) + s.entre(0, eApi ? 380 : 90) * (estado >= 500 ? 4 : 1)), ip: `${s.de([102, 41, 197, 154])}.${s.entre(0, 255)}.${s.entre(0, 255)}.${s.entre(1, 254)}`, pais: s.de(PAISES), agente: s.de(AGENTES) };
+  const ms = Math.round((eApi ? 40 : 12) + s.entre(0, eApi ? 380 : 90) * (estado >= 500 ? 4 : 1));
+  const volta = s.entre(0, 2) > 0 ? VISITANTES[s.entre(0, VISITANTES.length - 1)] : null;
+  const ip = volta?.ip ?? `${s.de([102, 41, 197, 154])}.${s.entre(0, 255)}.${s.entre(0, 255)}.${s.entre(1, 254)}`;
+  const pais = volta?.pais ?? s.de(PAISES);
+  const recusado = !!bloqueia?.(ip, pais);
+  return { id: `rq-${n}`, quando: new Date(agora).toISOString(), metodo, caminho, estado: recusado ? 403 : estado, ms: recusado ? 1 + (n % 4) : ms, ip, pais, agente: s.de(AGENTES) };
 }
 
 /** O percentil `p` (0 a 1) de uma lista de números. */
@@ -330,12 +344,29 @@ export interface Bloqueio {
   motivo: string;
 }
 
+/** Um IP sorteado dentro do alvo de uma regra (um IP ou uma gama CIDR); null se o alvo não é um IPv4 (por exemplo, um país). */
+function ipNoAlvo(alvo: string, s: Sorteio): string | null {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?:\/(\d{1,2}))?$/.exec(alvo);
+  if (!m) return null;
+  const base = ((Number(m[1]) << 24) | (Number(m[2]) << 16) | (Number(m[3]) << 8) | Number(m[4])) >>> 0;
+  const bits = m[5] === undefined ? 32 : Number(m[5]);
+  const livres = 32 - bits;
+  const mascara = bits === 0 ? 0 : (0xffffffff << livres) >>> 0;
+  const r = s.entre(0, 1_000_000) / 1_000_000;
+  const aleatorio = livres === 0 ? 0 : livres === 1 ? Math.round(r) : 1 + Math.floor(r * (2 ** livres - 2));
+  const n = ((base & mascara) | aleatorio) >>> 0;
+  return [n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".");
+}
+
 /** Os pedidos bloqueados mais recentes: cada um pelo motivo (uma regra de bloquear ativa ou o limite de pedidos). `t` muda de 3 em 3 segundos para a lista andar. */
 export function gerarBloqueios(t: number, regras: { acao: string; alvo: string; ativa: boolean }[], limite: number, agora = Date.now()): Bloqueio[] {
   const motivos = [...regras.filter((r) => r.ativa && r.acao === "bloquear").map((r) => `Regra: ${r.alvo}`), `Limite de ${limite} por minuto`];
   const base = Math.floor(t / 3) * 10;
   return Array.from({ length: 10 }, (_, i) => {
     const s = new Sorteio(900 + base + i);
-    return { id: `bl-${base + i}`, quando: new Date(agora - i * 7000).toISOString(), ip: `${s.de([203, 185, 45, 91])}.${s.entre(0, 255)}.${s.entre(0, 255)}.${s.entre(1, 254)}`, caminho: s.de(["/entrar/", "/api/sessao", "/api/pagamentos", "/wp-login.php", "/.env"]), motivo: s.de(motivos) };
+    const motivo = s.de(motivos);
+    const alvo = motivo.startsWith("Regra: ") ? motivo.slice(7) : "";
+    const ip = ipNoAlvo(alvo, s) ?? `${s.de([203, 185, 45, 91])}.${s.entre(0, 255)}.${s.entre(0, 255)}.${s.entre(1, 254)}`;
+    return { id: `bl-${base + i}`, quando: new Date(agora - i * 7000).toISOString(), ip, caminho: s.de(["/entrar/", "/api/sessao", "/api/pagamentos", "/wp-login.php", "/.env"]), motivo };
   });
 }

@@ -12,6 +12,7 @@ import { ControlosDaIA } from "./conteudo/ControlosIA";
 import { Blog } from "./conteudo/Blog";
 import { Galeria } from "./conteudo/Galeria";
 import { GestorDeFicheiros } from "./conteudo/GestorDeFicheiros";
+import { Produtos } from "./conteudo/Produtos";
 import { Exportar } from "./analise/Exportar";
 import { Ficheiros } from "./analise/Ficheiros";
 import { GraficosPagina } from "./analise/Graficos";
@@ -68,6 +69,7 @@ export function Modulo({ areaId, moduloId }: { areaId: string; moduloId: string 
   if (areaId === "conteudo") {
     if (moduloId === "biblioteca") return <GestorDeFicheiros />;
     if (moduloId === "galeria") return <Galeria />;
+    if (moduloId === "editor-produtos") return <Produtos />;
     return <Blog />;
   }
   if (areaId === "ia") return <ControlosDaIA aba={moduloId as "comportamento" | "memoria" | "testar"} />;

@@ -10,6 +10,7 @@ import {
   CursorClickIcon,
   PulseIcon,
   FireIcon,
+  PackageIcon,
   CaretDownIcon,
   CaretUpIcon,
   FolderIcon,
@@ -203,6 +204,8 @@ const BASE = {
   clique: CursorClickIcon,
   pulso: PulseIcon,
   fogo: FireIcon,
+  produto: PackageIcon,
+  local: MapPinIcon,
 } satisfies Record<string, IconeFosforo>;
 
 /** Todos os ícones saem com traço grosso («bold»), para terem peso visual no painel. Nunca «duotone»: pinta um retângulo cinzento por trás do desenho. */

@@ -95,3 +95,79 @@ export function linhasApagadas(linhas: number, dias: number): number {
 /** Um endereço de e-mail minimamente válido. */
 export const emailValido = (t: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(t.trim());
  
+// ---------- bloquear e desbloquear um IP ----------
+
+export interface RegraDeAcesso {
+  id: string;
+  acao: "permitir" | "bloquear";
+  alvo: string;
+  nota: string;
+  ativa: boolean;
+}
+
+/** Um IPv4 como número de 32 bits, ou null se não for um IPv4. */
+function numeroDoIp(ip: string): number | null {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip.trim());
+  if (!m || [m[1], m[2], m[3], m[4]].some((o) => Number(o) > 255)) return null;
+  return ((Number(m[1]) << 24) | (Number(m[2]) << 16) | (Number(m[3]) << 8) | Number(m[4])) >>> 0;
+}
+
+/** Quão específico é o alvo de uma regra: um país vale 0, uma gama vale a sua máscara + 1, um IP sozinho vale 33. Ganha a regra mais específica. */
+function especificidade(alvo: string): number {
+  if (/^[A-Za-z]{2}$/.test(alvo.trim())) return 0;
+  const m = /\/(\d{1,2})$/.exec(alvo.trim());
+  return m ? Number(m[1]) + 1 : 33;
+}
+
+/** Se o alvo de uma regra (um IP, uma gama CIDR ou um país) apanha este IP; `pais` é o país do pedido, se se souber. */
+export function alvoApanhaIp(alvo: string, ip: string, pais?: string): boolean {
+  const a = alvo.trim();
+  if (/^[A-Za-z]{2}$/.test(a)) return !!pais && pais.toUpperCase() === a.toUpperCase();
+  const m = /^([\d.]+)(?:\/(\d{1,2}))?$/.exec(a);
+  const base = m ? numeroDoIp(m[1]) : null;
+  const alvoIp = numeroDoIp(ip);
+  if (base === null || alvoIp === null) return false;
+  const bits = m![2] === undefined ? 32 : Number(m![2]);
+  if (bits === 0) return true;
+  const mascara = (0xffffffff << (32 - bits)) >>> 0;
+  return ((base & mascara) >>> 0) === ((alvoIp & mascara) >>> 0);
+}
+
+/** A regra ativa que decide o que acontece a este IP: a mais específica que o apanha (num empate, a que bloqueia). Null se nenhuma o apanha. */
+export function regraQueApanha<T extends RegraDeAcesso>(ip: string, regras: T[], pais?: string): T | null {
+  let melhor: T | null = null;
+  for (const r of regras) {
+    if (!r.ativa || !alvoApanhaIp(r.alvo, ip, pais)) continue;
+    if (!melhor) melhor = r;
+    else {
+      const a = especificidade(r.alvo);
+      const b = especificidade(melhor.alvo);
+      if (a > b || (a === b && r.acao === "bloquear" && melhor.acao !== "bloquear")) melhor = r;
+    }
+  }
+  return melhor;
+}
+
+/** Se o firewall (com as regras dadas) bloqueia este IP. */
+export const ipBloqueado = (ip: string, regras: RegraDeAcesso[], pais?: string) => regraQueApanha(ip, regras, pais)?.acao === "bloquear";
+
+export interface PlanoDeAcesso {
+  /** A regra a gravar (nova ou a mesma já com a ação mudada). */
+  guardar: RegraDeAcesso | null;
+  /** O identificador da regra a apagar. */
+  remover: string | null;
+}
+
+/**
+ * O que fazer às regras para bloquear (`quer = "bloquear"`) ou desbloquear (`"permitir"`) um IP. Bloquear grava (ou muda) a regra do IP sozinho; desbloquear apaga essa regra se mais nenhuma
+ * regra o bloqueia, e senão grava uma regra que o permite (a mais específica ganha, por isso as outras regras continuam para os restantes IPs).
+ */
+export function planoDeAcesso(ip: string, pais: string | undefined, regras: RegraDeAcesso[], quer: "bloquear" | "permitir", novoId: string, nota = ""): PlanoDeAcesso {
+  const exata = regras.find((r) => r.alvo.trim() === ip.trim());
+  if (quer === "bloquear") {
+    return { guardar: exata ? { ...exata, acao: "bloquear", ativa: true, nota: nota || exata.nota } : { id: novoId, acao: "bloquear", alvo: ip.trim(), nota, ativa: true }, remover: null };
+  }
+  const restantes = regras.filter((r) => r.id !== exata?.id);
+  if (exata && !ipBloqueado(ip, restantes, pais)) return { guardar: null, remover: exata.id };
+  return { guardar: exata ? { ...exata, acao: "permitir", ativa: true } : { id: novoId, acao: "permitir", alvo: ip.trim(), nota: nota || "Desbloqueado à mão", ativa: true }, remover: null };
+}

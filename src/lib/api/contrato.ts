@@ -14,7 +14,7 @@ export interface Endpoint {
   exemplo: unknown;
 }
 
-const PAGAMENTO = { id: "pg-2601", referencia: "PG-02601", cliente: "Cliente Exemplo", metodo: "Transferência", valor: 125000, moeda: "AOA", data: "2026-10-28", estado: "Confirmado", conta: "AO78 0000 0000 1234 5678 1017 2" };
+const PAGAMENTO = { id: "pg-2601", referencia: "PG-02601", cliente: "Cliente Exemplo", metodo: "Transferência", valor: 125000, moeda: "AOA", data: "2026-10-28", estado: "Confirmado", conta: "AO06 0040 0000 1234 5678 1014 2" };
 const ERRO = { id: "er-1", nivel: "erro", mensagem: "TypeError: x is undefined", origem: "/api/pedidos", ocorrencias: 14, ultimo: "2026-10-29T03:12:00Z", estado: "Novo" };
 
 export const ENDPOINTS: Endpoint[] = [
@@ -26,8 +26,8 @@ export const ENDPOINTS: Endpoint[] = [
   { id: "comprovativos-listar", area: "pagamentos", metodo: "GET", caminho: "/v1/comprovativos", descricao: "Lista os comprovativos recebidos, com o estado de validação.", exemplo: { itens: [{ id: "cp-1", ficheiro: "comprovativo-0142.pdf", pagamento: "PG-02601", de: "Cliente Exemplo", recebido: "2026-10-28T09:41:00Z", estado: "Por validar", url: "https://…/ficheiros/cp-1" }] } },
   { id: "comprovativos-enviar", area: "pagamentos", metodo: "POST", caminho: "/v1/comprovativos", descricao: "Recebe um comprovativo (multipart/form-data: ficheiro, pagamento, de).", exemplo: { id: "cp-2", estado: "Por validar" } },
   { id: "comprovativos-decidir", area: "pagamentos", metodo: "PATCH", caminho: "/v1/comprovativos/{id}", descricao: "Valida ou rejeita um comprovativo (e, se for validado, confirma o pagamento).", exemplo: { estado: "Validado", nota: "Montante e referência conferem." } },
-  { id: "contas-listar", area: "pagamentos", metodo: "GET", caminho: "/v1/contas-bancarias", descricao: "Lista as contas e IBANs configurados.", exemplo: { itens: [{ id: "cb-1", banco: "BAI", titular: "Empresa Exemplo, Lda.", iban: "AO78000000001234567810172", moeda: "AOA", principal: true, ativa: true }] } },
-  { id: "contas-guardar", area: "pagamentos", metodo: "PUT", caminho: "/v1/contas-bancarias/{id}", descricao: "Cria ou altera uma conta (o IBAN é validado com o módulo 97).", exemplo: { banco: "BAI", titular: "Empresa Exemplo, Lda.", iban: "AO78000000001234567810172", moeda: "AOA", principal: true, ativa: true } },
+  { id: "contas-listar", area: "pagamentos", metodo: "GET", caminho: "/v1/contas-bancarias", descricao: "Lista as contas e IBANs configurados.", exemplo: { itens: [{ id: "cb-1", banco: "BAI", titular: "Empresa Exemplo, Lda.", iban: "AO06004000001234567810142", moeda: "AOA", principal: true, ativa: true }] } },
+  { id: "contas-guardar", area: "pagamentos", metodo: "PUT", caminho: "/v1/contas-bancarias/{id}", descricao: "Cria ou altera uma conta (o IBAN é validado com o módulo 97).", exemplo: { banco: "BAI", titular: "Empresa Exemplo, Lda.", iban: "AO06004000001234567810142", moeda: "AOA", principal: true, ativa: true } },
   { id: "contas-remover", area: "pagamentos", metodo: "DELETE", caminho: "/v1/contas-bancarias/{id}", descricao: "Remove uma conta.", exemplo: { removida: true } },
   // Marketing
   { id: "eventos-registar", area: "marketing", metodo: "POST", caminho: "/v1/eventos", descricao: "Recebe os eventos do site: visitas e cliques (ver Marketing, «Rastreio»).", exemplo: { tipo: "visita", visitante: "v-8f2a", sessao: "s-91c0", pagina: "/precos", referrer: "https://www.google.com/", utm: { source: "google", medium: "cpc", campaign: "outubro" }, quando: "2026-10-29T03:12:00Z" } },
