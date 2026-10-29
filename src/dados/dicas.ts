@@ -1,8 +1,9 @@
 // Textos das dicas (tooltips) do painel: o que cada estado significa em cada módulo, o que cada campo pede, o que cada tipo e estatística quer dizer.
 // Ficam aqui, arrumados por assunto, para que nenhum componente tenha português escrito no código.
+import { SIGNIFICADO_SUPER } from "./modulos-super";
 
 /** Significado de cada estado, por módulo; «*» serve a todos os módulos que não o definem. */
-export const SIGNIFICADO_ESTADO: Record<string, Record<string, string>> = {
+const SIGNIFICADO_PROPRIO: Record<string, Record<string, string>> = {
   encomendas: {
     Recebida: "O cliente fez a encomenda e ainda ninguém a tratou.",
     "Em preparação": "A equipa aceitou a encomenda e está a preparar os artigos.",
@@ -40,6 +41,13 @@ export const SIGNIFICADO_ESTADO: Record<string, Record<string, string>> = {
     Aprovada: "Aprovada.",
     "Concluída": "Concluída; não tem mais passos.",
   },
+};
+
+/** O significado de cada estado: o dos módulos do projeto e o do super painel (pagamentos, comprovativos, erros e os estados que se repetem nos ecrãs). */
+export const SIGNIFICADO_ESTADO: Record<string, Record<string, string>> = {
+  ...SIGNIFICADO_PROPRIO,
+  ...SIGNIFICADO_SUPER,
+  "*": { ...SIGNIFICADO_PROPRIO["*"], ...SIGNIFICADO_SUPER["*"] },
 };
 
 export function significadoDoEstado(modulo: string, estado: string): string | null {

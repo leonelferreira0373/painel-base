@@ -12,7 +12,8 @@
     "test": "vitest run",
     "ativos": "node scripts/copiar-ativos.mjs",
     "postinstall": "node scripts/copiar-ativos.mjs",
-    "padroes": "node scripts/verificar-padroes.mjs"
+    "padroes": "node scripts/verificar-padroes.mjs",
+    "exemplo-api": "node scripts/servidor-de-exemplo.mjs"
   },
   "dependencies": {
     "@cloudflare/kumo": "^2.16.0",

@@ -5,7 +5,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { REGISTOS } from "@/dados/modulos";
 import { criarNotificacao, MODULO_NOTIFICACOES } from "@/dados/notificacoes";
 import { FUNCOES, funcaoPorId, type Funcao } from "@/dados/rbac";
-import type { DefTransicao, Linha } from "@/dados/tipos";
+import type { DefRegistos, DefTransicao, Linha } from "@/dados/tipos";
+import { chamar, lerLigacao, useLigacao } from "@/lib/api/cliente";
 import { extrairFicheiro } from "@/lib/extract";
 import { analisar } from "@/lib/analysis/perfil";
 import type { Sugestao } from "@/lib/analysis/sugestoes";
@@ -65,6 +66,29 @@ export function Provider({ children }: { children: ReactNode }) {
     toasts.add({ title: texto, timeout: 4200 });
   }, []);
 
+  // Com o painel ligado a um servidor, os módulos que declaram `api` leem as linhas dele; ao desligar, voltam aos dados de demonstração.
+  const ligacao = useLigacao();
+  const modoAnterior = useRef(ligacao.modo);
+  const carregarDaApi = useCallback(async (def: DefRegistos) => {
+    if (!def.api) return;
+    const r = await chamar<{ itens: Record<string, string | number>[] }>(lerLigacao(), "GET", def.api.lista);
+    const linhas = r.itens.map((it, i) => ({ ...(def.api?.mapear ? def.api.mapear(it) : it), id: String(it.id ?? `${def.id}-${i + 1}`) }) as Linha);
+    setRegistos((x) => ({ ...x, [def.id]: linhas }));
+  }, []);
+  useEffect(() => {
+    const defs = Object.values(REGISTOS).filter((d) => d.api);
+    const veioDeLigado = modoAnterior.current === "ligado";
+    modoAnterior.current = ligacao.modo;
+    if (ligacao.modo === "ligado") {
+      let vivo = true;
+      defs.forEach((d) => carregarDaApi(d).catch((e) => vivo && avisar(`${d.titulo}: ${e instanceof Error ? e.message : "não foi possível ler do servidor"}`)));
+      return () => {
+        vivo = false;
+      };
+    }
+    if (veioDeLigado) setRegistos((x) => ({ ...x, ...Object.fromEntries(defs.map((d) => [d.id, d.semente()])) }));
+  }, [ligacao.modo, ligacao.base, ligacao.token, carregarDaApi, avisar]);
+
   // Restaura a função escolhida e os ficheiros já analisados: recarregar a página não volta a zero.
   useEffect(() => {
     try {
@@ -112,6 +136,7 @@ export function Provider({ children }: { children: ReactNode }) {
     (modulo: string, linha: Linha, t: DefTransicao) => {
       const def = REGISTOS[modulo];
       const chave = def.estadoChave ?? "estado";
+      if (def.api?.estado && lerLigacao().modo === "ligado") chamar(lerLigacao(), "PATCH", def.api.estado, { estado: t.para }, { id: linha.id }).catch((e) => avisar(e instanceof Error ? e.message : "O servidor não aceitou a mudança"));
       const extra = t.aplicar ? t.aplicar(linha, contador.current++) : {};
       setRegistos((r) => {
         const proximo = { ...r, [modulo]: r[modulo].map((l) => (l.id === linha.id ? ({ ...l, ...extra, [chave]: t.para } as Linha) : l)) };
@@ -135,6 +160,7 @@ export function Provider({ children }: { children: ReactNode }) {
       const nova: Linha = { id: `${modulo}-n${n}`, ...valores, ...(def.estadoChave ? { [def.estadoChave]: def.estadoInicial ?? def.transicoes?.[0]?.de[0] ?? "Pedido" } : {}), ...(def.colunas.some((c) => c.chave === "processo") ? { processo: `${prefixo}-${String(2700 + (n % 1000)).padStart(5, "0")}` } : {}) };
       setRegistos((r) => ({ ...r, [modulo]: [nova, ...r[modulo]] }));
       marcar(`${modulo}:${nova.id}`);
+      if (def.api?.criar && lerLigacao().modo === "ligado") chamar(lerLigacao(), "POST", def.api.criar, valores).then(() => carregarDaApi(def)).catch((e) => avisar(e instanceof Error ? e.message : "O servidor não aceitou o registo"));
       avisar("Registo criado");
     },
     [avisar, marcar],

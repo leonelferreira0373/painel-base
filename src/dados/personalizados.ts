@@ -80,3 +80,39 @@ export const LETRA = {
     validar: (e: string) => (/^[\p{L}\p{N} .\-]{2,40}$/u.test(e) ? null : "Escreva só o nome da letra, por exemplo Georgia."),
   } satisfies EspecificacaoPersonalizada,
 };
+
+/** Quantos pedidos por segundo gera a simulação do tempo real. */
+export const RITMO_DE_PEDIDOS = {
+  opcoes: { "1": "1 por segundo", "2": "2 por segundo", "5": "5 por segundo" } as Record<string, string>,
+  personalizado: { chave: "ritmoDePedidos", omissao: "2", rotulo: "Pedidos por segundo", tipo: "numero", unidade: "por segundo", min: 1, max: 50, exemplo: "10", mostrar: (v: string) => `${v} por segundo` } satisfies EspecificacaoPersonalizada,
+};
+
+/** A idade, em dias, a partir da qual se apagam dados (linhas de uma tabela, ficheiros temporários, logs…). */
+export const DIAS_DE_DADOS = {
+  opcoes: { "7": "7 dias", "30": "30 dias", "90": "90 dias", "365": "1 ano" } as Record<string, string>,
+  personalizado: { chave: "diasDeDados", omissao: "90", rotulo: "Dias", tipo: "numero", unidade: "dias", min: 1, max: 3650, exemplo: "45", mostrar: (v: string) => plural(Number(v), "dia", "dias") } satisfies EspecificacaoPersonalizada,
+};
+
+/** O limite de pedidos por minuto, por visitante, do firewall. */
+export const LIMITE_POR_MINUTO = {
+  opcoes: { "60": "60 por minuto", "120": "120 por minuto", "300": "300 por minuto", "600": "600 por minuto" } as Record<string, string>,
+  personalizado: { chave: "limitePorMinuto", omissao: "120", rotulo: "Pedidos por minuto", tipo: "numero", unidade: "por minuto", min: 1, max: 100000, exemplo: "200", mostrar: (v: string) => `${Number(v).toLocaleString("pt-PT")} por minuto` } satisfies EspecificacaoPersonalizada,
+};
+
+/** De quantas em quantas horas se faz uma cópia de segurança. */
+export const FREQUENCIA_DE_COPIA = {
+  opcoes: { "6": "De 6 em 6 horas", "12": "De 12 em 12 horas", "24": "Todos os dias", "168": "Todas as semanas" } as Record<string, string>,
+  personalizado: { chave: "frequenciaDeCopia", omissao: "24", rotulo: "Horas entre cópias", tipo: "numero", unidade: "horas", min: 1, max: 720, exemplo: "8", mostrar: (v: string) => `De ${v} em ${v} horas` } satisfies EspecificacaoPersonalizada,
+};
+
+/** Durante quantos dias se guardam as cópias de segurança antes de se apagarem. */
+export const RETENCAO_DE_COPIAS = {
+  opcoes: { "7": "7 dias", "14": "14 dias", "30": "30 dias", "90": "90 dias" } as Record<string, string>,
+  personalizado: { chave: "retencaoDeCopias", omissao: "14", rotulo: "Dias", tipo: "numero", unidade: "dias", min: 1, max: 3650, exemplo: "21", mostrar: (v: string) => plural(Number(v), "dia", "dias") } satisfies EspecificacaoPersonalizada,
+};
+
+/** A porta do servidor de e-mail (SMTP). */
+export const PORTA_SMTP = {
+  opcoes: { "25": "25 (sem cifra)", "465": "465 (SSL)", "587": "587 (STARTTLS)", "2525": "2525 (alternativa)" } as Record<string, string>,
+  personalizado: { chave: "portaSmtp", omissao: "587", rotulo: "Porta", tipo: "numero", min: 1, max: 65535, exemplo: "2587", mostrar: (v: string) => v } satisfies EspecificacaoPersonalizada,
+};

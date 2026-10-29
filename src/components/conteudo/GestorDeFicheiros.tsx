@@ -29,7 +29,7 @@ export function descarregarBlob(nome: string, blob: Blob) {
 }
 
 /** A janela de pré-visualização: imagem, PDF ou texto; para o resto, só a transferência. */
-function PreVisualizar({ item, aoFechar }: { item: ItemDaBiblioteca | null; aoFechar: () => void }) {
+export function PreVisualizar({ item, aoFechar }: { item: ItemDaBiblioteca | null; aoFechar: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   const [texto, setTexto] = useState<string | null>(null);
   useEffect(() => {

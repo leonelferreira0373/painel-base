@@ -13,6 +13,8 @@ export interface ItemDaBiblioteca {
   alt?: string;
   /** O conteúdo (só nos ficheiros). */
   blob?: Blob;
+  /** Dados próprios de quem usa a biblioteca (por exemplo, o estado de um comprovativo). */
+  meta?: Record<string, string>;
 }
 
 export const TIPO_PASTA = "pasta";

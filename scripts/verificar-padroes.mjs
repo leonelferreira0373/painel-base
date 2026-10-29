@@ -16,6 +16,7 @@ const EXCECOES = {
     ["src/dados/aparencia.ts", "as cores de origem de cada tema são os dados que o utilizador personaliza, não estilos"],
     ["src/app/layout.tsx", "`themeColor` do navegador não aceita variáveis CSS"],
     ["src/components/SeletorDeCor.tsx", "um seletor de cor desenha as cores que se escolhem"],
+    ["src/lib/comprovativos.ts", "o comprovativo é uma imagem desenhada num canvas, com as cores de um recibo"],
   ],
   inputCru: [["src/components/auth/CampoSenha.tsx", "o campo de palavra-passe tem o botão «Mostrar» dentro do campo, que o Input do Kumo não permite"]],
   setaGlifo: [["src/dados/atalhos.ts", "é a tecla «seta para a direita» do teclado, não um caminho entre ecrãs"]],

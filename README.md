@@ -13,6 +13,7 @@
 - **Definições da conta:** perfil, segurança, e-mail e telefone, notificações, lembretes, aparência, chaves de acesso pessoais, dados e privacidade.
 - **Entrada:** entrar, registar, recuperar palavra-passe e e-mail, verificação em dois passos, páginas legais.
 - **Assistente de IA** (módulo [`ai-chat`](https://github.com/ferreirakorp/ai-chat)) aberto pelo botão «Perguntar à IA», com autorização para guardar as conversas.
+- **Super painel pronto a ligar:** Pagamentos (métricas, comprovativos com imagem, contas e IBANs validados), Marketing (de onde vêm os visitantes, páginas quentes, botões mais clicados, campanhas com UTM e o script de rastreio) e Developer tools (saúde do servidor, pedidos em tempo real, erros, base de dados com segurança por linha, cópias de segurança, firewall, páginas do site, envio de e-mails e limpeza). Correm em dados de demonstração e ligam-se a qualquer servidor que cumpra o contrato de `docs/API.md` (`npm run exemplo-api` sobe um servidor de exemplo).
 - **Pesquisa rápida** com recentes e dicas, **atalhos de teclado configuráveis** e menu do utilizador com aparência, idioma e fuso horário.
 - **Tema claro e escuro**, desvanecimento nas pontas das áreas com scroll, dicas em todo o lado, estados vazios e de carregamento.
 - **Análise de dados no navegador:** CSV, JSON, XML, Excel, PDF (com OCR), Word, ZIP, e-mails e imagens → perfil, qualidade, gráficos, exportação em CSV, Excel e PDF. Nada sai do dispositivo.

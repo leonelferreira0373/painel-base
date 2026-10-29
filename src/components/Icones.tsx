@@ -2,6 +2,14 @@
 import { forwardRef } from "react";
 import {
   AirplaneIcon,
+  BankIcon,
+  MegaphoneIcon,
+  DatabaseIcon,
+  HardDrivesIcon,
+  TerminalWindowIcon,
+  CursorClickIcon,
+  PulseIcon,
+  FireIcon,
   CaretDownIcon,
   CaretUpIcon,
   FolderIcon,
@@ -187,6 +195,14 @@ const BASE = {
   globo: GlobeIcon,
   telefone: PhoneIcon,
   descida: ArrowDownRightIcon,
+  banco: BankIcon,
+  megafone: MegaphoneIcon,
+  base: DatabaseIcon,
+  servidor: HardDrivesIcon,
+  terminal: TerminalWindowIcon,
+  clique: CursorClickIcon,
+  pulso: PulseIcon,
+  fogo: FireIcon,
 } satisfies Record<string, IconeFosforo>;
 
 /** Todos os ícones saem com traço grosso («bold»), para terem peso visual no painel. Nunca «duotone»: pinta um retângulo cinzento por trás do desenho. */

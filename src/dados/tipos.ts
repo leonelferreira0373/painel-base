@@ -43,6 +43,18 @@ export interface DefCampo {
   obrigatorio?: boolean;
 }
 
+/** Onde um módulo de registos lê e escreve quando o painel está ligado a um servidor (contrato em lib/api/contrato.ts). */
+export interface DefApi {
+  /** O endereço da lista (GET devolve `{ itens }`). */
+  lista: string;
+  /** O endereço que muda o estado de uma linha (PATCH com `{ estado }`; leva `{id}`). */
+  estado?: string;
+  /** O endereço que cria uma linha (POST com os valores do formulário). */
+  criar?: string;
+  /** Completa uma linha que veio do servidor (por exemplo, com uma coluna calculada). */
+  mapear?: (item: Record<string, string | number>) => Record<string, string | number>;
+}
+
 export interface DefRegistos {
   id: string;
   titulo: string;
@@ -50,6 +62,8 @@ export interface DefRegistos {
   estadoChave?: string;
   /** Estado de um registo novo; sem ele, usa o primeiro estado de partida das transições. */
   estadoInicial?: string;
+  /** Se existe, o módulo lê e escreve no servidor quando o painel está ligado a um. */
+  api?: DefApi;
   transicoes?: DefTransicao[];
   campos: DefCampo[];
   graficos: DefGrafico[];

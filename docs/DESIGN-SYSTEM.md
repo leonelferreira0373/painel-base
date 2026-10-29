@@ -186,6 +186,16 @@ Usa-se sempre o componente do Kumo; **nunca** um `<button>`, `<input>` ou `<sele
 - **No telemóvel, as janelas ficam no meio do ecrã** (como as do painel da Business Corporation): os `Dialog` ficam centrados na vertical, com 16 px de margem e a rolar por dentro se não couberem; o seletor de contas e o de clientes (`PopupCartao modalNoTelemovel`) abrem como janela ao centro, com o fundo escurecido; a pesquisa rápida é um cartão por baixo do cabeçalho; o cabeçalho tem 56 px e a gaveta 288 px. As tabelas não quebram palavras: deslizam na horizontal.
 - **O painel flutuante da IA** (`#aia-painel`) leva o mesmo anel e a mesma elevação dos outros cartões flutuantes (5f).
 
+## 5l. O super painel: pagamentos, marketing e developer tools
+
+- **Dados vindos de um contrato**: nenhum ecrã inventa dados. Lê com `useApi` / `useColecao` (`src/lib/api/`): em modo simulado vem o gerador local (`dados/super-dados.ts`), em modo ligado vem do servidor, e o ecrã é o mesmo. O modo diz-se com **uma só etiqueta** (`AvisoDeApi`): «Dados de demonstração» ou «Ligado ao servidor», com a explicação na dica e, se falhar, o aviso com «Tentar de novo». Nunca um parágrafo por baixo do título.
+- **Cartão de estatística** (`Estatistica`, `super/SuperPecas.tsx`): o `CartaoEstatistica` com o gráfico do que **se observou** enquanto o ecrã esteve aberto (`useSerie`). Sem números inventados: um valor que não mexeu mostra só o valor.
+- **Tabela de uma linha por linha** (`TabelaSimples`): desliza na horizontal, as palavras nunca se quebram nem se empilham.
+- **Estados** com `Estado`; quando o estado não é uma palavra do fluxo (códigos HTTP, regras de firewall) passa-se `variante` (`success`, `error`, `warning`, `neutral`). Os significados vão em `SIGNIFICADO_SUPER` (`dados/modulos-super.ts`).
+- **Ações que mudam ou apagam coisas** usam sempre `Confirmar`; o que não se desfaz (apagar linhas, restaurar uma cópia, desligar o firewall) pede que se escreva a palavra (`escrever="APAGAR"`).
+- **Opções com valor livre** (ritmo, dias, limite por minuto, porta SMTP, frequência e retenção das cópias) usam `SeletorPersonalizavel` com a sua especificação em `dados/personalizados.ts`.
+- **Número, data e hora** nunca são campos nativos: `SeletorDeData`, `SeletorDeHora` e texto com `inputMode="decimal"`.
+
 ## 6. Gráficos
 
 - Os gráficos são do ECharts, desenhados por `Grafico` (`components/graficos/Graficos.tsx`) a partir de um `GraficoSpec` (`linha`, `colunas`, `barras`, `rosca`, `histograma`, `dispersao`, `matriz`).

@@ -3,6 +3,7 @@
 
 import { Button, Dialog, DropdownMenu, Input, Select, Tooltip } from "@cloudflare/kumo";
 import { MenuCartao } from "./Flutuantes";
+import { SeletorDeData, SeletorDeHora } from "./SeletoresDeTempo";
 import { DICA_CAMPO } from "@/dados/dicas";
 import { useMemo, useState } from "react";
 import { AREAS } from "@/dados/estrutura";
@@ -69,8 +70,12 @@ function NovoRegisto({ def, aberto, aoMudar, iniciais }: { def: DefRegistos; abe
             {def.campos.map((c) =>
               c.tipo === "opcoes" ? (
                 <Select key={c.chave} label={c.rotulo} labelTooltip={DICA_CAMPO[c.chave]} hideLabel={false} value={v[c.chave] ?? ""} onValueChange={(x) => setV({ ...v, [c.chave]: String(x) })} required={c.obrigatorio} items={Object.fromEntries((c.opcoes ?? []).map((o) => [o, o]))} />
+              ) : c.tipo === "data" ? (
+                <SeletorDeData key={c.chave} label={c.rotulo} valor={v[c.chave] ?? ""} aoMudar={(x) => setV({ ...v, [c.chave]: x })} />
+              ) : c.tipo === "hora" ? (
+                <SeletorDeHora key={c.chave} label={c.rotulo} valor={v[c.chave] ?? ""} aoMudar={(x) => setV({ ...v, [c.chave]: x })} />
               ) : (
-                <Input key={c.chave} label={c.rotulo} labelTooltip={DICA_CAMPO[c.chave]} type={c.tipo === "data" ? "date" : c.tipo === "hora" ? "time" : c.tipo === "numero" ? "number" : "text"} value={v[c.chave] ?? ""} onChange={(e) => setV({ ...v, [c.chave]: e.target.value })} required={c.obrigatorio} />
+                <Input key={c.chave} label={c.rotulo} labelTooltip={DICA_CAMPO[c.chave]} inputMode={c.tipo === "numero" ? "decimal" : undefined} value={v[c.chave] ?? ""} onChange={(e) => setV({ ...v, [c.chave]: c.tipo === "numero" ? e.target.value.replace(/[^\d.,]/g, "") : e.target.value })} required={c.obrigatorio} />
               ),
             )}
           </div>

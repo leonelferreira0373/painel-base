@@ -18,8 +18,20 @@ import { Perfil } from "./analise/Perfil";
 import { Ic, ICONES } from "./Icones";
 import { PAINEIS } from "./Paineis";
 import { Registos } from "./Registos";
+import { BaseDeDados, PedidosEmTempoReal, SaudeVps } from "./super/DevServidor";
+import { ApiLigacoes, Backups, EnviosDeEmail, Firewall, Limpeza, PaginasDoSite } from "./super/DevOperacoes";
+import { Campanhas, MarketingVisao, Rastreio } from "./super/MarketingPaginas";
+import { Comprovativos, ContasIban, PagamentosVisao } from "./super/PagamentosPaginas";
+import type { ComponentType } from "react";
 import { Pagina } from "./ui";
 import { VisaoGeral } from "./VisaoGeral";
+
+/** Os ecrãs próprios do super painel (os que não são uma lista de registos), por área e módulo. */
+const ECRAS: Record<string, Record<string, ComponentType>> = {
+  pagamentos: { metricas: PagamentosVisao, comprovativos: Comprovativos, contas: ContasIban },
+  marketing: { "visao-marketing": MarketingVisao, campanhas: Campanhas, rastreio: Rastreio },
+  dev: { saude: SaudeVps, "pedidos-web": PedidosEmTempoReal, bd: BaseDeDados, backups: Backups, limpeza: Limpeza, firewall: Firewall, paginas: PaginasDoSite, envios: EnviosDeEmail, api: ApiLigacoes },
+};
 
 function SemAcesso() {
   const { funcao, mudarFuncao } = useApp();
@@ -58,6 +70,8 @@ export function Modulo({ areaId, moduloId }: { areaId: string; moduloId: string 
     return <Blog />;
   }
   if (areaId === "ia") return <ControlosDaIA aba={moduloId as "comportamento" | "memoria" | "testar"} />;
+  const Ecra = ECRAS[areaId]?.[moduloId];
+  if (Ecra) return <Ecra />;
   const Painel = PAINEIS[moduloId];
   if (Painel) return <Painel />;
   if (REGISTOS[moduloId]) return <Registos moduloId={moduloId} />;

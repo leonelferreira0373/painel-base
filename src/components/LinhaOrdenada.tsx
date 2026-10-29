@@ -14,7 +14,7 @@ export function LinhaOrdenada({ nome, valor, proporcao, copiar = nome, ativa = f
       <span className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-kumo-tint">
         <span className="block h-full rounded-full bg-kumo-brand" style={{ width: `${Math.min(100, Math.max(0, proporcao))}%` }} />
       </span>
-      <span className="w-8 shrink-0 text-right tabular-nums text-kumo-strong">{valor}</span>
+      <span className="min-w-8 shrink-0 text-right tabular-nums text-kumo-strong">{valor}</span>
       {aoAbrir && <Ic nome="seta" tamanho={12} className="shrink-0 text-kumo-subtle" />}
     </>
   );
