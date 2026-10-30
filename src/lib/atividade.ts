@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { PROJETO } from "@/dados/projeto";
 import { chamar, lerLigacao } from "./api/cliente";
+import { apagarConversas } from "./conversas-ia";
 
 export type TipoDeAcao = "sessao" | "navegacao" | "clique" | "definicao" | "campo" | "janela" | "ia" | "convite" | "token" | "funcao" | "nota" | "dados" | "servidor";
 
@@ -60,6 +61,8 @@ export interface Acao {
   caminho?: string;
   antes?: string;
   depois?: string;
+  /** O identificador da conversa com a IA a que a ação pertence (a conversa inteira abre-se a partir daqui). */
+  conversa?: string;
 }
 
 // ---------- o aparelho ----------
@@ -140,6 +143,39 @@ export interface FiltroDeAcoes {
   texto?: string;
   de?: string;
   ate?: string;
+}
+
+/** Uma linha que junta as ações de uma conversa com a IA: quantas perguntas houve e qual foi a primeira. */
+export interface AcaoAgrupada extends Acao {
+  resumo?: { perguntas: number; primeira: string };
+}
+
+const PERGUNTA = /^Perguntou à IA: «([\s\S]*)»$/;
+
+/** Junta as ações de cada conversa com a IA numa só linha (no lugar da mais recente); as outras ficam como estão. A lista vem da mais recente para a mais antiga. */
+export function agruparConversas(acoes: Acao[]): AcaoAgrupada[] {
+  const grupos = new Map<string, AcaoAgrupada>();
+  const saida: AcaoAgrupada[] = [];
+  for (const a of acoes) {
+    if (a.tipo !== "ia" || !a.conversa) {
+      saida.push(a);
+      continue;
+    }
+    let g = grupos.get(a.conversa);
+    if (!g) {
+      const { antes: _antes, depois: _depois, ...resto } = a;
+      g = { ...resto, id: `conversa-${a.conversa}`, texto: "Conversa com a IA", resumo: { perguntas: 0, primeira: "" } };
+      grupos.set(a.conversa, g);
+      saida.push(g);
+    }
+    const pergunta = PERGUNTA.exec(a.texto);
+    if (pergunta) {
+      g.resumo!.perguntas += 1;
+      // da mais recente para a mais antiga: a última que se encontra é a primeira que se fez
+      g.resumo!.primeira = pergunta[1];
+    }
+  }
+  return saida;
 }
 
 const semAcentos = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -230,13 +266,13 @@ function mudarSessao(id: string, f: (s: Sessao) => Sessao): void {
 const emServidor = () => lerLigacao().modo === "ligado";
 
 /** Regista uma ação na sessão em curso. Duas iguais seguidas no mesmo segundo contam como uma. */
-export function registar(tipo: TipoDeAcao, texto: string, extra: Partial<Pick<Acao, "caminho" | "antes" | "depois">> = {}): void {
+export function registar(tipo: TipoDeAcao, texto: string, extra: Partial<Pick<Acao, "caminho" | "antes" | "depois" | "conversa">> = {}): void {
   if (typeof window === "undefined" || !atual) return;
   const agora = new Date().toISOString();
   const acoes = lerAcoes();
   const ultima = acoes[0];
   if (ultima && ultima.sessao === atual.id && ultima.tipo === tipo && ultima.texto === texto && ultima.depois === extra.depois && Date.now() - new Date(ultima.quando).getTime() < 1000) return;
-  const acao: Acao = { id: nova(), sessao: atual.id, quando: agora, tipo, texto: texto.slice(0, 240), caminho: extra.caminho ?? window.location.pathname, ...(extra.antes !== undefined ? { antes: extra.antes } : {}), ...(extra.depois !== undefined ? { depois: extra.depois } : {}) };
+  const acao: Acao = { id: nova(), sessao: atual.id, quando: agora, tipo, texto: texto.slice(0, 240), caminho: extra.caminho ?? window.location.pathname, ...(extra.antes !== undefined ? { antes: extra.antes } : {}), ...(extra.depois !== undefined ? { depois: extra.depois } : {}), ...(extra.conversa ? { conversa: extra.conversa } : {}) };
   acoesEmMemoria = [acao, ...acoes].slice(0, MAXIMO_ACOES);
   mudarSessao(atual.id, (s) => ({ ...s, ultima: agora, acoes: s.acoes + 1 }));
   if (emServidor()) fila.push(acao);
@@ -354,6 +390,7 @@ export function reporAtividade(d: { sessoes: Sessao[]; acoes: Acao[] }): void {
 export function apagarAtividade(): void {
   sessoesEmMemoria = atual ? lerSessoes().filter((s) => s.id === atual!.id) : [];
   acoesEmMemoria = atual ? lerAcoes().filter((a) => a.sessao === atual!.id) : [];
+  apagarConversas(new Set(lerAcoes().flatMap((a) => (a.conversa ? [a.conversa] : []))));
   descarregar();
   window.dispatchEvent(new Event(EVENTO_ATIVIDADE));
 }

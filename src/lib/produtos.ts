@@ -1,4 +1,5 @@
 // Os produtos do painel: o que se guarda de cada um e as funções puras do editor (ler o preço e o stock escritos, validar, escolher a imagem principal). Ficam no navegador; as imagens são da biblioteca (a mesma da galeria) e cada produto guarda só os seus identificadores.
+import type { Enquadramento } from "./enquadramento";
 import { useGuardado } from "./guardado";
 
 export type EstadoDeProduto = "rascunho" | "publicado" | "arquivado";
@@ -17,6 +18,8 @@ export interface Produto {
   estado: EstadoDeProduto;
   /** Os identificadores das imagens da biblioteca; a primeira é a principal. */
   imagens: string[];
+  /** Como cada imagem se mostra na moldura (zoom e ponto), pelo identificador da imagem. */
+  enquadramentos?: Record<string, Enquadramento>;
   criado: string;
   atualizado: string;
 }

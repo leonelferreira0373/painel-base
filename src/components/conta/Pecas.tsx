@@ -1,10 +1,12 @@
 // Peças comuns das definições da conta: cartão com linhas, linha com título e controlo, interruptor, janela de confirmação e formatos de data.
 "use client";
 
-import { Button, Dialog, Input, LayerCard, Switch } from "@cloudflare/kumo";
+import { Button, Dialog, Input, LayerCard, Popover, Switch, Tooltip } from "@cloudflare/kumo";
 import { useEffect, useState, type ReactNode } from "react";
 import { Dica, DicaInfo } from "../Dica";
 import { ICONES } from "../Icones";
+import { EscolherCor } from "../EscolherCor";
+import { PopupCartao } from "../Flutuantes";
 import { Frase, Pilula } from "../Frase";
 
 export function Cartao({ titulo, dica, acoes, children, perigo = false }: { titulo: string; dica?: string; acoes?: ReactNode; children: ReactNode; perigo?: boolean }) {
@@ -45,6 +47,103 @@ export function LinhaCampo({ children }: { children: ReactNode }) {
 
 export function Interruptor({ marcado, aoMudar, rotulo, desativado }: { marcado: boolean; aoMudar: (v: boolean) => void; rotulo: string; desativado?: boolean }) {
   return <Switch checked={marcado} onCheckedChange={aoMudar} aria-label={rotulo} disabled={desativado} />;
+}
+
+/** Itens com um interruptor cada (liga-se mais do que um ao mesmo tempo): é a mesma lista nos filtros do painel e na escolha dos locais de uma imagem. */
+export function ListaDeInterruptores({ itens, escolhidos, aoMudar, rotulo }: { itens: { id: string; rotulo: string; contagem?: number }[]; escolhidos: string[]; aoMudar: (id: string, ligado: boolean) => void; rotulo: string }) {
+  return (
+    <>
+      {itens.map((i) => (
+        <label key={i.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2.5 py-2 hover:bg-kumo-tint">
+          <span className="min-w-0 truncate text-sm text-kumo-default">{i.rotulo}</span>
+          <span className="inline-flex shrink-0 items-center gap-2">
+            {i.contagem !== undefined && <span className="text-xs tabular-nums text-kumo-subtle">{i.contagem}</span>}
+            <Interruptor marcado={escolhidos.includes(i.id)} aoMudar={(v) => aoMudar(i.id, v)} rotulo={`${rotulo}: ${i.rotulo}`} />
+          </span>
+        </label>
+      ))}
+    </>
+  );
+}
+
+/** Uma linha de cor: o nome à esquerda e, à direita, o quadrado da cor com o seu valor, que abre o seletor (as cores prontas, a que se escreve e a escolha de «sem cor»). */
+export function LinhaDeCor({ titulo, valor, aoMudar, cores, padrao }: { titulo: string; valor: string | null; aoMudar: (hex: string | null) => void; cores: { rotulo: string; hex: string }[]; /** A cor com que o seletor começa quando ainda não há nenhuma. */ padrao: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="min-w-0 truncate text-sm text-kumo-default">{titulo}</span>
+      <Popover.Root>
+        <Tooltip
+          content={`Escolher a cor: ${titulo}`}
+          render={
+            <Popover.Trigger
+              render={
+                <Button variant="secondary" size="sm" icon={<span aria-hidden className="size-4 rounded-[4px] ring-1 ring-black/10 dark:ring-white/20" style={{ background: valor ?? "transparent" }} />}>
+                  {valor ? valor.toUpperCase() : "Sem cor"}
+                </Button>
+              }
+            />
+          }
+        />
+        <PopupCartao alinhar="end" className="w-[232px] p-3">
+          <EscolherCor alternar cor={valor} aoMudar={aoMudar} cores={cores} padrao={padrao} rotuloDeVoltar="Tirar a cor" />
+        </PopupCartao>
+      </Popover.Root>
+    </div>
+  );
+}
+
+/** Um grupo do formulário: o título do campo e, por baixo, o que se escolhe ou escreve. */
+export function Seccao({ titulo, children }: { titulo: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-sm font-medium text-kumo-default">{titulo}</h3>
+      {children}
+    </section>
+  );
+}
+
+/** Opções prontas que se escolhem com um toque (uma ou várias) e um botão «Personalizar» para quem quer escrever a sua: preencher um campo sem precisar de saber o que escrever. */
+export function EscolhaDeOpcoes({ rotulo, opcoes, valor, aoMudar, varias = false, personalizar = true, placeholder = "Escreva e carregue em Enter", renderizar }: { rotulo: string; opcoes: string[]; valor: string[]; aoMudar: (v: string[]) => void; varias?: boolean; /** Mostra o botão «Personalizar». */ personalizar?: boolean; placeholder?: string; /** Como se mostra cada opção (por omissão, o próprio texto). */ renderizar?: (opcao: string) => ReactNode }) {
+  const [aEscrever, setAEscrever] = useState(false);
+  const [texto, setTexto] = useState("");
+  const todas = [...opcoes, ...valor.filter((v) => !opcoes.includes(v))];
+  const alternar = (o: string) => aoMudar(valor.includes(o) ? valor.filter((x) => x !== o) : varias ? [...valor, o] : [o]);
+  const juntar = () => {
+    const t = texto.trim();
+    setTexto("");
+    setAEscrever(false);
+    if (t && !valor.includes(t)) aoMudar(varias ? [...valor, t] : [t]);
+  };
+  return (
+    <div role="group" aria-label={rotulo} className="flex flex-wrap items-center gap-2">
+      {todas.map((o) => (
+        <Button key={o} size="sm" variant="secondary" aria-pressed={valor.includes(o)} className={valor.includes(o) ? "!bg-kumo-brand/15 !ring-kumo-brand/50" : ""} onClick={() => alternar(o)}>
+          {renderizar ? renderizar(o) : o}
+        </Button>
+      ))}
+      {aEscrever ? (
+        <Input
+          aria-label={`${rotulo}: escrever`}
+          autoFocus
+          size="sm"
+          className="w-48"
+          value={texto}
+          placeholder={placeholder}
+          autoComplete="off"
+          onChange={(e) => setTexto(e.target.value)}
+          onBlur={juntar}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.preventDefault(), juntar());
+            else if (e.key === "Escape") (setTexto(""), setAEscrever(false));
+          }}
+        />
+      ) : personalizar ? (
+        <Button size="sm" variant="ghost" icon={ICONES.mais} onClick={() => setAEscrever(true)}>
+          Personalizar
+        </Button>
+      ) : null}
+    </div>
+  );
 }
 
 /** A janela modal das ações do painel: confirmar algo que muda ou apaga, ou pedir um valor (`children` é o campo; `desativado` segura o botão de ação até o valor servir). */

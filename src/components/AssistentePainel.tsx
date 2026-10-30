@@ -24,6 +24,7 @@ import { quemFala } from "@/lib/ia-quem-fala";
 import { useSessao } from "@/lib/auth";
 import { BotaoCopiar } from "./Copiar";
 import { Frase, semMarcas } from "./Frase";
+import { useCoresDoAssistente } from "@/lib/ia-aparencia";
 import { AnelDeContexto, ContextoDaIa } from "./ia/AnelDeContexto";
 import { CartaoDeAprovacao } from "./ia/CartaoDeAprovacao";
 import { CartaoDePesquisaPronta } from "./pesquisa/MotorDePesquisas";
@@ -48,6 +49,8 @@ const normalizar = (t: string) =>
     .trim();
 
 export function AssistentePainel() {
+  // as cores do assistente que a pessoa escolheu ficam aplicadas logo à entrada
+  useCoresDoAssistente();
   const router = useRouter();
   const pathname = usePathname();
   const { funcao } = useApp();

@@ -18,16 +18,26 @@
 }
 /* O ponto de estado é plano: verde com alguém online (âmbar quando ninguém está), sem o relevo 3D do módulo. */
 :root {
-  --aia-verde: rgb(34 197 94);
+  /* as cores do assistente: leves (azul, amarelo, rosa, verde), de partida; quem usa o painel escolhe as suas em Conta > Aparência (ver lib/ia-aparencia.ts) */
+  --ia-online: #86efac;
+  --ia-ausente: #fcd34d;
+  --ia-anel-bom: #93c5fd;
+  --ia-anel-aviso: #fcd34d;
+  --ia-anel-perigo: #f9a8d4;
+  --ia-parte-sistema: #93c5fd;
+  --ia-parte-ferramentas: #fcd34d;
+  --ia-parte-mensagens: #86efac;
+  --ia-parte-resposta: #f9a8d4;
+  --aia-verde: var(--ia-online);
 }
 .aia-vivo,
 .aia-ponto {
   background: var(--_cor, var(--aia-verde)) !important;
   box-shadow: none !important;
 }
-/* Sem ninguém online, o ponto de estado é âmbar (o realce do módulo já não o é). */
+/* Sem ninguém online, o ponto de estado é amarelo (a cor «Ninguém online»; o realce do módulo já não o é). */
 .aia-avatar-vivo[data-modo="offline"] .aia-vivo {
-  --_cor: var(--color-kumo-warning);
+  --_cor: var(--ia-ausente);
 }
 /* O painel do assistente é um cartão flutuante como os outros: o mesmo anel e a mesma elevação. */
 #aia-painel {

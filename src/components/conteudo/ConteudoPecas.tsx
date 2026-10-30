@@ -45,12 +45,12 @@ export function ZonaDeUpload({ aceitar, multiplo = true, aoEscolher, className =
   );
 }
 
-/** Endereços temporários (blob:) para mostrar as imagens guardadas; libertam-se quando já não servem. */
-export function useUrlsDeImagens(itens: ItemDaBiblioteca[]): Map<string, string> {
+/** Endereços temporários (blob:) para mostrar as imagens guardadas (com `todos`, também o áudio, o vídeo e os documentos); libertam-se quando já não servem. */
+export function useUrlsDeImagens(itens: ItemDaBiblioteca[], todos = false): Map<string, string> {
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     const novos = new Map<string, string>();
-    for (const i of itens) if (i.blob && i.tipo.startsWith("image/")) novos.set(i.id, URL.createObjectURL(i.blob));
+    for (const i of itens) if (i.blob && (todos || i.tipo.startsWith("image/"))) novos.set(i.id, URL.createObjectURL(i.blob));
     setUrls(novos);
     return () => novos.forEach((u) => URL.revokeObjectURL(u));
   }, [itens]);

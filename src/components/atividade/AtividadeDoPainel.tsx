@@ -10,13 +10,13 @@ import { useApi } from "@/lib/api/cliente";
 import { reciclar } from "@/lib/reciclagem";
 import { abrirDados, useFonteDeExportacao } from "@/lib/dados-da-pagina";
 import { useColecao } from "@/lib/api/colecao";
-import { apagarAtividade, duracaoDe, filtrarAcoes, lerAcoes, lerSessoes, registar, rotuloDoDispositivo, rotuloDoLocal, rotuloDoTipoDeAparelho, ROTULO_DO_TIPO, textoDaDuracao, useAtividade, type Acao, type Sessao, type TipoDeAcao } from "@/lib/atividade";
+import { agruparConversas, apagarAtividade, duracaoDe, filtrarAcoes, lerAcoes, lerSessoes, registar, rotuloDoDispositivo, rotuloDoLocal, rotuloDoTipoDeAparelho, ROTULO_DO_TIPO, textoDaDuracao, useAtividade, type Acao, type AcaoAgrupada, type Sessao, type TipoDeAcao } from "@/lib/atividade";
 import { cancelarConvite, conviteNovo, corpoDoConvite, erroDoConvite, expirarConvites, reenviarConvite, responderAoConvite, revogarConvite, totaisDeConvites, type Convite, type EstadoDoConvite } from "@/lib/convites";
 import { contagemPorDia, emailNovo, enviarEmail } from "@/lib/email";
 import { useEditar } from "@/lib/permissao";
 import { reporAcesso, revogarAcesso } from "@/lib/acessos-revogados";
 import { useSessao } from "@/lib/auth";
-import { Confirmar, Cartao, Interruptor } from "../conta/Pecas";
+import { Confirmar, Cartao, ListaDeInterruptores } from "../conta/Pecas";
 import { PopupCartao } from "../Flutuantes";
 import { Vazio } from "../conteudo/ConteudoPecas";
 import { Estado } from "../Estado";
@@ -25,6 +25,7 @@ import { ICONES } from "../Icones";
 import { useEmails } from "../super/EmailPecas";
 import { dataHora, Estatistica, horaCompleta, inteiro, TabelaSimples, type ColunaSimples } from "../super/SuperPecas";
 import { Pagina, Separadores, Titulo } from "../ui";
+import { BotaoDaConversa } from "./ConversaComIa";
 import { rotuloDaPagina } from "./ObservadorDaAtividade";
 
 const INATIVA_MS = 30 * 60_000;
@@ -37,8 +38,19 @@ function estadoDaSessao(s: Sessao, agora: number): { rotulo: string; variante: "
 
 const ESTADO_DO_CONVITE: Record<EstadoDoConvite, "success" | "error" | "warning" | "neutral"> = { Pendente: "warning", Aceite: "success", Recusado: "error", Expirado: "neutral", Cancelado: "neutral", Revogado: "error" };
 
-/** Uma ação em palavras: o texto e, se mudou alguma coisa, o antes e o depois. */
-function TextoDaAcao({ a }: { a: Acao }) {
+/** Uma ação em palavras: o texto e, se mudou alguma coisa, o antes e o depois. Uma conversa com a IA ocupa uma linha só, com o botão que a abre por inteiro. */
+function TextoDaAcao({ a }: { a: AcaoAgrupada }) {
+  if (a.conversa) {
+    const primeira = a.resumo?.primeira.replace(/[«»]/g, "").replace(/\s+/g, " ").trim();
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span>
+          <Frase>{primeira ? `Conversa com a IA «${primeira.length > 60 ? `${primeira.slice(0, 60)}…` : primeira}»` : "Conversa com a IA"}</Frase>
+        </span>
+        <BotaoDaConversa id={a.conversa} />
+      </span>
+    );
+  }
   return (
     <span className="inline-flex flex-wrap items-center gap-y-1">
       <span>
@@ -195,7 +207,7 @@ function DetalheDaSessao({ sessao: s, acoes, agora }: { sessao: Sessao; acoes: A
           <p className="text-sm text-kumo-subtle">Nada registado nesta sessão.</p>
         ) : (
           <ul className="flex max-h-80 flex-col divide-y divide-kumo-hairline overflow-y-auto rounded-lg ring ring-kumo-line">
-            {acoes.slice(0, 300).map((a) => (
+            {agruparConversas(acoes).slice(0, 300).map((a) => (
               <li key={a.id} className="flex items-start gap-3 px-3 py-2 text-sm">
                 <span className="w-16 shrink-0 tabular-nums text-kumo-subtle">{horaCompleta(a.quando)}</span>
                 <span className="min-w-0 flex-1">
@@ -221,15 +233,7 @@ function FiltroDeItens({ titulo, itens, escolhidos, aoMudar }: { titulo: string;
       <PopupCartao alinhar="start" className="w-[min(320px,calc(100vw-2rem))]">
         <div className="flex max-h-[min(60dvh,420px)] flex-col overflow-y-auto p-1.5">
           {itens.length === 0 && <span className="px-2.5 py-2 text-sm text-kumo-subtle">Nada para escolher.</span>}
-          {itens.map((i) => (
-            <label key={i.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2.5 py-2 hover:bg-kumo-tint">
-              <span className="min-w-0 truncate text-sm text-kumo-default">{i.rotulo}</span>
-              <span className="inline-flex shrink-0 items-center gap-2">
-                {i.contagem !== undefined && <span className="text-xs tabular-nums text-kumo-subtle">{i.contagem}</span>}
-                <Interruptor marcado={escolhidos.includes(i.id)} aoMudar={(v) => aoMudar(v ? [...escolhidos, i.id] : escolhidos.filter((x) => x !== i.id))} rotulo={`${titulo}: ${i.rotulo}`} />
-              </span>
-            </label>
-          ))}
+          <ListaDeInterruptores itens={itens} escolhidos={escolhidos} rotulo={titulo} aoMudar={(id, v) => aoMudar(v ? [...escolhidos, id] : escolhidos.filter((x) => x !== id))} />
           <div className="flex justify-end border-t border-kumo-hairline p-1.5">
             <Button variant="ghost" size="sm" disabled={escolhidos.length === 0} onClick={() => aoMudar([])}>
               Limpar
@@ -258,6 +262,7 @@ function Atividade({ acoes, sessoes, sessaoPorId, erro }: { acoes: Acao[]; sesso
   // a pesquisa e os tipos valem sempre; as pessoas escolhidas decidem se se vê o resumo ou tudo o que fizeram
   const dosTipos = useMemo(() => filtrarAcoes(acoes, { texto, tipos: tipos.length ? (tipos as TipoDeAcao[]) : undefined }), [acoes, texto, tipos]);
   const lista = useMemo(() => (pessoas.length ? dosTipos.filter((a) => pessoas.includes(quem(a))) : dosTipos), [dosTipos, pessoas, sessaoPorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const linhas = useMemo(() => agruparConversas(lista), [lista]);
   const resumo = useMemo<ResumoDaPessoa[]>(() => {
     const por = new Map<string, ResumoDaPessoa>();
     for (const s of sessoes) if (!por.has(s.utilizador)) por.set(s.utilizador, { pessoa: s.utilizador, funcao: s.funcao, acoes: 0, sessoes: 0, ultima: null });
@@ -273,7 +278,7 @@ function Atividade({ acoes, sessoes, sessaoPorId, erro }: { acoes: Acao[]; sesso
   const itensDeTipo = useMemo(() => Object.entries(ROTULO_DO_TIPO).map(([id, rotulo]) => ({ id, rotulo: String(rotulo), contagem: acoes.filter((a) => a.tipo === id).length })), [acoes]);
   const itensDePessoa = useMemo(() => resumo.map((r) => ({ id: r.pessoa, rotulo: r.pessoa, contagem: r.acoes })), [resumo]);
 
-  const colunas: ColunaSimples<Acao>[] = [
+  const colunas: ColunaSimples<AcaoAgrupada>[] = [
     { rotulo: "Quando", render: (a) => <span className="tabular-nums">{dataHora(a.quando)}</span> },
     { rotulo: "Quem", filtro: quem, render: quem },
     { rotulo: "Tipo", filtro: (a) => String(ROTULO_DO_TIPO[a.tipo]), render: (a) => <Estado valor={ROTULO_DO_TIPO[a.tipo]} variante="neutral" /> },
@@ -288,7 +293,7 @@ function Atividade({ acoes, sessoes, sessaoPorId, erro }: { acoes: Acao[]; sesso
   ];
   const aVerTudo = pessoas.length > 0;
   return (
-    <Cartao titulo={aVerTudo ? `Ações${lista.length ? ` (${lista.length})` : ""}` : `Pessoas${resumo.length ? ` (${resumo.length})` : ""}`}>
+    <Cartao titulo={aVerTudo ? `Ações${linhas.length ? ` (${linhas.length})` : ""}` : `Pessoas${resumo.length ? ` (${resumo.length})` : ""}`}>
       <div className="flex flex-col gap-2 border-b border-kumo-hairline p-3 lg:flex-row">
         <Input aria-label="Pesquisar na atividade" placeholder="Pesquisar nas ações, nos valores e nas páginas" value={texto} onChange={(e) => setTexto(e.target.value)} autoComplete="off" className="w-full" />
         <FiltroDeItens titulo="Tipos" itens={itensDeTipo} escolhidos={tipos} aoMudar={setTipos} />
@@ -300,8 +305,8 @@ function Atividade({ acoes, sessoes, sessaoPorId, erro }: { acoes: Acao[]; sesso
         <Vazio icone="recentes" titulo="Ainda não há atividade" texto="Cada página aberta, clique, definição e mensagem fica aqui." />
       ) : aVerTudo ? (
         <>
-          <TabelaSimples colunas={colunas} linhas={lista.slice(0, quantas)} chave={(a) => a.id} vazio="Nenhuma ação corresponde à pesquisa." />
-          {lista.length > quantas && (
+          <TabelaSimples colunas={colunas} linhas={linhas.slice(0, quantas)} chave={(a) => a.id} vazio="Nenhuma ação corresponde à pesquisa." />
+          {linhas.length > quantas && (
             <div className="flex justify-center border-t border-kumo-hairline p-3">
               <Button variant="secondary" onClick={() => setQuantas((q) => q + 200)}>
                 Mostrar mais

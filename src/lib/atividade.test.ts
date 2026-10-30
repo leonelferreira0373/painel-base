@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { descreverAgente, duracaoDe, fecharInativas, filtrarAcoes, mascarar, paraCsv, textoDaDuracao, type Acao, type Sessao } from "./atividade";
+import { agruparConversas, descreverAgente, duracaoDe, fecharInativas, filtrarAcoes, mascarar, paraCsv, textoDaDuracao, type Acao, type Sessao } from "./atividade";
 
 const CHROME_WIN = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
 const EDGE = `${CHROME_WIN} Edg/141.0.3537.57`;
@@ -82,5 +82,20 @@ describe("paraCsv", () => {
     expect(csv).toContain('"Escreveu ""olá""; linha\nnova"');
     expect(csv).toContain("102.67.1.4");
     expect(csv).toContain("Chrome 141 em Windows 10/11");
+  });
+});
+
+describe("agruparConversas", () => {
+  const ia = (id: string, texto: string, conversa?: string) => acao({ id, tipo: "ia", texto, ...(conversa ? { conversa } : {}) });
+  it("junta cada conversa numa linha, no lugar da ação mais recente, com a primeira pergunta", () => {
+    // da mais recente para a mais antiga
+    const lista = [ia("5", "A IA respondeu: «Abra o Firewall.»", "c1"), acao({ id: "4", texto: "Abriu «Firewall»" }), ia("3", "Perguntou à IA: «E depois?»", "c1"), ia("2", "A IA: A ver o ecrã", "c1"), ia("1", "Perguntou à IA: «Como bloqueio um IP?»", "c1")];
+    const g = agruparConversas(lista);
+    expect(g.map((a) => a.id)).toEqual(["conversa-c1", "4"]);
+    expect(g[0]).toMatchObject({ texto: "Conversa com a IA", conversa: "c1", resumo: { perguntas: 2, primeira: "Como bloqueio um IP?" } });
+  });
+  it("conversas diferentes ficam em linhas diferentes e o que não é conversa não se mexe", () => {
+    const lista = [ia("3", "Perguntou à IA: «B»", "c2"), ia("2", "Abriu a conversa com a IA"), ia("1", "Perguntou à IA: «A»", "c1")];
+    expect(agruparConversas(lista).map((a) => a.id)).toEqual(["conversa-c2", "2", "conversa-c1"]);
   });
 });

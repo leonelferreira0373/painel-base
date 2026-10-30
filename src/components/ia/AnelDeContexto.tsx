@@ -10,16 +10,16 @@ import { formatarUsd, NEURONS_GRATIS_POR_DIA } from "@/lib/ia-modelos";
 import { aPagar, repartirContexto, ROTULO_DA_ORIGEM, tomDoAnel, useUsoDaIa, type OrigemDaIa, type ParteDoContexto } from "@/lib/ia-uso";
 import { BotaoCopiar } from "../Copiar";
 import { Dica } from "../Dica";
-import { coresDoAnel, useCorDoAnel } from "@/lib/ia-aparencia";
+import { coresDoAnel, useCoresDoAssistente, useCorDoAnel } from "@/lib/ia-aparencia";
 import { ICONES } from "../Icones";
 import { Recolhivel } from "../Recolhivel";
 
-const COR_DO_TOM = { sucesso: "var(--color-kumo-success)", aviso: "var(--color-kumo-warning)", perigo: "var(--color-kumo-danger)" } as const;
+const COR_DO_TOM = { sucesso: "var(--ia-anel-bom)", aviso: "var(--ia-anel-aviso)", perigo: "var(--ia-anel-perigo)" } as const;
 const COR_DA_PARTE: Record<ParteDoContexto["id"], string> = {
-  sistema: "var(--color-kumo-brand)",
-  ferramentas: "var(--color-kumo-warning)",
-  mensagens: "var(--color-kumo-success)",
-  resposta: "var(--color-kumo-danger)",
+  sistema: "var(--ia-parte-sistema)",
+  ferramentas: "var(--ia-parte-ferramentas)",
+  mensagens: "var(--ia-parte-mensagens)",
+  resposta: "var(--ia-parte-resposta)",
   livre: "var(--color-kumo-hairline)",
 };
 
@@ -46,6 +46,7 @@ export function Anel({ ocupacao, ativo, aTrabalhar = false, tamanho = 26, espess
 export function AnelDeContexto({ origem, ativo, tamanho = 26, className = "" }: { origem: OrigemDaIa; ativo: boolean; tamanho?: number; className?: string }) {
   const { contexto } = useUsoDaIa();
   const corDoAnel = useCorDoAnel();
+  useCoresDoAssistente();
   const [aberto, setAberto] = useState(false);
   const c = contexto(origem);
   const dica = c ? `Contexto: ${percentagem(c.ocupacao)} · ${inteiro(c.tokens)} de ${inteiro(c.janela)} tokens. Carregue para ver o modelo e o gasto.` : "Contexto da IA: ainda sem chamadas. Carregue para ver o modelo e o gasto.";

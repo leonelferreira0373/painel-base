@@ -1,4 +1,4 @@
-// O bloco de um campo com imagens: a imagem grande (ou a zona onde se largam ficheiros), as miniaturas, «Enviar» (guarda na galeria já ligada ao local do campo) e «Da galeria» (as imagens deste local primeiro). É o único sítio onde um campo de imagem se desenha; o local vem de `dados/locais.ts` e é o que a galeria mostra como botão.
+// O bloco de um campo com imagens: a imagem principal grande (ou a zona onde se largam ficheiros), as outras em miniaturas, «Enviar» (guarda na galeria já ligada ao local do campo) e «Da galeria» (as imagens deste local primeiro). Tocar na imagem abre-a quase em ecrã cheio para ver como fica e ajustar o enquadramento. É o único sítio onde um campo de imagem se desenha; o local vem de `dados/locais.ts` e é o que a galeria mostra como botão.
 "use client";
 
 import { Button } from "@cloudflare/kumo";
@@ -7,29 +7,45 @@ import type { IdDeLocal } from "@/dados/locais";
 import { eImagem, nomeUnico, type ItemDaBiblioteca } from "@/lib/biblioteca";
 import { useArmazem } from "@/lib/armazem";
 import { identificador } from "@/lib/conta";
+import { estiloDoEnquadramento, type Enquadramento } from "@/lib/enquadramento";
 import { comLocal, semRepetidas, tornarPrincipal } from "@/lib/locais";
 import { Ic, ICONES } from "../Icones";
+import { BotaoIcone } from "../ui";
 import { EscolherImagem } from "./EscolherImagem";
 import { useUrlsDeImagens, ZonaDeUpload } from "./ConteudoPecas";
+import { VisualizadorDeImagem } from "./VisualizadorDeImagem";
 
 export const PASTA_DAS_IMAGENS = "Galeria";
 
-/** `ids` são as imagens deste campo (a primeira é a principal); `varias` diz se o campo aceita mais do que uma. */
-export function BlocoDeImagem({ local, ids, aoMudar, varias = false, vazio = "Sem imagem", proporcao = "aspect-[4/3]" }: { local: IdDeLocal; ids: string[]; aoMudar: (ids: string[]) => void; varias?: boolean; vazio?: string; /** As classes da proporção (e da altura máxima) da imagem grande. */ proporcao?: string }) {
+interface Propriedades {
+  local: IdDeLocal;
+  /** As imagens deste campo: a primeira é a principal. */
+  ids: string[];
+  aoMudar: (ids: string[]) => void;
+  /** O campo aceita mais do que uma imagem. */
+  varias?: boolean;
+  vazio?: string;
+  /** As classes da proporção (e da altura máxima) da imagem grande. */
+  proporcao?: string;
+  /** Largura / altura da moldura onde a imagem principal vai aparecer (para o ajuste). */
+  moldura?: number;
+  /** O enquadramento de cada imagem (pelo identificador) e o que fazer quando se ajusta. */
+  enquadramentos?: Record<string, Enquadramento>;
+  aoEnquadrar?: (id: string, e: Enquadramento) => void;
+}
+
+export function BlocoDeImagem({ local, ids, aoMudar, varias = false, vazio = "Sem imagem", proporcao = "aspect-[4/3]", moldura = 4 / 3, enquadramentos, aoEnquadrar }: Propriedades) {
   const { itens, guardar } = useArmazem<ItemDaBiblioteca>("ficheiros");
   const imagens = useMemo(() => itens.filter(eImagem), [itens]);
   const urls = useUrlsDeImagens(imagens);
   const [escolher, setEscolher] = useState(false);
-  const [vista, setVista] = useState(0);
+  const [ver, setVer] = useState(false);
   const existentes = ids.filter((id) => imagens.some((i) => i.id === id));
-  const atual = existentes[Math.min(vista, Math.max(0, existentes.length - 1))];
-  const item = imagens.find((i) => i.id === atual);
+  const item = imagens.find((i) => i.id === existentes[0]);
+  // a principal é a grande; as miniaturas são só as outras
+  const outras = existentes.slice(1);
 
-  const usar = (novas: string[]) => {
-    const todas = varias ? semRepetidas([...ids, ...novas]) : novas.slice(0, 1);
-    aoMudar(todas);
-    setVista(varias ? todas.length - 1 : 0);
-  };
+  const usar = (novas: string[]) => aoMudar(varias ? semRepetidas([...ids, ...novas]) : novas.slice(0, 1));
   const carregar = async (ficheiros: File[]) => {
     const atuais = [...itens];
     const novas: string[] = [];
@@ -41,10 +57,6 @@ export function BlocoDeImagem({ local, ids, aoMudar, varias = false, vazio = "Se
     }
     if (novas.length) usar(novas);
   };
-  const tirar = (id: string) => {
-    aoMudar(ids.filter((x) => x !== id));
-    setVista(0);
-  };
 
   return (
     <ZonaDeUpload aceitar="image/*" multiplo={varias} aoEscolher={carregar} className="flex min-w-0 flex-col gap-3 p-4">
@@ -52,7 +64,13 @@ export function BlocoDeImagem({ local, ids, aoMudar, varias = false, vazio = "Se
         <>
           <div className={`relative grid ${proporcao} w-full place-items-center overflow-hidden rounded-xl bg-kumo-tint ring transition-colors ${aArrastar ? "ring-kumo-brand" : "ring-kumo-line"}`}>
             {item && urls.get(item.id) ? (
-              <img src={urls.get(item.id)} alt={item.alt ?? item.nome} className="size-full object-contain" />
+              <>
+                <img src={urls.get(item.id)} alt={item.alt ?? item.nome} className="size-full" style={estiloDoEnquadramento(enquadramentos?.[item.id])} />
+                <button type="button" onClick={() => setVer(true)} aria-label="Ver e ajustar a imagem" className="absolute inset-0 cursor-zoom-in" />
+                <span className="absolute right-2 top-2">
+                  <BotaoIcone dica="Ver e ajustar a imagem" icone="ampliar" tamanho="sm" variante="secondary" aoClicar={() => setVer(true)} />
+                </span>
+              </>
             ) : (
               <button type="button" onClick={abrir} className="flex size-full flex-col items-center justify-center gap-2 text-sm text-kumo-subtle" aria-label="Enviar imagens">
                 <Ic nome="imagem" tamanho={32} />
@@ -60,12 +78,12 @@ export function BlocoDeImagem({ local, ids, aoMudar, varias = false, vazio = "Se
               </button>
             )}
           </div>
-          {varias && existentes.length > 1 && (
-            <ul className="flex gap-2 overflow-x-auto" aria-label="Imagens">
-              {existentes.map((id, n) => (
+          {varias && outras.length > 0 && (
+            <ul className="sem-barra flex gap-2 overflow-x-auto" aria-label="Outras imagens">
+              {outras.map((id, n) => (
                 <li key={id} className="shrink-0">
-                  <button type="button" onClick={() => setVista(n)} aria-label={`Ver a imagem ${n + 1}${n === 0 ? " (principal)" : ""}`} aria-pressed={id === atual} className={`block size-14 overflow-hidden rounded-lg ring transition-shadow ${id === atual ? "ring-2 ring-kumo-brand" : "ring-kumo-line hover:ring-kumo-interact"}`}>
-                    {urls.get(id) && <img src={urls.get(id)} alt="" className="size-full object-cover" />}
+                  <button type="button" onClick={() => aoMudar(tornarPrincipal(ids, id))} aria-label={`Tornar principal a imagem ${n + 2}`} className="block size-14 overflow-hidden rounded-lg ring ring-kumo-line transition-shadow hover:ring-kumo-interact">
+                    {urls.get(id) && <img src={urls.get(id)} alt="" className="size-full" style={estiloDoEnquadramento(enquadramentos?.[id])} />}
                   </button>
                 </li>
               ))}
@@ -78,18 +96,14 @@ export function BlocoDeImagem({ local, ids, aoMudar, varias = false, vazio = "Se
             <Button variant="secondary" icon={<Ic nome="imagem" />} onClick={() => setEscolher(true)}>
               Da galeria
             </Button>
-            {varias && item && existentes.length > 1 && existentes[0] !== item.id && (
-              <Button variant="ghost" onClick={() => (aoMudar(tornarPrincipal(ids, item.id)), setVista(0))}>
-                Tornar principal
-              </Button>
-            )}
             {item && (
-              <Button variant="ghost" icon={ICONES.lixo} onClick={() => tirar(item.id)}>
+              <Button variant="ghost" icon={ICONES.lixo} onClick={() => aoMudar(ids.filter((x) => x !== item.id))}>
                 Tirar
               </Button>
             )}
           </div>
           <EscolherImagem aberto={escolher} aoMudar={setEscolher} aoEscolher={usar} local={local} multiplo={varias} jaEscolhidas={ids} />
+          {item && <VisualizadorDeImagem aberto={ver} aoMudar={setVer} src={urls.get(item.id)} alt={item.alt ?? item.nome} proporcao={moldura} valor={enquadramentos?.[item.id]} aoGuardar={(e) => aoEnquadrar?.(item.id, e)} />}
         </>
       )}
     </ZonaDeUpload>

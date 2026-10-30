@@ -19,7 +19,7 @@ import { PopupCartao } from "../Flutuantes";
 import { Anel } from "../ia/AnelDeContexto";
 import { EscolhaDeCor } from "../SeletorDeCor";
 import { COR_DE_PARTIDA } from "@/lib/cores-graficos";
-import { coresDoAnel, definirCorDoAnel, useCorDoAnel } from "@/lib/ia-aparencia";
+import { CORES_DO_ASSISTENTE, coresDoAnel, definirCorDoAnel, definirCorDoAssistente, reporCoresDoAssistente, lerCoresDoAssistente, useCoresDoAssistente, useCorDoAnel, type ChaveDeCor } from "@/lib/ia-aparencia";
 import { ICONES, Ic } from "../Icones";
 import { BotaoIcone } from "../ui";
 import { CodigoDialog } from "./CodigoDialog";
@@ -175,31 +175,80 @@ export function SecaoAparencia() {
   );
 }
 
-/** A cor do anel de contexto da IA (a área redonda ao lado da escrita do chat): qualquer cor, com pré-visualização, ou as cores do aviso. */
+/** Uma cor do assistente: o quadrado da cor, o botão que a muda (com o seletor de cor do painel) e o que volta à de partida. */
+function LinhaDeCorDoAssistente({ chave }: { chave: ChaveDeCor }) {
+  const cores = useCoresDoAssistente();
+  const [aberta, setAberta] = useState(false);
+  const c = CORES_DO_ASSISTENTE[chave];
+  const cor = cores[chave];
+  const mudada = cor !== c.padrao;
+  return (
+    <Linha titulo={c.rotulo}>
+      <span className="inline-flex items-center gap-2">
+        <Popover.Root open={aberta} onOpenChange={setAberta}>
+          <Dica conteudo={`Escolher a cor: ${c.rotulo}`}>
+            <Popover.Trigger
+              render={
+                <Button variant="secondary" icon={<span aria-hidden className="size-4 rounded-[4px] ring-1 ring-black/10 dark:ring-white/20" style={{ background: cor }} />}>
+                  {cor.toUpperCase()}
+                </Button>
+              }
+            />
+          </Dica>
+          <PopupCartao alinhar="end" modalNoTelemovel aoFechar={() => setAberta(false)} className="w-[min(320px,calc(100vw-24px))] p-3">
+            <EscolhaDeCor valor={cor} aoMudar={(hex) => definirCorDoAssistente(chave, hex)} />
+          </PopupCartao>
+        </Popover.Root>
+        <Button variant="ghost" disabled={!mudada} onClick={() => definirCorDoAssistente(chave, null)}>
+          Repor
+        </Button>
+      </span>
+    </Linha>
+  );
+}
+
+/** As cores do assistente de IA: o ponto de «alguém online» e de «ninguém online», o anel de contexto (as três fases e, se quiser, uma cor só) e as partes do contexto. Todas leves por omissão e todas configuráveis. */
 function CorDoAnelDeContexto() {
   const cor = useCorDoAnel();
+  const cores = useCoresDoAssistente();
   const [aberta, setAberta] = useState(false);
+  const algumaMudada = cor !== null || Object.keys(lerCoresDoAssistente()).length > 0;
   return (
-    <Cartao titulo="Anel de contexto da IA" dica="A área redonda ao lado de onde escreve ao assistente: o arco mostra quanto da janela do modelo a última resposta ocupou. Sem cor escolhida, o arco muda de verde para âmbar e vermelho à medida que enche.">
-      <Linha titulo="Cor do anel">
-        <span className="inline-flex items-center gap-3">
-          <span className="grid size-9 place-items-center rounded-full" style={cor ? { background: coresDoAnel(cor).fundo } : undefined}>
-            <Anel ocupacao={0.62} ativo tamanho={22} corPropria={cor} />
+    <>
+      <Cartao titulo="Cores do assistente" acoes={<Button variant="ghost" size="sm" disabled={!algumaMudada} onClick={() => reporCoresDoAssistente()}>Repor todas</Button>} dica="O ponto ao lado da fotografia do assistente, o anel de contexto ao lado de onde escreve e as partes da janela do modelo. Cada cor é sua: escolha a que quiser ou volte à de partida.">
+        <LinhaDeCorDoAssistente chave="online" />
+        <LinhaDeCorDoAssistente chave="ausente" />
+      </Cartao>
+      <Cartao titulo="Anel de contexto da IA" dica="A área quadrada ao lado de onde escreve ao assistente: o arco mostra quanto da janela do modelo a última resposta ocupou e muda de cor à medida que enche. Uma cor só para o anel vale por todas as fases.">
+        <LinhaDeCorDoAssistente chave="anelBom" />
+        <LinhaDeCorDoAssistente chave="anelAviso" />
+        <LinhaDeCorDoAssistente chave="anelPerigo" />
+        <Linha titulo="Uma cor para todo o anel">
+          <span className="inline-flex items-center gap-3">
+            <span className="grid size-9 place-items-center rounded-md" style={cor ? { background: coresDoAnel(cor).fundo } : undefined}>
+              <Anel ocupacao={0.62} ativo tamanho={22} corPropria={cor} />
+            </span>
+            <Popover.Root open={aberta} onOpenChange={setAberta}>
+              <Dica conteudo="Escolher a cor do anel">
+                <Popover.Trigger render={<Button variant="secondary">{cor ? cor.toUpperCase() : "Cores das fases"}</Button>} />
+              </Dica>
+              <PopupCartao alinhar="end" modalNoTelemovel aoFechar={() => setAberta(false)} className="w-[min(320px,calc(100vw-24px))] p-3">
+                <EscolhaDeCor valor={cor ?? cores.anelBom} aoMudar={(hex) => definirCorDoAnel(hex)} />
+              </PopupCartao>
+            </Popover.Root>
+            <Button variant="ghost" disabled={!cor} onClick={() => definirCorDoAnel(null)}>
+              Repor
+            </Button>
           </span>
-          <Popover.Root open={aberta} onOpenChange={setAberta}>
-            <Dica conteudo="Escolher a cor do anel">
-              <Popover.Trigger render={<Button variant="secondary">{cor ? cor.toUpperCase() : "Cores do aviso"}</Button>} />
-            </Dica>
-            <PopupCartao alinhar="end" modalNoTelemovel aoFechar={() => setAberta(false)} className="w-[min(320px,calc(100vw-24px))] p-3">
-              <EscolhaDeCor valor={cor ?? COR_DE_PARTIDA} aoMudar={(hex) => definirCorDoAnel(hex)} />
-            </PopupCartao>
-          </Popover.Root>
-          <Button variant="ghost" disabled={!cor} onClick={() => definirCorDoAnel(null)}>
-            Repor
-          </Button>
-        </span>
-      </Linha>
-    </Cartao>
+        </Linha>
+      </Cartao>
+      <Cartao titulo="Partes do contexto" dica="As cores com que a janela do modelo se reparte na janela «Contexto e utilização»: as instruções, as ferramentas, a conversa e a resposta.">
+        <LinhaDeCorDoAssistente chave="parteSistema" />
+        <LinhaDeCorDoAssistente chave="parteFerramentas" />
+        <LinhaDeCorDoAssistente chave="parteMensagens" />
+        <LinhaDeCorDoAssistente chave="parteResposta" />
+      </Cartao>
+    </>
   );
 }
 

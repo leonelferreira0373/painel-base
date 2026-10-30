@@ -228,6 +228,8 @@ function Navegacao() {
   const listaRecentes = recentes
     .map(entradaDe)
     .filter((x): x is NonNullable<typeof x> => x !== null)
+    // dois recentes com o mesmo endereço contam como um (a chave da lista é o endereço)
+    .filter((x, i, todos) => todos.findIndex((y) => y.href === x.href) === i)
     .slice(0, 5);
 
   const subBotao = (a: Area, m: Modulo) => (

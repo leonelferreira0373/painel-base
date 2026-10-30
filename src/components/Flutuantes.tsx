@@ -14,6 +14,15 @@ export const DISTANCIA_AO_GATILHO = 8;
 /** A superfície de TODOS os cartões flutuantes (popups, menus, submenus): o mesmo fundo e os mesmos cantos. A sombra e o anel vêm da regra única de globals.css. Um cartão novo usa esta constante (ou um destes três componentes), nunca as suas próprias classes. */
 export const SUPERFICIE_FLUTUANTE = "rounded-lg bg-kumo-base text-kumo-default";
 
+/** Um cartão flutuante que não é um popup (a barra por cima do texto escolhido, a das ferramentas do título, a de localizar): a mesma superfície e, pelo atributo, o mesmo anel e a mesma elevação dos popups e dos menus (regra única de globals.css). */
+export function CartaoFlutuante({ children, className = "", ...resto }: ComponentProps<"div">) {
+  return (
+    <div data-cartao-flutuante="" {...resto} className={`${SUPERFICIE_FLUTUANTE} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 /** Um cartão flutuante com conteúdo livre (o seletor de contas, o do período, o dos filtros): abre junto do gatilho e vira para o lado onde houver espaço. */
 export function PopupCartao({ children, className = "", lado = "bottom", alinhar = "start", modalNoTelemovel = false, aoFechar }: { children: ReactNode; className?: string; lado?: "bottom" | "top" | "left" | "right"; alinhar?: "start" | "center" | "end"; /** No telemóvel abre como janela no meio do ecrã, com o fundo escurecido, em vez de colado ao botão. */ modalNoTelemovel?: boolean; /** Fecha o popup: com `modalNoTelemovel`, tocar no fundo escurecido (fora do cartão) chama-o, porque o fundo é o próprio contentor do popup e o Base UI não o conta como «fora». */ aoFechar?: () => void }) {
   return (

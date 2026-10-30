@@ -4,6 +4,7 @@ import { caminho } from "@/dados/estrutura";
 import { faqAtivas, guardarFaqAgora, lerFaq, faqNova, erroDaFaq, type Faq } from "./faq";
 import { clicar, descreverRef, escolher, esperarMs, escrever, lerEcra, premirTecla } from "./ia-ecra";
 import { registar } from "./atividade";
+import { acrescentarNaConversa } from "./conversas-ia";
 import { marcarEmUso, marcarFase, registarUsoDaIa } from "./ia-uso";
 import type { UsoDeChamada } from "./ia-modelos";
 import { pontuarPaginas, type PaginaPesquisavel } from "./pesquisa-ia";
@@ -189,7 +190,8 @@ export function criarTransporteDoPainel(cfg: ConfiguracaoDoAgente): TransporteDo
       const esquema = esquemaDasFerramentas(ferramentas);
       const pergunta = [...historico].reverse().find((m) => m.papel === "user")?.texto ?? "";
       const sistema = cfg.sistema(pergunta);
-      registar("ia", `Perguntou à IA: «${pergunta.slice(0, 160)}»`);
+      registar("ia", `Perguntou à IA: «${pergunta.slice(0, 160)}»`, { conversa });
+      acrescentarNaConversa(conversa, "pessoa", pergunta);
       const mensagens: MensagemParaIa[] = [
         { role: "system", content: sistema },
         ...historico.slice(-MAXIMO_DE_MENSAGENS).map<MensagemParaIa>((m) => ({ role: m.papel === "user" ? "user" : "assistant", content: m.texto.slice(0, MAXIMO_POR_MENSAGEM) })),
@@ -198,7 +200,9 @@ export function criarTransporteDoPainel(cfg: ConfiguracaoDoAgente): TransporteDo
       if (oficial) {
         // uma pergunta pronta (um pill) responde-se com a resposta oficial, sem gastar a IA
         yield { passo: { titulo: "A usar a resposta oficial da equipa", icone: "cerebro" } };
-        registar("ia", `A IA respondeu com a resposta oficial: «${oficial.slice(0, 140)}»`);
+        registar("ia", `A IA respondeu com a resposta oficial: «${oficial.slice(0, 140)}»`, { conversa });
+        acrescentarNaConversa(conversa, "passo", "A usar a resposta oficial da equipa");
+        acrescentarNaConversa(conversa, "ia", oficial);
         marcarFase("escrever");
         try {
           for (const bloco of oficial.match(/\S+\s*|\s+/g) ?? [oficial]) {
@@ -223,14 +227,19 @@ export function criarTransporteDoPainel(cfg: ConfiguracaoDoAgente): TransporteDo
           try {
             r = await fetch(`${cfg.urlIa}/assistente`, { method: "POST", headers: { "Content-Type": "application/json", "X-Sessao-Ia": conversa }, body: JSON.stringify({ mensagens, ferramentas: esquema, sessao: conversa }), signal: sinal });
           } catch {
-            if (!sinal.aborted) yield { erro: "indisponivel" };
+            if (!sinal.aborted) {
+              acrescentarNaConversa(conversa, "aviso", "A IA não está disponível.");
+              yield { erro: "indisponivel" };
+            }
             return;
           }
           if (r.status === 429) {
+            acrescentarNaConversa(conversa, "aviso", "Atingiu o limite de mensagens com a IA.");
             yield { erro: "limite" };
             return;
           }
           if (!r.ok) {
+            acrescentarNaConversa(conversa, "aviso", "A IA não está disponível.");
             yield { erro: "indisponivel" };
             return;
           }
@@ -241,7 +250,8 @@ export function criarTransporteDoPainel(cfg: ConfiguracaoDoAgente): TransporteDo
 
           if (d.chamadas.length === 0) {
             const final = d.texto.trim() || "Não consegui responder a isto.";
-            registar("ia", `A IA respondeu: «${final.slice(0, 140)}»`);
+            registar("ia", `A IA respondeu: «${final.slice(0, 140)}»`, { conversa });
+            acrescentarNaConversa(conversa, "ia", final);
             // a resposta chega aos poucos, como se escrevesse
             marcarFase("escrever");
             for (const bloco of final.match(/\S+\s*|\s+/g) ?? [final]) {
@@ -262,12 +272,15 @@ export function criarTransporteDoPainel(cfg: ConfiguracaoDoAgente): TransporteDo
             }
             const titulo = f.titulo(c.argumentos);
             yield { passo: { titulo, icone: f.icone } };
-            if (!f.escreve) registar("ia", `A IA: ${titulo}`);
+            acrescentarNaConversa(conversa, "passo", titulo);
+            if (!f.escreve) registar("ia", `A IA: ${titulo}`, { conversa });
             if (f.escreve) {
               const id = `${conversa}-${c.id}`;
               yield { cartoes: [{ tipo: "aprovacao", id, descricao: titulo }] };
               const decisao = await pedirAprovacao(id, conversa, sinal);
-              registar("ia", `${decisao === "nao" ? "Recusou" : decisao === "sempre" ? "Permitiu sempre, nesta conversa," : "Permitiu"} à IA: ${titulo}`);
+              const dito = `${decisao === "nao" ? "Recusou" : decisao === "sempre" ? "Permitiu sempre, nesta conversa," : "Permitiu"} à IA: ${titulo}`;
+              registar("ia", dito, { conversa });
+              acrescentarNaConversa(conversa, "decisao", dito);
               if (decisao === "nao") {
                 mensagens.push({ role: "tool", tool_call_id: c.id, content: "A pessoa não autorizou esta ação. Não tentes outra vez sem ela pedir." });
                 continue;
@@ -289,6 +302,7 @@ export function criarTransporteDoPainel(cfg: ConfiguracaoDoAgente): TransporteDo
             mensagens.push({ role: "tool", tool_call_id: c.id, content: resultado.slice(0, 6000) });
           }
         }
+        acrescentarNaConversa(conversa, "ia", "Parei: fiz muitos passos sem chegar ao fim. Diga-me como continuar.");
         yield { t: "Parei: fiz muitos passos sem chegar ao fim. Diga-me como continuar." };
         yield { fim: true };
       } finally {

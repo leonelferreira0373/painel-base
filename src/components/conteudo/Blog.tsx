@@ -1,174 +1,279 @@
-// O editor de blog do painel: a lista de artigos (rascunho ou publicado) e o editor, com a barra de formatação, a pré-visualização, o endereço, o resumo, as etiquetas e a imagem de capa da biblioteca. Os artigos ficam no navegador; exportam-se em Markdown.
+// O blog do painel: a lista de artigos (rascunho ou publicado) e o editor visual — uma folha em branco com as ferramentas em cima e, nos três pontos, as opções do artigo (capa, cabeçalho, SEO, pré-visualizar, exportar em HTML e em PDF); o botão «Publicar» está sempre à vista. O SEO faz-se sozinho a partir do título, do texto e da capa; quem quiser escreve por cima. Os artigos ficam no navegador; exportam-se em HTML.
 "use client";
 
-import { Badge, Button, Input, InputArea, Tooltip } from "@cloudflare/kumo";
-import { useMemo, useRef, useState } from "react";
-import { alternarFormato, type FerramentaDeFormato } from "@/lib/blog-formatar";
-import { artigoNovo, lerEtiquetas, paraMarkdown, slugDe, tempoDeLeitura, type Artigo } from "@/lib/blog";
+import { Badge, Button, Dialog, DropdownMenu, Tooltip } from "@cloudflare/kumo";
+import type { Editor as EditorTipTap } from "@tiptap/react";
+import { ChevronLeft, EllipsisVertical } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { artigoNovo, slugDe, tempoDeLeitura, type Artigo } from "@/lib/blog";
+import { modeloPorOmissao, type ModeloDeColagem } from "@/lib/blog-colagem";
+import { htmlDoArtigo, textoDoHtml } from "@/lib/blog-html";
+import { seoAoVivo } from "@/lib/blog-seo";
+import { alinharDoTitulo, estiloDoTitulo } from "@/lib/blog-titulo";
+import { corValida } from "@/lib/cores-graficos";
 import { eImagem, type ItemDaBiblioteca } from "@/lib/biblioteca";
 import { useArmazem } from "@/lib/armazem";
 import { identificador } from "@/lib/conta";
-import { Markdown } from "@/lib/markdown";
+import { estiloDoEnquadramento } from "@/lib/enquadramento";
 import { BarraDeGuardar } from "../BarraDeGuardar";
 import { Cartao, Confirmar, Linha } from "../conta/Pecas";
-import { Ic, ICONES, type Icone } from "../Icones";
-import { Pagina, Separadores, Titulo } from "../ui";
-import { BlocoDeImagem } from "./BlocoDeImagem";
+import { MenuCartao } from "../Flutuantes";
+import { Ic, ICONES } from "../Icones";
+import { BotaoIcone, Pagina, Titulo } from "../ui";
+import { AreaDoTitulo } from "./AreaDeTexto";
 import { useUrlsDeImagens, Vazio } from "./ConteudoPecas";
+import { EditorDeTexto } from "./EditorDeTexto";
+import { EscolherDaBiblioteca } from "./EscolherDaBiblioteca";
 import { EscolherImagem } from "./EscolherImagem";
-import { descarregarBlob } from "./GestorDeFicheiros";
+import { EscolherTipoDeLetra } from "./EscolherTipoDeLetra";
+import { exportarHtml, exportarPdf } from "./exportarArtigo";
+import { PreviaDoArtigo } from "./PreviaDoArtigo";
+import { SeoDoArtigo } from "./SeoDoArtigo";
+import { useFontesCarregadas, useFontesDoArtigo } from "./useFontes";
+import type { TipoDeFicheiro } from "./FicheiroDoBlog";
+import { VisualizadorDeImagem } from "./VisualizadorDeImagem";
 
 const data = (iso: string) => new Date(iso).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" });
 
-const FERRAMENTAS: (FerramentaDeFormato & { icone: Icone; rotulo: string })[] = [
-  { id: "negrito", tipo: "inline", icone: "negrito", rotulo: "Negrito", antes: "**", depois: "**", exemplo: "texto" },
-  { id: "italico", tipo: "inline", icone: "italico", rotulo: "Itálico", antes: "*", depois: "*", exemplo: "texto" },
-  { id: "titulo", tipo: "linha", icone: "titulo", rotulo: "Título", antes: "\n## ", depois: "", exemplo: "Título" },
-  { id: "lista", tipo: "linha", icone: "lista", rotulo: "Lista", antes: "\n- ", depois: "", exemplo: "item" },
-  { id: "citacao", tipo: "linha", icone: "citacao", rotulo: "Citação", antes: "\n> ", depois: "", exemplo: "citação" },
-  { id: "codigo", tipo: "inline", icone: "codigo", rotulo: "Código", antes: "`", depois: "`", exemplo: "código" },
-  { id: "ligacao", tipo: "inline", icone: "link", rotulo: "Ligação", antes: "[", depois: "](https://)", exemplo: "texto" },
-];
+type Janela = "capa" | "imagem" | "colagem" | "ficheiro" | "fonte" | "previa" | "seo" | null;
 
 function Editor({ inicial, outros, aoSair, aoAbrir }: { inicial: Artigo; outros: Artigo[]; aoSair: () => void; aoAbrir: (a: Artigo) => void }) {
   const { guardar } = useArmazem<Artigo>("artigos");
   const { itens: ficheiros } = useArmazem<ItemDaBiblioteca>("ficheiros");
   const imagens = useMemo(() => ficheiros.filter(eImagem), [ficheiros]);
-  const urls = useUrlsDeImagens(imagens);
+  const htmlInicial = useMemo(() => htmlDoArtigo(inicial), [inicial]);
   const [a, setA] = useState<Artigo>(inicial);
-  const [etiquetas, setEtiquetas] = useState(inicial.etiquetas.join(", "));
-  const [aba, setAba] = useState<"escrever" | "previsao">("escrever");
-  const [imagemNoTexto, setImagemNoTexto] = useState(false);
+  // o áudio, o vídeo e os documentos que o texto usa também precisam do seu endereço
+  const usados = useMemo(() => new Set([...(a.html ?? htmlInicial).matchAll(/data-id="([^"]+)"/g)].map((m) => m[1])), [a.html, htmlInicial]);
+  const doArtigo = useMemo(() => ficheiros.filter((f) => eImagem(f) || usados.has(f.id)), [ficheiros, usados]);
+  const urls = useUrlsDeImagens(doArtigo, true);
+  useFontesCarregadas();
+  useFontesDoArtigo(a.html ?? htmlInicial, a.cabecalho?.fonte);
+  const [editor, setEditor] = useState<EditorTipTap | null>(null);
+  const [janela, setJanela] = useState<Janela>(null);
+  const [verCapa, setVerCapa] = useState(false);
   const [sujo, setSujo] = useState(false);
   /** Sair do editor, ou abrir outro artigo, com alterações por guardar. */
   const [saida, setSaida] = useState<"sair" | Artigo | null>(null);
-  const area = useRef<HTMLTextAreaElement>(null);
+  const titulo = useRef<HTMLTextAreaElement>(null);
   const mudar = (p: Partial<Artigo>) => (setA((x) => ({ ...x, ...p })), setSujo(true));
-  const slug = a.slug || slugDe(a.titulo);
+  const seo = seoAoVivo(a);
+  const cab = a.cabecalho;
+  const palavras = a.conteudo.trim().split(/\s+/).filter(Boolean).length;
+  const podeGuardar = a.titulo.trim().length > 0;
 
-  /** Põe o texto novo e a seleção onde a formatação a deixou. */
-  const aplicar = (r: { texto: string; inicio: number; fim: number }) => {
-    const t = area.current;
-    mudar({ conteudo: r.texto });
-    requestAnimationFrame(() => {
-      t?.focus();
-      t?.setSelectionRange(r.inicio, r.fim);
-    });
-  };
-  /** Cada botão liga e desliga: carregar outra vez tira a formatação. */
-  const formatar = (f: FerramentaDeFormato) => {
-    const t = area.current;
-    aplicar(alternarFormato(a.conteudo, t?.selectionStart ?? a.conteudo.length, t?.selectionEnd ?? a.conteudo.length, f));
-  };
-  const inserir = (antes: string, depois: string, exemplo: string) => {
-    const t = area.current;
-    const ini = t?.selectionStart ?? a.conteudo.length;
-    const fim = t?.selectionEnd ?? a.conteudo.length;
-    const escolhido = a.conteudo.slice(ini, fim) || exemplo;
-    aplicar({ texto: `${a.conteudo.slice(0, ini)}${antes}${escolhido}${depois}${a.conteudo.slice(fim)}`, inicio: ini + antes.length, fim: ini + antes.length + escolhido.length });
-  };
+  const subtitulo = useRef<HTMLTextAreaElement>(null);
+  /** Que pedido de colagem está aberto: uma colagem nova, ou mais imagens para a escolhida. */
+  const modoDaColagem = useRef<"nova" | "mais">("nova");
+  const modeloDaColagem = useRef<ModeloDeColagem | undefined>(undefined);
+  const tipoDeFicheiro = useRef<TipoDeFicheiro>("documento");
+  // o título e o subtítulo crescem com o que se escreve
+  useEffect(() => {
+    for (const campo of [titulo.current, subtitulo.current]) {
+      if (!campo) continue;
+      campo.style.height = "auto";
+      campo.style.height = `${campo.scrollHeight}px`;
+    }
+  }, [a.titulo, a.cabecalho?.subtitulo, a.cabecalho?.centrado]);
+
   const gravar = async (estado: Artigo["estado"]) => {
     const agora = new Date().toISOString();
-    await guardar({ ...a, slug, etiquetas: lerEtiquetas(etiquetas), estado, atualizado: agora, publicado: estado === "publicado" ? (a.publicado ?? agora) : a.publicado });
+    // um artigo antigo (Markdown) fica em HTML a partir daqui
+    const html = a.html ?? htmlInicial;
+    const final: Artigo = { ...a, html, conteudo: a.html ? a.conteudo : textoDoHtml(html), slug: a.slug.trim() || slugDe(a.titulo), estado, atualizado: agora, publicado: estado === "publicado" ? (a.publicado ?? agora) : a.publicado };
+    await guardar(final);
     setSujo(false);
-    setA((x) => ({ ...x, slug, estado, atualizado: agora }));
+    setA(final);
   };
-  const podeGuardar = a.titulo.trim().length > 0;
   const abrirOutro = (o: Artigo) => (sujo ? setSaida(o) : aoAbrir(o));
+  const desfazer = () => {
+    setA(inicial);
+    editor?.commands.setContent(htmlInicial, { emitUpdate: false });
+    setSujo(false);
+  };
+
+  const menu = (
+    <DropdownMenu>
+      <Tooltip content="Opções do artigo" render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" size="base" icon={EllipsisVertical} aria-label="Opções do artigo" className="[&_svg]:size-5 [&_svg]:stroke-[1.75] transition-transform active:scale-90 data-[popup-open]:!bg-black/[0.09] dark:data-[popup-open]:!bg-white/15" />} />} />
+      <MenuCartao>
+        <DropdownMenu.Group>
+          <DropdownMenu.Label>{`${a.estado === "publicado" ? "Publicado" : "Rascunho"} · ${palavras} ${palavras === 1 ? "palavra" : "palavras"} · ${tempoDeLeitura(a.conteudo)} min`}</DropdownMenu.Label>
+        </DropdownMenu.Group>
+        <DropdownMenu.Item icon={<Ic nome="olho" />} onClick={() => setJanela("previa")}>
+          Pré-visualizar
+        </DropdownMenu.Item>
+        <DropdownMenu.Item icon={<Ic nome="imagem" />} onClick={() => setJanela("capa")}>
+          Imagem de capa
+        </DropdownMenu.Item>
+        {a.capa && (
+          <DropdownMenu.Item icon={<Ic nome="ampliar" />} onClick={() => setVerCapa(true)}>
+            Ajustar a capa
+          </DropdownMenu.Item>
+        )}
+        {a.capa && (
+          <DropdownMenu.Item icon={<Ic nome="lixo" />} onClick={() => mudar({ capa: undefined, capaEnquadramento: undefined })}>
+            Tirar a capa
+          </DropdownMenu.Item>
+        )}
+        <DropdownMenu.CheckboxItem checked={!!cab?.linhas} onCheckedChange={(v) => mudar({ cabecalho: { ...cab, linhas: v } })}>
+          Linhas à volta do título
+        </DropdownMenu.CheckboxItem>
+        <DropdownMenu.CheckboxItem checked={cab?.subtitulo !== undefined} onCheckedChange={(v) => mudar({ cabecalho: { ...cab, subtitulo: v ? "" : undefined } })}>
+          Subtítulo
+        </DropdownMenu.CheckboxItem>
+        <DropdownMenu.Item icon={<Ic nome="tamanhoDoTexto" />} onClick={() => setJanela("fonte")}>
+          Tipo de letra do título
+        </DropdownMenu.Item>
+        <DropdownMenu.Item icon={<Ic nome="globo" />} onClick={() => setJanela("seo")}>
+          <span className="flex w-full items-center justify-between gap-6">
+            SEO
+            <span className="tabular-nums text-kumo-subtle">{seo.resultado.pontos}</span>
+          </span>
+        </DropdownMenu.Item>
+        <DropdownMenu.Item icon={<Ic nome="transferir" />} onClick={() => void exportarPdf({ ...a, html: a.html ?? htmlInicial }, ficheiros)}>
+          Exportar em PDF
+        </DropdownMenu.Item>
+        <DropdownMenu.Item icon={<Ic nome="transferir" />} onClick={() => void exportarHtml({ ...a, html: a.html ?? htmlInicial }, ficheiros)}>
+          Exportar em HTML
+        </DropdownMenu.Item>
+      </MenuCartao>
+    </DropdownMenu>
+  );
+
+  /** O botão de publicar está sempre à vista, ao lado dos três pontos. */
+  const extras = (
+    <div className="flex items-center gap-1">
+      {a.estado === "publicado" ? (
+        <Button variant="secondary" size="sm" disabled={!podeGuardar} onClick={() => void gravar("rascunho")}>
+          Despublicar
+        </Button>
+      ) : (
+        <Button variant="primary" size="sm" disabled={!podeGuardar} onClick={() => void gravar("publicado")}>
+          Publicar
+        </Button>
+      )}
+      {menu}
+    </div>
+  );
+
+  const alinhado = alinharDoTitulo(cab);
+  const corDoTitulo = corValida(cab?.cor) ? cab?.cor : undefined;
+  const topo = (
+    <div className="flex flex-col gap-5 pb-4 pt-8">
+      {a.capa && urls.get(a.capa) && (
+        <button type="button" onClick={() => setVerCapa(true)} aria-label="Ajustar a imagem de capa" className="block aspect-[16/7] w-full cursor-zoom-in overflow-hidden rounded-xl bg-kumo-tint">
+          <img src={urls.get(a.capa)} alt="" className="size-full" style={estiloDoEnquadramento(a.capaEnquadramento)} />
+        </button>
+      )}
+      <AreaDoTitulo aspeto={cab} aoMudar={(parcial) => mudar({ cabecalho: { ...cab, ...parcial } })} className={`flex flex-col gap-3 ${cab?.linhas ? "border-y border-kumo-line py-5" : ""}`}>
+        <textarea
+          ref={titulo}
+          aria-label="Título do artigo"
+          rows={1}
+          value={a.titulo}
+          placeholder="Título"
+          onChange={(e) => mudar({ titulo: e.target.value.replace(/\n/g, " ") })}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), subtitulo.current ? subtitulo.current.focus() : (editor?.chain().setTextSelection(1).run(), editor?.view.focus()))}
+          className="w-full resize-none overflow-hidden bg-transparent leading-tight text-kumo-default outline-none placeholder:text-kumo-subtle/50"
+          style={estiloDoTitulo(cab)}
+        />
+        {cab?.subtitulo !== undefined && (
+          <textarea
+            ref={subtitulo}
+            aria-label="Subtítulo do artigo"
+            rows={1}
+            value={cab.subtitulo}
+            placeholder="Subtítulo"
+            onChange={(e) => mudar({ cabecalho: { ...cab, subtitulo: e.target.value.replace(/\n/g, " ") } })}
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), editor?.chain().setTextSelection(1).run(), editor?.view.focus())}
+            className="w-full resize-none overflow-hidden bg-transparent text-xl leading-snug text-kumo-default outline-none placeholder:text-kumo-subtle/50"
+            style={{ fontFamily: a.cabecalho?.fonte ?? "Georgia, Cambria, serif", textAlign: alinhado, color: corDoTitulo }}
+          />
+        )}
+      </AreaDoTitulo>
+    </div>
+  );
 
   return (
     <Pagina largo>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex min-w-0 flex-col gap-4">
-          {/* começa logo no editor: a barra de formatação em cima (numa só linha, com scroll), a capa, o título e o texto */}
-          <div className="pleno min-w-0 overflow-hidden rounded-xl bg-kumo-base ring ring-kumo-line">
-            <div className="sem-barra flex items-center gap-1 overflow-x-auto border-b border-kumo-hairline p-2 [&>*]:shrink-0" role="toolbar" aria-label="Formatação">
-              <Tooltip content="Voltar aos artigos" render={<Button variant="ghost" size="sm" shape="square" icon={ICONES.anterior} aria-label="Voltar aos artigos" onClick={() => (sujo ? setSaida("sair") : aoSair())} />} />
-              {FERRAMENTAS.map((f) => (
-                <Tooltip key={f.id} content={f.rotulo} render={<Button variant="ghost" size="sm" shape="square" icon={<Ic nome={f.icone} />} aria-label={f.rotulo} disabled={aba !== "escrever"} onMouseDown={(e) => e.preventDefault()} onClick={() => formatar(f)} />} />
-              ))}
-              <Tooltip content="Imagem" render={<Button variant="ghost" size="sm" shape="square" icon={<Ic nome="imagem" />} aria-label="Imagem" disabled={aba !== "escrever"} onMouseDown={(e) => e.preventDefault()} onClick={() => setImagemNoTexto(true)} />} />
-              <span className="ml-auto pl-2">
-                <Separadores itens={[{ id: "escrever", rotulo: "Escrever" }, { id: "previsao", rotulo: "Pré-visualizar" }]} valor={aba} aoMudar={(id) => setAba(id as "escrever" | "previsao")} />
-              </span>
-            </div>
-            {aba === "escrever" ? (
-              <div className="flex flex-col">
-                <BlocoDeImagem local="blog-capa" ids={a.capa ? [a.capa] : []} aoMudar={(ids) => mudar({ capa: ids[0] })} vazio="Imagem de capa" proporcao="aspect-[16/7]" />
-                <div className="flex flex-col gap-3 px-4 pb-4">
-                  <Input aria-label="Título do artigo" size="lg" value={a.titulo} onChange={(e) => mudar({ titulo: e.target.value })} placeholder="Título" autoComplete="off" className="w-full" />
-                  <InputArea ref={area} aria-label="Texto do artigo" value={a.conteudo} onValueChange={(v) => mudar({ conteudo: v })} minRows={16} autoResize placeholder="Escreva em Markdown: ## título, **negrito**, *itálico*, - lista, [texto](https://ligação)…" />
-                  <span className="text-xs text-kumo-subtle">
-                    {a.conteudo.trim().split(/\s+/).filter(Boolean).length} palavras · {tempoDeLeitura(a.conteudo)} min de leitura
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="min-h-64 p-4">
-                {a.capa && urls.get(a.capa) && <img src={urls.get(a.capa)} alt="" className="mb-4 aspect-[16/7] w-full rounded-xl object-cover" />}
-                {a.titulo.trim() && <h1 className="mb-3 text-2xl font-semibold text-kumo-default">{a.titulo}</h1>}
-                {a.conteudo.trim() ? <Markdown texto={a.conteudo} urlDe={(id) => urls.get(id)} /> : <span className="text-sm text-kumo-subtle">Ainda não há texto.</span>}
-              </div>
-            )}
-          </div>
+      <EditorDeTexto
+        html={htmlInicial}
+        aoMudar={(html, texto) => mudar({ html, conteudo: texto })}
+        urls={urls}
+        inicio={<BotaoIcone dica="Voltar aos artigos" icone={ChevronLeft} tamanho="base" className="[&_svg]:size-5 [&_svg]:stroke-[1.75]" aoClicar={() => (sujo ? setSaida("sair") : aoSair())} />}
+        extras={extras}
+        topo={topo}
+        aoPedirImagem={() => setJanela("imagem")}
+        aoPedirColagem={(modo, modelo) => ((modoDaColagem.current = modo), (modeloDaColagem.current = modelo), setJanela("colagem"))}
+        aoPedirFicheiro={(tipo) => ((tipoDeFicheiro.current = tipo), setJanela("ficheiro"))}
+        aoCriar={setEditor}
+      />
 
-          {outros.length > 0 && (
-            <section aria-label="Outros blogs já escritos" className="flex min-w-0 flex-col gap-2">
-              <h3 className="px-1 text-sm font-medium text-kumo-default">Outros blogs já escritos</h3>
-              <ul className="sem-barra m-0 flex list-none gap-3 overflow-x-auto p-1 [&>*]:shrink-0">
-                {outros.map((o) => (
-                  <li key={o.id}>
-                    <button type="button" onClick={() => abrirOutro(o)} aria-label={`Abrir «${o.titulo || "Sem título"}»`} className="relative block size-28 cursor-pointer overflow-hidden rounded-xl bg-kumo-tint ring ring-kumo-line transition-shadow hover:ring-kumo-interact">
-                      {o.capa && urls.get(o.capa) ? (
-                        <img src={urls.get(o.capa)} alt="" className="size-full object-cover" />
-                      ) : (
-                        <span className="grid size-full place-items-center text-kumo-subtle">
-                          <Ic nome="artigo" tamanho={28} />
-                        </span>
-                      )}
-                      <span className="absolute inset-x-0 bottom-0 line-clamp-2 bg-kumo-base/90 px-2 py-1 text-left text-xs font-medium text-kumo-default">{o.titulo || "Sem título"}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-        </div>
-        <div className="flex min-w-0 flex-col gap-4">
-          <Cartao titulo="Publicação">
-            <div className="flex flex-col gap-4 p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-kumo-subtle">Estado</span>
-                <Badge variant={a.estado === "publicado" ? "success" : "warning"}>{a.estado === "publicado" ? "Publicado" : "Rascunho"}</Badge>
-              </div>
-              <InputArea label="Resumo" value={a.resumo} onValueChange={(v) => mudar({ resumo: v })} minRows={2} autoResize placeholder="Duas frases que aparecem na lista e nas partilhas" />
-              <Input label="Endereço" description={`/blog/${slug || "…"}`} value={a.slug} placeholder={slugDe(a.titulo)} onChange={(e) => mudar({ slug: slugDe(e.target.value) })} />
-              <Input label="Etiquetas" description="Separe por vírgulas." value={etiquetas} onChange={(e) => (setEtiquetas(e.target.value), setSujo(true))} placeholder="notícias, transportes" />
-              <div className="flex flex-wrap gap-2">
-                {a.estado === "publicado" ? (
-                  <Button variant="secondary" disabled={!podeGuardar} onClick={() => gravar("rascunho")}>
-                    Passar a rascunho
-                  </Button>
-                ) : (
-                  <Button variant="primary" disabled={!podeGuardar} onClick={() => gravar("publicado")}>
-                    Publicar
-                  </Button>
-                )}
-              </div>
-            </div>
-          </Cartao>
-        </div>
-      </div>
-      <BarraDeGuardar sujo={sujo} desativadoGuardar={!podeGuardar} aoDesfazer={() => (setA(inicial), setEtiquetas(inicial.etiquetas.join(", ")), setSujo(false))} aoGuardar={() => gravar(a.estado)} />
+      {outros.length > 0 && (
+        <section aria-label="Outros blogs já escritos" className="mx-auto flex w-full min-w-0 max-w-[46rem] flex-col gap-2">
+          <h3 className="px-1 text-sm font-medium text-kumo-default">Outros blogs já escritos</h3>
+          <ul className="sem-barra m-0 flex list-none gap-3 overflow-x-auto p-1 [&>*]:shrink-0">
+            {outros.map((o) => (
+              <li key={o.id}>
+                <button type="button" onClick={() => abrirOutro(o)} aria-label={`Abrir «${o.titulo || "Sem título"}»`} className="relative block size-28 cursor-pointer overflow-hidden rounded-xl bg-kumo-tint ring ring-kumo-line transition-shadow hover:ring-kumo-interact">
+                  {o.capa && urls.get(o.capa) ? (
+                    <img src={urls.get(o.capa)} alt="" className="size-full" style={estiloDoEnquadramento(o.capaEnquadramento)} />
+                  ) : (
+                    <span className="grid size-full place-items-center text-kumo-subtle">
+                      <Ic nome="artigo" tamanho={28} />
+                    </span>
+                  )}
+                  <span className="absolute inset-x-0 bottom-0 line-clamp-2 bg-kumo-base/90 px-2 py-1 text-left text-xs font-medium text-kumo-default">{o.titulo || "Sem título"}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <BarraDeGuardar sujo={sujo} desativadoGuardar={!podeGuardar} aoDesfazer={desfazer} aoGuardar={() => gravar(a.estado)} />
+
+      <EscolherImagem aberto={janela === "capa"} aoMudar={(v) => !v && setJanela(null)} local="blog-capa" aoEscolher={(ids) => ids[0] && mudar({ capa: ids[0], capaEnquadramento: undefined })} />
       <EscolherImagem
-        aberto={imagemNoTexto}
-        aoMudar={setImagemNoTexto}
+        aberto={janela === "imagem"}
+        aoMudar={(v) => !v && setJanela(null)}
         local="blog-corpo"
         aoEscolher={(ids) => {
           const i = imagens.find((x) => x.id === ids[0]);
-          if (i) inserir("![", `](biblioteca:${i.id})`, i.alt ?? i.nome);
+          if (i) editor?.chain().focus().insertContent({ type: "imagemDoBlog", attrs: { id: i.id, alt: i.alt ?? "" } }).run();
         }}
       />
+      <EscolherImagem
+        aberto={janela === "colagem"}
+        aoMudar={(v) => !v && setJanela(null)}
+        local="blog-corpo"
+        multiplo
+        aoEscolher={(ids) => {
+          if (!editor || ids.length === 0) return;
+          if (modoDaColagem.current === "nova") editor.chain().focus().insertContent({ type: "colagemDoBlog", attrs: { ids, modelo: modeloDaColagem.current ?? modeloPorOmissao(ids.length), alt: "", legenda: "" } }).run();
+          else editor.chain().focus().updateAttributes("colagemDoBlog", { ids: [...new Set([...(editor.getAttributes("colagemDoBlog").ids as string[]), ...ids])] }).run();
+        }}
+      />
+      <VisualizadorDeImagem aberto={verCapa} aoMudar={setVerCapa} src={a.capa ? urls.get(a.capa) : undefined} proporcao={16 / 7} valor={a.capaEnquadramento} aoGuardar={(e) => mudar({ capaEnquadramento: e })} />
+
+      <EscolherDaBiblioteca
+        aberto={janela === "ficheiro"}
+        aoMudar={(v) => !v && setJanela(null)}
+        tipo={tipoDeFicheiro.current}
+        aoEscolher={(i) => editor?.chain().focus().insertContent({ type: "ficheiroDoBlog", attrs: { tipo: tipoDeFicheiro.current, id: i.id, nome: i.nome, tamanho: i.tamanho, legenda: "" } }).run()}
+      />
+      <Dialog.Root open={janela === "fonte"} onOpenChange={(v) => !v && setJanela(null)}>
+        <Dialog size="sm" className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <Dialog.Title className="text-lg font-semibold">Tipo de letra do título</Dialog.Title>
+            <Dialog.Close render={(p) => <Button {...p} variant="ghost" shape="square" icon={ICONES.fechar} aria-label="Fechar" />} />
+          </div>
+          <EscolherTipoDeLetra valor={cab?.fonte ?? null} aoEscolher={(f) => mudar({ cabecalho: { ...cab, fonte: f ?? undefined } })} />
+        </Dialog>
+      </Dialog.Root>
+      <PreviaDoArtigo aberto={janela === "previa"} aoMudar={(v) => !v && setJanela(null)} a={{ ...a, html: a.html ?? htmlInicial }} urls={urls} ficheiros={ficheiros} aoPdf={() => void exportarPdf({ ...a, html: a.html ?? htmlInicial }, ficheiros)} />
+      <SeoDoArtigo aberto={janela === "seo"} aoMudar={(v) => !v && setJanela(null)} a={a} aoAlterar={mudar} />
+
       <Confirmar aberto={!!saida} aoMudar={(v) => !v && setSaida(null)} titulo="Sair sem guardar?" texto="As alterações a este artigo ainda não foram guardadas." rotuloAcao="Sair sem guardar" perigo aoConfirmar={() => (saida === "sair" ? aoSair() : saida && aoAbrir(saida))} />
     </Pagina>
   );
@@ -176,6 +281,7 @@ function Editor({ inicial, outros, aoSair, aoAbrir }: { inicial: Artigo; outros:
 
 export function Blog() {
   const { itens, pronto, guardar, remover } = useArmazem<Artigo>("artigos");
+  const { itens: ficheiros } = useArmazem<ItemDaBiblioteca>("ficheiros");
   const [aEditar, setAEditar] = useState<Artigo | null>(null);
   const [apagar, setApagar] = useState<Artigo | null>(null);
   const ordenados = useMemo(() => [...itens].sort((a, b) => b.atualizado.localeCompare(a.atualizado)), [itens]);
@@ -208,11 +314,11 @@ export function Blog() {
                 <Button variant="ghost" size="sm" onClick={() => setAEditar(a)}>
                   Editar
                 </Button>
-                <Button variant="ghost" size="sm" shape="square" icon={ICONES.transferir} aria-label={`Exportar ${a.titulo} em Markdown`} onClick={() => descarregarBlob(`${a.slug || slugDe(a.titulo) || "artigo"}.md`, new Blob([paraMarkdown(a)], { type: "text/markdown" }))} />
+                <BotaoIcone dica={`Exportar «${a.titulo || "Sem título"}» em HTML`} icone="transferir" tamanho="sm" aoClicar={() => void exportarHtml(a, ficheiros)} />
                 <Button variant="ghost" size="sm" onClick={() => guardar({ ...a, estado: a.estado === "publicado" ? "rascunho" : "publicado", publicado: a.publicado ?? new Date().toISOString(), atualizado: new Date().toISOString() })}>
                   {a.estado === "publicado" ? "Despublicar" : "Publicar"}
                 </Button>
-                <Button variant="ghost" size="sm" shape="square" icon={ICONES.lixo} aria-label={`Remover ${a.titulo}`} onClick={() => setApagar(a)} />
+                <BotaoIcone dica={`Remover «${a.titulo || "Sem título"}»`} icone="lixo" tamanho="sm" aoClicar={() => setApagar(a)} />
               </div>
             </Linha>
           ))

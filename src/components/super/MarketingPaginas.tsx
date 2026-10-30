@@ -1,7 +1,7 @@
 // Os ecrãs de marketing que não são uma lista simples: a visão geral (visitas, de onde vieram, páginas quentes e botões mais clicados), o construtor de campanhas (ligações com UTM) e o rastreio (o script para pôr no site, o contrato de eventos e um teste). As origens, as páginas e os cliques em tabela são módulos de registos.
 "use client";
 
-import { Button, Input } from "@cloudflare/kumo";
+import { Button } from "@cloudflare/kumo";
 import { useEffect, useMemo, useState } from "react";
 import { gerarCliques, gerarOrigens, gerarPaginas, gerarPublico, gerarResumoMarketing, type Clique, type Origem, type PaginaQuente, type PublicoDeMarketing, type ResumoMarketing } from "@/dados/super-dados";
 import { NOMES_DE_PAISES } from "@/dados/paises";
@@ -12,10 +12,11 @@ import { chamar, useApi, useLigacao } from "@/lib/api/cliente";
 import { endpointPorId } from "@/lib/api/contrato";
 import { identificador } from "@/lib/conta";
 import { analisarContactos, ESTADOS_DE_CONTACTO, metricasDeContactos, ORDEM_DOS_ESTADOS } from "@/lib/email-contactos";
-import { frasaDaRota, textoDaRota } from "@/lib/rotas";
+import { eRota, frasaDaRota, textoDaRota } from "@/lib/rotas";
 import { erroDoUtm, montarUrlUtm, origemDoVisitante, taxaDeConversao, type ParametrosUtm } from "@/lib/marketing";
+import { ESCOLHAS_VAZIAS, faltaEscolher, FONTES_DE_CAMPANHA, MEIOS_DE_CAMPANHA, meioHabitual, normalizarPagina, normalizarSite, OBJETIVOS_DE_CAMPANHA, parametrosDeCampanha, periodosDeCampanha, SEM_DATA, VARIANTES_DE_CAMPANHA, type EscolhasDeCampanha } from "@/lib/campanhas";
 import { useEditar } from "@/lib/permissao";
-import { Cartao, Confirmar, Linha } from "../conta/Pecas";
+import { Cartao, Confirmar, EscolhaDeOpcoes, Linha, Seccao } from "../conta/Pecas";
 import { Frase, Rota } from "../Frase";
 import { BotaoCopiar } from "../Copiar";
 import { Grafico, RegistoDoGrafico } from "../graficos/Graficos";
@@ -178,40 +179,99 @@ interface Campanha extends ParametrosUtm {
   criada: string;
 }
 
-const CAMPANHA_VAZIA: ParametrosUtm = { url: "https://", fonte: "", meio: "", campanha: "", termo: "", conteudo: "" };
+/** O que a pessoa já escolheu (para só mostrar o que falta quando já começou). */
+const comecou = (e: EscolhasDeCampanha) => !!(e.pagina || e.fonte || e.meio || e.objetivo);
 
 export function Campanhas() {
   const [lista, setLista] = useGuardado<Campanha[]>("campanhas-utm", []);
-  const [p, setP] = useState<ParametrosUtm>(CAMPANHA_VAZIA);
+  const [sites, setSites, sitesLidos] = useGuardado<string[]>("campanhas-sites", []);
+  const paginas = useApi<{ itens: PaginaQuente[] }>("/v1/marketing/paginas", () => ({ itens: gerarPaginas() }));
+  const agora = useAgora();
+  const [e, setE] = useState<EscolhasDeCampanha>(ESCOLHAS_VAZIAS);
   const [apagar, setApagar] = useState<Campanha | null>(null);
   const editar = useEditar();
-  const erro = erroDoUtm(p);
-  const mostrarErro = p.fonte !== "" || p.meio !== "" || p.campanha !== "" || p.url !== "https://";
-  const ligacao = erro ? null : montarUrlUtm(p);
+  const periodos = useMemo(() => (agora ? periodosDeCampanha(agora) : [SEM_DATA]), [agora?.getMonth(), agora?.getFullYear()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const caminhos = useMemo(() => [...(paginas.dados?.itens ?? [])].sort((a, b) => b.visitas - a.visitas).map((p) => p.pagina), [paginas.dados]);
+  // o site (o do painel, na primeira vez) e o mês de hoje já vêm escolhidos: é o que quase toda a gente quer
+  useEffect(() => {
+    if (sitesLidos && sites.length === 0) setSites([window.location.origin]);
+  }, [sitesLidos, sites.length, setSites]);
+  useEffect(() => {
+    setE((x) => (x.site || !sites[0] ? x : { ...x, site: sites[0] }));
+  }, [sites]);
+  useEffect(() => {
+    setE((x) => (x.periodo || !agora ? x : { ...x, periodo: periodos[0] }));
+  }, [agora, periodos]);
+
+  const falta = faltaEscolher(e);
+  const parametros = parametrosDeCampanha(e);
+  const erro = parametros ? erroDoUtm(parametros) : null;
+  const ligacao = parametros && !erro ? montarUrlUtm(parametros) : null;
+  const guardar = () => {
+    if (!parametros || erro) return;
+    setLista((l) => [{ ...parametros, id: identificador(), criada: new Date().toISOString() }, ...l]);
+    setE({ ...ESCOLHAS_VAZIAS, site: e.site, periodo: e.periodo });
+  };
   return (
     <Pagina>
       <Titulo titulo="Campanhas" />
       <div className="grid gap-4 lg:grid-cols-2">
-        <Cartao titulo="Nova ligação rastreada" dica="Os parâmetros UTM dizem ao rastreio de que campanha veio cada visita. Use sempre os mesmos nomes (em minúsculas, sem espaços) para os relatórios não se partirem.">
-          <div className="flex flex-col gap-3 p-4">
-            <Input label="Endereço da página" value={p.url} onChange={(e) => setP({ ...p, url: e.target.value })} />
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Input label="Fonte" value={p.fonte} onChange={(e) => setP({ ...p, fonte: e.target.value })} placeholder="facebook" />
-              <Input label="Meio" value={p.meio} onChange={(e) => setP({ ...p, meio: e.target.value })} placeholder="social" />
-              <Input label="Campanha" value={p.campanha} onChange={(e) => setP({ ...p, campanha: e.target.value })} placeholder="outubro-2026" />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input label="Termo (opcional)" value={p.termo ?? ""} onChange={(e) => setP({ ...p, termo: e.target.value })} placeholder="pedir-proposta" />
-              <Input label="Conteúdo (opcional)" value={p.conteudo ?? ""} onChange={(e) => setP({ ...p, conteudo: e.target.value })} placeholder="botao-azul" />
-            </div>
-            {mostrarErro && erro && <span className="text-sm text-kumo-danger">{erro}</span>}
+        <Cartao titulo="Nova ligação rastreada" dica="Escolha uma opção em cada passo ou carregue em «Personalizar» para escrever a sua. Os nomes ficam sempre certos para os relatórios (minúsculas, sem acentos nem espaços), por isso não precisa de saber nada de UTM.">
+          <div className="flex flex-col gap-5 p-4">
+            <Seccao titulo="Site">
+              <EscolhaDeOpcoes
+                rotulo="Site"
+                opcoes={sites}
+                valor={e.site ? [e.site] : []}
+                placeholder="exemplo.pt"
+                renderizar={(s) => s.replace(/^https?:\/\//, "")}
+                aoMudar={(v) => {
+                  const s = normalizarSite(v[0] ?? "");
+                  if (s && !sites.includes(s)) setSites([...sites, s]);
+                  setE({ ...e, site: s });
+                }}
+              />
+            </Seccao>
+            <Seccao titulo="Página">
+              <EscolhaDeOpcoes rotulo="Página" opcoes={caminhos} valor={e.pagina ? [e.pagina] : []} placeholder="/pagina ou endereço completo" renderizar={(p) => (eRota(p) ? <Frase>{frasaDaRota(p)}</Frase> : p)} aoMudar={(v) => setE({ ...e, pagina: normalizarPagina(v[0] ?? "") })} />
+            </Seccao>
+            <Seccao titulo="Onde vai aparecer">
+              <EscolhaDeOpcoes
+                rotulo="Onde vai aparecer"
+                opcoes={FONTES_DE_CAMPANHA.map((f) => f.rotulo)}
+                valor={e.fonte ? [e.fonte] : []}
+                placeholder="Rádio, parceiro, evento…"
+                aoMudar={(v) => {
+                  const fonte = v[0] ?? "";
+                  // o tipo de divulgação que costuma ir com a fonte fica já escolhido, a menos que a pessoa tenha escolhido outro
+                  const meio = !e.meio || e.meio === meioHabitual(e.fonte) ? meioHabitual(fonte) : e.meio;
+                  setE({ ...e, fonte, meio });
+                }}
+              />
+            </Seccao>
+            <Seccao titulo="Tipo de divulgação">
+              <EscolhaDeOpcoes rotulo="Tipo de divulgação" opcoes={MEIOS_DE_CAMPANHA.map((m) => m.rotulo)} valor={e.meio ? [e.meio] : []} placeholder="Spot de rádio, flyer…" aoMudar={(v) => setE({ ...e, meio: v[0] ?? "" })} />
+            </Seccao>
+            <Seccao titulo="Para quê">
+              <EscolhaDeOpcoes rotulo="Para quê" opcoes={OBJETIVOS_DE_CAMPANHA} valor={e.objetivo ? [e.objetivo] : []} placeholder="Dia do cliente, feira…" aoMudar={(v) => setE({ ...e, objetivo: v[0] ?? "" })} />
+            </Seccao>
+            <Seccao titulo="Quando">
+              <EscolhaDeOpcoes rotulo="Quando" opcoes={periodos} valor={e.periodo ? [e.periodo] : []} placeholder="Verão 2027…" aoMudar={(v) => setE({ ...e, periodo: v[0] ?? "" })} />
+            </Seccao>
+            <Seccao titulo="Versão da mensagem (opcional)">
+              <EscolhaDeOpcoes rotulo="Versão da mensagem" opcoes={VARIANTES_DE_CAMPANHA} valor={e.variante ? [e.variante] : []} placeholder="Botão verde, cartaz A3…" aoMudar={(v) => setE({ ...e, variante: v[0] ?? "" })} />
+            </Seccao>
+            <Seccao titulo="Palavra-chave (opcional)">
+              <EscolhaDeOpcoes rotulo="Palavra-chave" opcoes={[]} valor={e.palavra ? [e.palavra] : []} placeholder="transporte marítimo" aoMudar={(v) => setE({ ...e, palavra: v[0] ?? "" })} />
+            </Seccao>
+            {erro ? <span className="text-sm text-kumo-danger">{erro}</span> : comecou(e) && falta.length > 0 ? <span className="text-sm text-kumo-subtle">Falta escolher: {falta.join(", ")}.</span> : null}
             <div className="rounded-lg bg-kumo-tint p-3 text-xs break-all" aria-label="Ligação gerada">
-              {ligacao ?? "A ligação aparece aqui quando os campos estiverem certos."}
+              {ligacao ?? "A ligação aparece aqui quando tudo estiver escolhido."}
             </div>
             <div className="flex flex-wrap gap-2">
               {ligacao && <BotaoCopiar texto={ligacao} rotulo="Copiar a ligação" dica="Copiar a ligação" />}
               {editar && (
-                <Button variant="primary" icon={ICONES.guardar} disabled={!!erro} onClick={() => (setLista((l) => [{ ...p, id: identificador(), criada: new Date().toISOString() }, ...l]), setP(CAMPANHA_VAZIA))}>
+                <Button variant="primary" icon={ICONES.guardar} disabled={!ligacao} onClick={guardar}>
                   Guardar na lista
                 </Button>
               )}
@@ -220,7 +280,7 @@ export function Campanhas() {
         </Cartao>
         <Cartao titulo={`Ligações guardadas (${lista.length})`}>
           {lista.length === 0 ? (
-            <Vazio icone="link" titulo="Ainda não guardou nenhuma" texto="Preencha o formulário e guarde a ligação para a ter sempre à mão." />
+            <Vazio icone="link" titulo="Ainda não guardou nenhuma" texto="Escolha as opções e guarde a ligação para a ter sempre à mão." />
           ) : (
             lista.map((c) => (
               <Linha key={c.id} titulo={<span className="truncate font-medium">{c.campanha}</span>} estado={`${c.fonte} / ${c.meio} · ${c.url.replace(/^https?:\/\//, "")}`}>

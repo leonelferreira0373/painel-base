@@ -1,15 +1,15 @@
 // Peças de página do painel (as mesmas proporções do painel da Cloudflare): contentor centrado, título com ações, cartão de métrica com menu de opções e cartão de painel.
 "use client";
 
-import { Button, DropdownMenu, LayerCard, Surface, Tooltip } from "@cloudflare/kumo";
+import { Button, DropdownMenu, LayerCard, Popover, Surface, Tooltip } from "@cloudflare/kumo";
 import { IdDoGraficoProvider } from "./graficos/CorDoGrafico";
 import { NumeroEmRoda } from "./NumeroEmRoda";
 import { idDoGrafico, useCorDoGrafico } from "@/lib/cores-graficos";
 import { variacaoDeSerie } from "@/lib/serie";
 import { usePathname } from "next/navigation";
-import { MenuCartao, SubMenuCartao, SeparadorDeMenu } from "./Flutuantes";
+import { MenuCartao, PopupCartao, SubMenuCartao, SeparadorDeMenu } from "./Flutuantes";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { createElement, type ComponentType, type ReactNode } from "react";
 import { CorpoDica, Dica, DicaInfo } from "./Dica";
 import { EsqueletoCartao } from "./Estados";
 import { Ic, ICONES, type Icone } from "./Icones";
@@ -66,9 +66,48 @@ export function Secao({ titulo, acoes, children }: { titulo: string; acoes?: Rea
   );
 }
 
-/** Botão só com ícone e dica ao passar o rato, como os botões de ícone do painel da Cloudflare. */
-export function BotaoIcone({ dica, icone, aoClicar, tamanho = "base", variante = "ghost" }: { dica: string; icone: keyof typeof ICONES; aoClicar?: () => void; tamanho?: "xs" | "sm" | "base"; variante?: "ghost" | "secondary" }) {
-  return <Tooltip content={dica} render={<Button variant={variante} shape="square" size={tamanho} icon={ICONES[icone]} aria-label={dica} onClick={aoClicar} />} />;
+/** Um ícone para um botão: o nome de um dos ícones do painel ou um componente SVG (por exemplo, do Lucide). */
+export type IconeDeBotao = keyof typeof ICONES | ComponentType<{ className?: string }>;
+const iconeDe = (i: IconeDeBotao): ReactNode | (typeof ICONES)[keyof typeof ICONES] => (typeof i === "string" ? ICONES[i] : createElement(i));
+
+/** Como se vê um botão de ícone ligado (negrito ativo, menu aberto): um fundo suave, nunca uma caixa com contorno. */
+export const BOTAO_LIGADO = "!bg-black/[0.09] dark:!bg-white/15";
+/** Todo o botão de ícone responde ao rato e ao dedo: o fundo muda ao passar e ao premir encolhe um pouco. */
+const RESPOSTA = "transition-[background-color,transform] duration-100 active:scale-90";
+
+/** Botão só com ícone e dica ao passar o rato, como os botões de ícone do painel da Cloudflare. `ligado` pinta-o como ativo (fundo suave). */
+export function BotaoIcone({ dica, icone, aoClicar, tamanho = "base", variante = "ghost", desativado = false, ligado = false, className = "" }: { dica: string; icone: IconeDeBotao; aoClicar?: () => void; tamanho?: "xs" | "sm" | "base"; variante?: "ghost" | "secondary"; desativado?: boolean; ligado?: boolean; className?: string }) {
+  const botao = <Button variant={variante} shape="square" size={tamanho} icon={iconeDe(icone)} aria-label={dica} aria-pressed={ligado || undefined} onClick={aoClicar} disabled={desativado} className={`${RESPOSTA} ${ligado ? BOTAO_LIGADO : ""} ${className}`} />;
+  // um botão desativado não recebe o rato: a dica fica no invólucro
+  return desativado ? (
+    <Tooltip content={dica} render={<span className="inline-flex" />}>
+      {botao}
+    </Tooltip>
+  ) : (
+    <Tooltip content={dica} render={botao} />
+  );
+}
+
+/** Um botão só com ícone (e dica) que abre um menu de itens; `ativo` pinta-o como ligado e fica com o mesmo fundo enquanto o menu está aberto. */
+export function MenuDeIcone({ dica, icone, ativo = false, tamanho = "sm", className = "", children }: { dica: string; icone: IconeDeBotao; ativo?: boolean; tamanho?: "xs" | "sm" | "base"; className?: string; children: ReactNode }) {
+  return (
+    <DropdownMenu>
+      <Tooltip content={dica} render={<DropdownMenu.Trigger render={<Button variant="ghost" shape="square" size={tamanho} icon={iconeDe(icone)} aria-label={dica} className={`${RESPOSTA} data-[popup-open]:${BOTAO_LIGADO.replace(" dark:!", " dark:data-[popup-open]:!").replace("!bg", "!bg")} ${ativo ? BOTAO_LIGADO : ""} ${className}`} />} />} />
+      <MenuCartao>{children}</MenuCartao>
+    </DropdownMenu>
+  );
+}
+
+/** Um botão só com ícone (e dica) que abre um cartão com o que lá se pôr (um campo, uma paleta). */
+export function CartaoDeIcone({ dica, icone, ativo = false, tamanho = "sm", largura = "w-[232px]", className = "", children }: { dica: string; icone: IconeDeBotao; ativo?: boolean; tamanho?: "xs" | "sm" | "base"; largura?: string; className?: string; children: ReactNode }) {
+  return (
+    <Popover.Root>
+      <Tooltip content={dica} render={<Popover.Trigger render={<Button variant="ghost" shape="square" size={tamanho} icon={iconeDe(icone)} aria-label={dica} className={`${RESPOSTA} data-[popup-open]:!bg-black/[0.09] dark:data-[popup-open]:!bg-white/15 ${ativo ? BOTAO_LIGADO : ""} ${className}`} />} />} />
+      <PopupCartao alinhar="start" className={`${largura} p-3`}>
+        {children}
+      </PopupCartao>
+    </Popover.Root>
+  );
 }
 
 export type TipoCartao = "serie" | "colunas" | "rosca";
