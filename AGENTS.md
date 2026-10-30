@@ -15,6 +15,7 @@ Este repositório tem um sistema de design e padrões de código fixos. Antes de
 - **Sem texto de ajuda debaixo de títulos.** A explicação vai numa dica (`Dica`, textos em `src/dados/dicas.ts`).
 - **Um só botão `primary` por zona**; botões só de ícone levam dica e `aria-label`.
 - **Toda a página começa com `Pagina` + `Titulo`**, tem estado a carregar, vazio e sem permissão, e funciona a 375 px e no tema escuro.
+- **Anéis e bordas nunca cortados.** O `ring` é uma `box-shadow` FORA da caixa: um `overflow` diferente de `visible` num eixo obriga o outro eixo a cortar também (`overflow-x-auto` ⇒ `overflow-y: auto`), e uma `mask-image` ou `clip-path` recorta à caixa. Numa fila que rola, dê folga ao que tem anel (`py-0.5 -my-0.5`, e `px-0.5 -mx-0.5` numa coluna que rola); numa máscara ponha `mask-clip: no-clip`; as regras globais sem camada (`scrollbar-*`) ganham às utilidades do Tailwind: ponha-as em `@layer base`. Veja sempre as bordas de cada contentor que rola ou corta antes de entregar.
 - **Português natural de empresa** nos textos; ids e caminhos em minúsculas, sem acentos.
 - **Todo o ficheiro de código começa por um comentário** a dizer para que serve.
 - **Exportação estática:** nada de código de servidor do Next (rotas `route.ts`, `cookies()`, `headers()`).

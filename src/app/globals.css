@@ -162,6 +162,9 @@ svg:has(> path.fill-kumo-arrow-edge) {
   mask-image: linear-gradient(to right, transparent 0, #000 var(--fe), #000 calc(100% - var(--fd)), transparent 100%), linear-gradient(to bottom, transparent 0, #000 var(--fc), #000 calc(100% - var(--fb)), transparent 100%);
   -webkit-mask-composite: source-in;
   mask-composite: intersect;
+  /* `no-clip`: sem isto a máscara recorta tudo o que passa da caixa do elemento e os anéis (`ring`) dos botões encostados ao limite ficavam cortados */
+  -webkit-mask-clip: no-clip;
+  mask-clip: no-clip;
 }
 .esbatido[data-ini="1"] { --fe: 40px; }
 .esbatido[data-fim="1"] { --fd: 40px; }

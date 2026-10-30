@@ -645,9 +645,9 @@ export function EditorDeTexto({ html, aoMudar, urls, inicio, extras, topo, aoPed
         {/* no telemóvel há duas filas: em cima voltar, publicar e o menu; por baixo, as ferramentas com a largura toda (a fila rola de lado e esbate no fim) */}
         <div className="mx-auto flex max-w-[62rem] flex-wrap items-center gap-1 sm:flex-nowrap">
           {inicio && <div className="shrink-0 max-sm:order-1">{inicio}</div>}
-          {/* as ferramentas ficam ao centro; se não couberem, a fila começa no princípio e rola (as margens automáticas dos extremos deixam de contar) */}
+          {/* as ferramentas ficam ao centro; se não couberem, a fila começa no princípio e rola (as margens automáticas dos extremos deixam de contar). O enchimento de 2 px (compensado pela margem negativa) dá espaço ao anel das caixas (a do tamanho do texto): uma fila que rola corta tudo o que passa do seu limite */}
           <div
-            className="sem-barra flex min-w-0 flex-1 items-center gap-1 overflow-x-auto max-sm:order-3 max-sm:basis-full max-sm:[mask-image:linear-gradient(to_right,transparent,black_8px,black_calc(100%-28px),transparent)] [&>*]:shrink-0 [&>:first-child]:ml-auto [&>:last-child]:mr-auto"
+            className="sem-barra -my-0.5 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-0.5 max-sm:order-3 max-sm:basis-full max-sm:[mask-image:linear-gradient(to_right,transparent,black_8px,black_calc(100%-28px),transparent)] [&>*]:shrink-0 [&>:first-child]:ml-auto [&>:last-child]:mr-auto"
             role="toolbar"
             aria-label="Formatação do texto"
             // carregar num botão não tira o cursor do texto: a formatação aplica-se logo e o que se escreve a seguir já a leva
